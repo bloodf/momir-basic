@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { parseManaCost } from './ManaSymbol';
-import { getManaUnicode, getManaColor, isKnownSymbol, MANA_FONT_FAMILY } from '@/constants/manaSymbols';
 
 interface PrintManaCostProps {
   manaCost: string;
@@ -17,28 +16,11 @@ export const PrintManaCost = memo(function PrintManaCost({ manaCost, size = 18, 
     <View style={[styles.container, { gap }]}>
       {symbols.map((s, i) => {
         const code = s.replace(/[{}]/g, '').trim();
-        if (isKnownSymbol(code)) {
-          return (
-            <Text
-              key={`${code}-${i}`}
-              style={{
-                fontSize: size * 0.85,
-                color: getManaColor(code),
-                lineHeight: size,
-                fontFamily: Platform.OS === 'web' ? 'Mana' : MANA_FONT_FAMILY,
-                fontWeight: 'normal' as const,
-                textAlign: 'center' as const,
-                width: size,
-                height: size,
-              }}
-            >
-              {getManaUnicode(code)}
-            </Text>
-          );
-        }
         return (
-          <View key={`${code}-${i}`} style={[styles.fallback, { width: size, height: size, borderRadius: size / 2 }]}>
-            <Text style={[styles.fallbackText, { fontSize: size * 0.55 }]}>{code}</Text>
+          <View key={`${code}-${i}`} style={[styles.badge, { minWidth: size, height: size, borderRadius: size / 2 }]}>
+            <Text style={[styles.badgeText, { fontSize: size * 0.55, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
+              {code}
+            </Text>
           </View>
         );
       })}
@@ -52,13 +34,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
   },
-  fallback: {
+  badge: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: '#E8E8E8',
+    paddingHorizontal: 3,
   },
-  fallbackText: {
-    color: '#666',
+  badgeText: {
+    color: '#222',
     fontWeight: '700' as const,
     textAlign: 'center' as const,
   },

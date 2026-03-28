@@ -17,7 +17,7 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
-import { X, Printer, Download, Check, Sword, Shield } from 'lucide-react-native';
+import { X, Printer, Download, Check } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useSettings } from '@/providers/SettingsProvider';
@@ -220,15 +220,7 @@ export default function PrintPreviewScreen() {
 
             {hasStats && (
               <View style={styles.receiptStatsRow}>
-                <View style={styles.receiptStatItem}>
-                  <Sword size={12} color="#000000" />
-                  <Text style={styles.receiptStatValue}>{card.power}</Text>
-                </View>
-                <Text style={styles.receiptStatSlash}>/</Text>
-                <View style={styles.receiptStatItem}>
-                  <Shield size={12} color="#000000" />
-                  <Text style={styles.receiptStatValue}>{card.toughness}</Text>
-                </View>
+                <Text style={styles.receiptStatValue}>{card.power} / {card.toughness}</Text>
               </View>
             )}
 
@@ -442,20 +434,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     alignSelf: 'flex-end' as const,
   },
-  receiptStatItem: {
-    flexDirection: 'row' as const,
-    alignItems: 'center',
-    gap: 3,
-  },
   receiptStatValue: {
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#000000',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  receiptStatSlash: {
-    fontSize: 14,
-    color: '#666666',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   receiptQrWrap: {

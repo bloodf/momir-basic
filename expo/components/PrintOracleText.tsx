@@ -1,6 +1,5 @@
 import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { getManaUnicode, getManaColor, isKnownSymbol, MANA_FONT_FAMILY } from '@/constants/manaSymbols';
 
 interface PrintOracleTextProps {
   text: string;
@@ -11,6 +10,31 @@ interface PrintOracleTextProps {
 interface TextSegment {
   type: 'text' | 'symbol';
   value: string;
+}
+
+const SYMBOL_LABELS: Record<string, string> = {
+  'W': '{W}',
+  'U': '{U}',
+  'B': '{B}',
+  'R': '{R}',
+  'G': '{G}',
+  'C': '{C}',
+  'S': '{S}',
+  'E': '{E}',
+  'X': '{X}',
+  'Y': '{Y}',
+  'Z': '{Z}',
+  'T': '{T}',
+  'Q': '{Q}',
+  'CHAOS': '{CHAOS}',
+};
+
+function getSymbolLabel(code: string): string {
+  const upper = code.toUpperCase().trim();
+  if (SYMBOL_LABELS[upper]) return SYMBOL_LABELS[upper];
+  if (/^\d+$/.test(upper)) return `{${upper}}`;
+  if (upper.includes('/')) return `{${upper}}`;
+  return `{${code}}`;
 }
 
 function parseOracleText(text: string): TextSegment[][] {
@@ -43,7 +67,6 @@ export const PrintOracleText = memo(function PrintOracleText({
   color = '#000000',
 }: PrintOracleTextProps) {
   const paragraphs = useMemo(() => parseOracleText(text), [text]);
-  const symbolFontSize = fontSize + 1;
   const lineH = fontSize * 1.55;
 
   return (
@@ -52,25 +75,19 @@ export const PrintOracleText = memo(function PrintOracleText({
         <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: lineH }]}>
           {segments.map((seg, sIdx) => {
             if (seg.type === 'symbol') {
-              if (isKnownSymbol(seg.value)) {
-                return (
-                  <Text
-                    key={sIdx}
-                    style={{
-                      fontSize: symbolFontSize,
-                      color: getManaColor(seg.value),
-                      lineHeight: lineH,
-                      fontFamily: Platform.OS === 'web' ? 'Mana' : MANA_FONT_FAMILY,
-                      fontWeight: 'normal' as const,
-                    }}
-                  >
-                    {getManaUnicode(seg.value)}
-                  </Text>
-                );
-              }
+              const label = getSymbolLabel(seg.value);
               return (
-                <Text key={sIdx} style={{ fontSize: fontSize - 1, color: '#666', lineHeight: lineH }}>
-                  {`{${seg.value}}`}
+                <Text
+                  key={sIdx}
+                  style={{
+                    fontSize: fontSize - 1,
+                    lineHeight: lineH,
+                    color: '#333',
+                    fontWeight: '700' as const,
+                    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                  }}
+                >
+                  {label}
                 </Text>
               );
             }
