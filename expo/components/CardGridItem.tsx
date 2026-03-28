@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Printer } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { ManaCost } from './ManaCost';
+import { SetSymbol } from './SetSymbol';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 
@@ -48,8 +49,6 @@ export const CardGridItem = memo(function CardGridItem({ card, onPress }: CardGr
     });
   }, [card, router]);
 
-  const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
-
   return (
     <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
       <Pressable
@@ -81,7 +80,7 @@ export const CardGridItem = memo(function CardGridItem({ card, onPress }: CardGr
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{card.printedName ?? card.name}</Text>
           <View style={styles.metaRow}>
-            <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
+            <SetSymbol setCode={card.setCode} rarity={card.rarity} size={13} />
             <Text style={styles.setName} numberOfLines={1}>{card.setName}</Text>
           </View>
           <ManaCost manaCost={card.manaCost} size={12} gap={1} />
@@ -151,11 +150,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  rarityDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
   },
   setName: {
     color: Colors.textMuted,

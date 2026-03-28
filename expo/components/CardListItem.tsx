@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Printer } from 'lucide-react-native';
 import { ManaCost } from './ManaCost';
+import { SetSymbol } from './SetSymbol';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 
@@ -26,7 +27,6 @@ export const CardListItem = memo(function CardListItem({ card, onPress, showPrin
     });
   }, [card, router]);
 
-  const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
   const dateStr = new Date(card.fetchedAt).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -53,7 +53,7 @@ export const CardListItem = memo(function CardListItem({ card, onPress, showPrin
         </View>
         <Text style={styles.typeLine} numberOfLines={1}>{card.printedTypeLine ?? card.typeLine}</Text>
         <View style={styles.metaRow}>
-          <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
+          <SetSymbol setCode={card.setCode} rarity={card.rarity} size={13} />
           <Text style={styles.setName}>{card.setName}</Text>
           <Text style={styles.date}>{dateStr}</Text>
         </View>
@@ -122,11 +122,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 2,
-  },
-  rarityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
   setName: {
     color: Colors.textMuted,

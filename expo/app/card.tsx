@@ -44,6 +44,7 @@ import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/sc
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
+import { SetSymbol } from '@/components/SetSymbol';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_HEIGHT * 0.48;
@@ -395,14 +396,17 @@ export default function CardDetailScreen() {
               >
                 <Text style={styles.detailLabel}>{t.card.set}</Text>
                 <View style={styles.detailValueRow}>
-                  <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
+                  <SetSymbol setCode={card.setCode} rarity={card.rarity} size={16} />
                   <Text style={[styles.detailValue, styles.tappableValue]} numberOfLines={1}>{card.setName}</Text>
                 </View>
               </Pressable>
 
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t.card.rarity}</Text>
-                <Text style={[styles.detailValue, { color: rarityColor }]}>{rarityLabel}</Text>
+                <View style={styles.detailValueRow}>
+                  <SetSymbol setCode={card.setCode} rarity={card.rarity} size={14} />
+                  <Text style={[styles.detailValue, { color: rarityColor }]}>{rarityLabel}</Text>
+                </View>
               </View>
 
               <View style={styles.detailItem}>
@@ -474,7 +478,7 @@ export default function CardDetailScreen() {
                         isCurrentSet && styles.printingItemCurrent,
                       ]}
                     >
-                      <View style={[styles.printingRarityDot, { backgroundColor: pRarityColor }]} />
+                      <SetSymbol setCode={p.setCode} rarity={p.rarity} size={16} />
                       <View style={styles.printingInfo}>
                         <Text style={[
                           styles.printingSetName,
@@ -483,7 +487,7 @@ export default function CardDetailScreen() {
                         <Text style={styles.printingMeta}>#{p.collectorNumber} · {p.setCode}{p.releasedAt ? ` · ${p.releasedAt.slice(0, 4)}` : ''}</Text>
                       </View>
                       <Text style={[styles.printingRarityLabel, { color: pRarityColor }]}>
-                        {p.rarity.charAt(0).toUpperCase()}
+                        {rarityLabels[p.rarity] ?? p.rarity.charAt(0).toUpperCase()}
                       </Text>
                     </View>
                   );
