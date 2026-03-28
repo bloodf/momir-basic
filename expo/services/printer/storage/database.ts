@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { SCHEMA_VERSION, MIGRATIONS } from './schema';
+import { MIGRATIONS } from './schema';
 
 // Singleton database instance
 let dbInstance: SQLite.SQLiteDatabase | null = null;

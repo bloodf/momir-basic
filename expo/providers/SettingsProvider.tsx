@@ -5,6 +5,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import {
   AppSettings,
   PrinterPreferences,
+  PrinterRecord,
   LegacyPrinterConfig,
   migratePrinterPreferences,
   DEFAULT_PRINTER_PREFERENCES,
@@ -20,6 +21,16 @@ const DEFAULT_SETTINGS: AppSettings = {
   printerConnected: false,
   devMode: false,
 };
+
+async function savePreferredPrinterToRegistry(deviceId: string): Promise<void> {
+  const { registryService } = await import('../services/printer/registry/service');
+  return registryService.savePreferredPrinter(deviceId);
+}
+
+async function getPreferredPrinterFromRegistry(): Promise<PrinterRecord | null> {
+  const { registryService } = await import('../services/printer/registry/service');
+  return registryService.getPreferredPrinter();
+}
 
 export const [SettingsProvider, useSettings] = createContextHook(() => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -83,10 +94,37 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     });
   }, [saveMutation]);
 
+  const savePreferredPrinter = useCallback(async (deviceId: string) => {
+    await updatePrinter({ preferredPrinterId: deviceId });
+    await savePreferredPrinterToRegistry(deviceId);
+  }, [updatePrinter]);
+
+  const getPreferredPrinter = useCallback(async (): Promise<PrinterRecord | null> => {
+    return getPreferredPrinterFromRegistry();
+  }, []);
+
   return useMemo(() => ({
     settings,
     updateSettings,
     updatePrinter,
+    savePreferredPrinter,
+    getPreferredPrinter,
     isLoading: settingsQuery.isLoading,
-  }), [settings, updateSettings, updatePrinter, settingsQuery.isLoading]);
+  }), [settings, updateSettings, updatePrinter, savePreferredPrinter, getPreferredPrinter, settingsQuery.isLoading]);
 });
+
+export async function getPrinterPreferencesFromSettings(): Promise<PrinterPreferences> {
+  const stored = await AsyncStorage.getItem(SETTINGS_KEY);
+  const parsed = stored ? JSON.parse(stored) : {};
+  return (parsed.printer as PrinterPreferences) ?? DEFAULT_PRINTER_PREFERENCES;
+}
+
+export async function savePrinterPreferencesToSettings(prefs: Partial<PrinterPreferences>): Promise<void> {
+  const stored = await AsyncStorage.getItem(SETTINGS_KEY);
+  const parsed = stored ? JSON.parse(stored) : {};
+  const updated = {
+    ...parsed,
+    printer: { ...(parsed.printer || DEFAULT_PRINTER_PREFERENCES), ...prefs },
+  };
+  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+}
