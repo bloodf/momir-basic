@@ -104,6 +104,31 @@ export async function listAllJobs(): Promise<PrintJob[]> {
   return (rows as Record<string, unknown>[] ?? []).map(rowToPrintJob);
 }
 
+export async function getNextJobForPrinter(printerId: string): Promise<PrintJob | null> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+  
+  // First try to get a job that's due for retry
+  const retryJob = await db.getFirstAsync<Record<string, unknown>>(
+    `SELECT * FROM print_jobs 
+     WHERE printer_id = ? AND state = 'retry_wait' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
+     ORDER BY next_retry_at ASC LIMIT 1`,
+    [printerId, now]
+  );
+  if (retryJob) return rowToPrintJob(retryJob);
+  
+  // Then try to get a queued job
+  const queuedJob = await db.getFirstAsync<Record<string, unknown>>(
+    `SELECT * FROM print_jobs 
+     WHERE printer_id = ? AND state = 'queued'
+     ORDER BY created_at ASC LIMIT 1`,
+    [printerId]
+  );
+  if (queuedJob) return rowToPrintJob(queuedJob);
+  
+  return null;
+}
+
 export async function updateJobState(
   id: string,
   state: PrintJobState,
