@@ -221,7 +221,7 @@ export const SearchFilters = React.memo(function SearchFilters({
 
   const containerHeight = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 380],
+    outputRange: [0, 420],
   });
 
   const containerOpacity = animValue.interpolate({
@@ -308,7 +308,7 @@ export const SearchFilters = React.memo(function SearchFilters({
 
           <View style={styles.filterSection}>
             <View style={styles.cmcHeader}>
-              <Text style={styles.filterLabel}>{t.search.cmc}</Text>
+              <Text style={[styles.filterLabel, { marginBottom: 0 }]}>{t.search.cmc}</Text>
               {filters.cmcValue !== '' && (
                 <Pressable onPress={handleCmcOperatorCycle} style={styles.cmcOperatorBtn}>
                   <Text style={styles.cmcOperatorText}>
@@ -456,9 +456,11 @@ const styles = StyleSheet.create({
   filtersContainer: {
     overflow: 'hidden',
     marginHorizontal: 16,
+    paddingTop: 8,
   },
   filterSection: {
-    marginBottom: 14,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   filterLabel: {
     fontSize: 11,
@@ -466,12 +468,12 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textTransform: 'uppercase' as const,
     letterSpacing: 0.8,
-    marginBottom: 8,
-    paddingHorizontal: 2,
+    marginBottom: 10,
   },
   colorRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
+    flexWrap: 'wrap',
   },
   colorChip: {
     width: 40,
@@ -497,7 +499,7 @@ const styles = StyleSheet.create({
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   chip: {
     paddingHorizontal: 14,
@@ -533,7 +535,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cmcOperatorBtn: {
     backgroundColor: Colors.goldDark,
@@ -553,6 +555,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     marginTop: 4,
+    marginHorizontal: 4,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.error,
@@ -567,6 +570,6 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   bottomSpacer: {
-    height: 8,
+    height: 10,
   },
 });
