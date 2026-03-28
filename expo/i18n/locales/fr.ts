@@ -98,6 +98,7 @@ const fr: Translations = {
     sendingData: 'Envoi à l\'imprimante...',
     printComplete: 'Impression terminée !',
     feedingPaper: 'Alimentation papier...',
+    connectingPrinter: 'Connexion à l\'imprimante...',
   },
   tabs: {
     cast: 'Lancer',

@@ -98,6 +98,7 @@ const ja: Translations = {
     sendingData: 'プリンターに送信中...',
     printComplete: '印刷完了！',
     feedingPaper: '紙送り中...',
+    connectingPrinter: 'プリンターに接続中...',
   },
   tabs: {
     cast: '唱える',

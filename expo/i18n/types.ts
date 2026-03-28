@@ -96,6 +96,7 @@ export interface Translations {
     sendingData: string;
     printComplete: string;
     feedingPaper: string;
+    connectingPrinter: string;
   };
   tabs: {
     cast: string;

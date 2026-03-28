@@ -98,6 +98,7 @@ const zhs: Translations = {
     sendingData: '发送到打印机...',
     printComplete: '打印完成！',
     feedingPaper: '送纸中...',
+    connectingPrinter: '连接打印机...',
   },
   tabs: {
     cast: '施放',

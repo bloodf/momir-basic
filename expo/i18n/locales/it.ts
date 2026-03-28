@@ -98,6 +98,7 @@ const it: Translations = {
     sendingData: 'Invio alla stampante...',
     printComplete: 'Stampa completata!',
     feedingPaper: 'Alimentazione carta...',
+    connectingPrinter: 'Connessione alla stampante...',
   },
   tabs: {
     cast: 'Lancia',

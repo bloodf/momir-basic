@@ -98,6 +98,7 @@ const ru: Translations = {
     sendingData: 'Отправка на принтер...',
     printComplete: 'Печать завершена!',
     feedingPaper: 'Подача бумаги...',
+    connectingPrinter: 'Подключение к принтеру...',
   },
   tabs: {
     cast: 'Разыграть',

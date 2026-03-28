@@ -98,6 +98,7 @@ const ko: Translations = {
     sendingData: '프린터로 전송 중...',
     printComplete: '인쇄 완료!',
     feedingPaper: '용지 공급 중...',
+    connectingPrinter: '프린터 연결 중...',
   },
   tabs: {
     cast: '시전',

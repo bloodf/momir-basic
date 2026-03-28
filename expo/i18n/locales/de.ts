@@ -98,6 +98,7 @@ const de: Translations = {
     sendingData: 'An Drucker senden...',
     printComplete: 'Druck abgeschlossen!',
     feedingPaper: 'Papiervorschub...',
+    connectingPrinter: 'Verbindung zum Drucker...',
   },
   tabs: {
     cast: 'Wirken',

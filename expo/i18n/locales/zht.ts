@@ -98,6 +98,7 @@ const zht: Translations = {
     sendingData: '傳送到印表機...',
     printComplete: '列印完成！',
     feedingPaper: '送紙中...',
+    connectingPrinter: '連接印表機...',
   },
   tabs: {
     cast: '施放',

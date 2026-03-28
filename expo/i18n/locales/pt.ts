@@ -98,6 +98,7 @@ const pt: Translations = {
     sendingData: 'Enviando para impressora...',
     printComplete: 'Impressão concluída!',
     feedingPaper: 'Alimentando papel...',
+    connectingPrinter: 'Conectando à impressora...',
   },
   tabs: {
     cast: 'Conjurar',

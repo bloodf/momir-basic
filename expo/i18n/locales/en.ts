@@ -98,6 +98,7 @@ const en: Translations = {
     sendingData: 'Sending to printer...',
     printComplete: 'Print complete!',
     feedingPaper: 'Feeding paper...',
+    connectingPrinter: 'Connecting to printer...',
   },
   tabs: {
     cast: 'Cast',
