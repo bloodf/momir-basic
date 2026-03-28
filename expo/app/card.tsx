@@ -383,13 +383,22 @@ export default function CardDetailScreen() {
             </View>
 
             <View style={styles.detailGrid}>
-              <View style={styles.detailItem}>
+              <Pressable
+                style={styles.detailItem}
+                onPress={() => {
+                  if (Platform.OS !== 'web') void Haptics.selectionAsync();
+                  router.dismiss();
+                  setTimeout(() => {
+                    router.push({ pathname: '/(tabs)/search', params: { initialQuery: `s:${card.setCode.toLowerCase()}` } });
+                  }, 100);
+                }}
+              >
                 <Text style={styles.detailLabel}>{t.card.set}</Text>
                 <View style={styles.detailValueRow}>
                   <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
-                  <Text style={styles.detailValue} numberOfLines={1}>{card.setName}</Text>
+                  <Text style={[styles.detailValue, styles.tappableValue]} numberOfLines={1}>{card.setName}</Text>
                 </View>
-              </View>
+              </Pressable>
 
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t.card.rarity}</Text>
@@ -406,13 +415,22 @@ export default function CardDetailScreen() {
               </View>
 
               {card.artist ? (
-                <View style={styles.detailItem}>
+                <Pressable
+                  style={styles.detailItem}
+                  onPress={() => {
+                    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+                    router.dismiss();
+                    setTimeout(() => {
+                      router.push({ pathname: '/(tabs)/search', params: { initialQuery: `a:"${card.artist}"` } });
+                    }, 100);
+                  }}
+                >
                   <Text style={styles.detailLabel}>{t.card.artist}</Text>
                   <View style={styles.detailValueRow}>
                     <Paintbrush size={12} color={Colors.textMuted} />
-                    <Text style={styles.detailValue} numberOfLines={1}>{card.artist}</Text>
+                    <Text style={[styles.detailValue, styles.tappableValue]} numberOfLines={1}>{card.artist}</Text>
                   </View>
-                </View>
+                </Pressable>
               ) : null}
 
               <View style={[styles.detailItem, styles.detailItemLast]}>
@@ -801,6 +819,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     flexShrink: 1,
+  },
+  tappableValue: {
+    color: Colors.gold,
+    textDecorationLine: 'underline' as const,
+    textDecorationColor: 'rgba(232,105,45,0.3)',
   },
   detailMeta: {
     color: Colors.textMuted,

@@ -10,7 +10,7 @@ import {
   Platform,
   Animated,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
@@ -50,7 +50,9 @@ export default function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
   const { locale, t } = useI18n();
 
+  const searchParams = useLocalSearchParams<{ initialQuery?: string }>();
   const [query, setQuery] = useState('');
+  const lastInitialQuery = useRef('');
   const [results, setResults] = useState<Card[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -61,6 +63,12 @@ export default function SearchScreen() {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const lastSearchQuery = useRef('');
+  const pendingInitialQuery = useRef<string | null>(null);
+
+  if (searchParams.initialQuery && searchParams.initialQuery !== lastInitialQuery.current) {
+    lastInitialQuery.current = searchParams.initialQuery;
+    pendingInitialQuery.current = searchParams.initialQuery;
+  }
 
   const totalPages = useMemo(() => Math.ceil(totalCount / CARDS_PER_PAGE), [totalCount]);
 
@@ -105,6 +113,25 @@ export default function SearchScreen() {
       setHasSearched(true);
     },
   });
+
+  React.useEffect(() => {
+    if (pendingInitialQuery.current) {
+      const q = pendingInitialQuery.current;
+      pendingInitialQuery.current = null;
+      setQuery(q);
+      setSuggestions([]);
+      setResults([]);
+      setHasSearched(false);
+      setFilters(EMPTY_FILTERS);
+      setFiltersVisible(false);
+      const fullQ = buildFullQuery(q, EMPTY_FILTERS);
+      if (fullQ) {
+        lastSearchQuery.current = fullQ;
+        searchMutation.mutate({ q: fullQ, page: 1 });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.initialQuery]);
 
   const autocompleteMutation = useMutation({
     mutationFn: async (q: string) => {
