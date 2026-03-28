@@ -1,6 +1,8 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { parseManaCost } from './ManaSymbol';
+import { getSymbolSvgUrl } from '@/constants/manaSymbols';
 
 interface PrintManaCostProps {
   manaCost: string;
@@ -17,11 +19,13 @@ export const PrintManaCost = memo(function PrintManaCost({ manaCost, size = 18, 
       {symbols.map((s, i) => {
         const code = s.replace(/[{}]/g, '').trim();
         return (
-          <View key={`${code}-${i}`} style={[styles.badge, { minWidth: size, height: size, borderRadius: size / 2 }]}>
-            <Text style={[styles.badgeText, { fontSize: size * 0.55, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
-              {code}
-            </Text>
-          </View>
+          <Image
+            key={`${code}-${i}`}
+            source={{ uri: getSymbolSvgUrl(code) }}
+            style={{ width: size, height: size }}
+            contentFit="contain"
+            cachePolicy="disk"
+          />
         );
       })}
     </View>
@@ -33,16 +37,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-  },
-  badge: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E8E8E8',
-    paddingHorizontal: 3,
-  },
-  badgeText: {
-    color: '#222',
-    fontWeight: '700' as const,
-    textAlign: 'center' as const,
   },
 });

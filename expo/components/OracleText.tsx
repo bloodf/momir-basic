@@ -1,7 +1,8 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import Colors from '@/constants/colors';
-import { getManaUnicode, getManaColor, isKnownSymbol, MANA_FONT_FAMILY } from '@/constants/manaSymbols';
+import { getSymbolSvgUrl } from '@/constants/manaSymbols';
 
 interface OracleTextProps {
   text: string;
@@ -9,33 +10,44 @@ interface OracleTextProps {
   color?: string;
 }
 
-interface TextSegment {
-  type: 'text' | 'symbol';
-  value: string;
-}
+type Chunk =
+  | { kind: 'word'; value: string }
+  | { kind: 'symbol'; code: string }
+  | { kind: 'break'; value?: undefined };
 
-function parseOracleText(text: string): TextSegment[][] {
+function tokenize(text: string): Chunk[] {
+  const chunks: Chunk[] = [];
   const paragraphs = text.split('\n');
-  return paragraphs.map(paragraph => {
-    const segments: TextSegment[] = [];
+
+  paragraphs.forEach((paragraph, pIdx) => {
+    if (pIdx > 0) chunks.push({ kind: 'break' });
+
     const regex = /\{([^}]+)\}/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = regex.exec(paragraph)) !== null) {
       if (match.index > lastIndex) {
-        segments.push({ type: 'text', value: paragraph.slice(lastIndex, match.index) });
+        const textBefore = paragraph.slice(lastIndex, match.index);
+        const words = textBefore.split(/(\s+)/);
+        words.forEach(w => {
+          if (w.length > 0) chunks.push({ kind: 'word', value: w });
+        });
       }
-      segments.push({ type: 'symbol', value: match[1] });
+      chunks.push({ kind: 'symbol', code: match[1] });
       lastIndex = regex.lastIndex;
     }
 
     if (lastIndex < paragraph.length) {
-      segments.push({ type: 'text', value: paragraph.slice(lastIndex) });
+      const remaining = paragraph.slice(lastIndex);
+      const words = remaining.split(/(\s+)/);
+      words.forEach(w => {
+        if (w.length > 0) chunks.push({ kind: 'word', value: w });
+      });
     }
-
-    return segments;
   });
+
+  return chunks;
 }
 
 export const OracleText = memo(function OracleText({
@@ -43,43 +55,47 @@ export const OracleText = memo(function OracleText({
   fontSize = 14,
   color = Colors.textPrimary,
 }: OracleTextProps) {
-  const paragraphs = useMemo(() => parseOracleText(text), [text]);
-  const lineH = fontSize * 1.6;
-  const symbolFontSize = fontSize + 1;
+  const chunks = useMemo(() => tokenize(text), [text]);
+  const symbolSize = fontSize + 2;
+
+  const paragraphs: Chunk[][] = useMemo(() => {
+    const result: Chunk[][] = [[]];
+    chunks.forEach(c => {
+      if (c.kind === 'break') {
+        result.push([]);
+      } else {
+        result[result.length - 1].push(c);
+      }
+    });
+    return result;
+  }, [chunks]);
 
   return (
     <View style={styles.container}>
-      {paragraphs.map((segments, pIdx) => (
-        <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: lineH }]}>
-          {segments.map((seg, sIdx) => {
-            if (seg.type === 'symbol') {
-              if (isKnownSymbol(seg.value)) {
-                return (
-                  <Text
-                    key={sIdx}
-                    style={[
-                      styles.manaChar,
-                      {
-                        fontSize: symbolFontSize,
-                        color: getManaColor(seg.value),
-                        lineHeight: lineH,
-                        fontFamily: Platform.OS === 'web' ? 'Mana' : MANA_FONT_FAMILY,
-                      },
-                    ]}
-                  >
-                    {getManaUnicode(seg.value)}
-                  </Text>
-                );
-              }
+      {paragraphs.map((para, pIdx) => (
+        <View key={pIdx} style={styles.paragraph}>
+          {para.map((chunk, cIdx) => {
+            if (chunk.kind === 'symbol') {
               return (
-                <Text key={sIdx} style={[styles.fallbackSymbol, { fontSize: fontSize - 1, lineHeight: lineH }]}>
-                  {`{${seg.value}}`}
-                </Text>
+                <Image
+                  key={cIdx}
+                  source={{ uri: getSymbolSvgUrl(chunk.code) }}
+                  style={[styles.symbolImage, { width: symbolSize, height: symbolSize, marginTop: (fontSize * 1.5 - symbolSize) / 2 }]}
+                  contentFit="contain"
+                  cachePolicy="disk"
+                />
               );
             }
-            return <Text key={sIdx}>{seg.value}</Text>;
+            return (
+              <Text
+                key={cIdx}
+                style={{ fontSize, color, lineHeight: fontSize * 1.5 }}
+              >
+                {chunk.value}
+              </Text>
+            );
           })}
-        </Text>
+        </View>
       ))}
     </View>
   );
@@ -90,13 +106,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   paragraph: {
+    flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
   },
-  manaChar: {
-    fontWeight: 'normal' as const,
-  },
-  fallbackSymbol: {
-    color: Colors.textMuted,
-    fontWeight: '600' as const,
+  symbolImage: {
+    marginHorizontal: 1,
   },
 });

@@ -1,5 +1,7 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
+import { getSymbolSvgUrl } from '@/constants/manaSymbols';
 
 interface PrintOracleTextProps {
   text: string;
@@ -7,58 +9,44 @@ interface PrintOracleTextProps {
   color?: string;
 }
 
-interface TextSegment {
-  type: 'text' | 'symbol';
-  value: string;
-}
+type Chunk =
+  | { kind: 'word'; value: string }
+  | { kind: 'symbol'; code: string }
+  | { kind: 'break'; value?: undefined };
 
-const SYMBOL_LABELS: Record<string, string> = {
-  'W': '{W}',
-  'U': '{U}',
-  'B': '{B}',
-  'R': '{R}',
-  'G': '{G}',
-  'C': '{C}',
-  'S': '{S}',
-  'E': '{E}',
-  'X': '{X}',
-  'Y': '{Y}',
-  'Z': '{Z}',
-  'T': '{T}',
-  'Q': '{Q}',
-  'CHAOS': '{CHAOS}',
-};
-
-function getSymbolLabel(code: string): string {
-  const upper = code.toUpperCase().trim();
-  if (SYMBOL_LABELS[upper]) return SYMBOL_LABELS[upper];
-  if (/^\d+$/.test(upper)) return `{${upper}}`;
-  if (upper.includes('/')) return `{${upper}}`;
-  return `{${code}}`;
-}
-
-function parseOracleText(text: string): TextSegment[][] {
+function tokenize(text: string): Chunk[] {
+  const chunks: Chunk[] = [];
   const paragraphs = text.split('\n');
-  return paragraphs.map(paragraph => {
-    const segments: TextSegment[] = [];
+
+  paragraphs.forEach((paragraph, pIdx) => {
+    if (pIdx > 0) chunks.push({ kind: 'break' });
+
     const regex = /\{([^}]+)\}/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = regex.exec(paragraph)) !== null) {
       if (match.index > lastIndex) {
-        segments.push({ type: 'text', value: paragraph.slice(lastIndex, match.index) });
+        const textBefore = paragraph.slice(lastIndex, match.index);
+        const words = textBefore.split(/(\s+)/);
+        words.forEach(w => {
+          if (w.length > 0) chunks.push({ kind: 'word', value: w });
+        });
       }
-      segments.push({ type: 'symbol', value: match[1] });
+      chunks.push({ kind: 'symbol', code: match[1] });
       lastIndex = regex.lastIndex;
     }
 
     if (lastIndex < paragraph.length) {
-      segments.push({ type: 'text', value: paragraph.slice(lastIndex) });
+      const remaining = paragraph.slice(lastIndex);
+      const words = remaining.split(/(\s+)/);
+      words.forEach(w => {
+        if (w.length > 0) chunks.push({ kind: 'word', value: w });
+      });
     }
-
-    return segments;
   });
+
+  return chunks;
 }
 
 export const PrintOracleText = memo(function PrintOracleText({
@@ -66,34 +54,47 @@ export const PrintOracleText = memo(function PrintOracleText({
   fontSize = 13,
   color = '#000000',
 }: PrintOracleTextProps) {
-  const paragraphs = useMemo(() => parseOracleText(text), [text]);
-  const lineH = fontSize * 1.55;
+  const chunks = useMemo(() => tokenize(text), [text]);
+  const symbolSize = fontSize + 1;
+
+  const paragraphs: Chunk[][] = useMemo(() => {
+    const result: Chunk[][] = [[]];
+    chunks.forEach(c => {
+      if (c.kind === 'break') {
+        result.push([]);
+      } else {
+        result[result.length - 1].push(c);
+      }
+    });
+    return result;
+  }, [chunks]);
 
   return (
     <View style={styles.container}>
-      {paragraphs.map((segments, pIdx) => (
-        <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: lineH }]}>
-          {segments.map((seg, sIdx) => {
-            if (seg.type === 'symbol') {
-              const label = getSymbolLabel(seg.value);
+      {paragraphs.map((para, pIdx) => (
+        <View key={pIdx} style={styles.paragraph}>
+          {para.map((chunk, cIdx) => {
+            if (chunk.kind === 'symbol') {
               return (
-                <Text
-                  key={sIdx}
-                  style={{
-                    fontSize: fontSize - 1,
-                    lineHeight: lineH,
-                    color: '#333',
-                    fontWeight: '700' as const,
-                    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-                  }}
-                >
-                  {label}
-                </Text>
+                <Image
+                  key={cIdx}
+                  source={{ uri: getSymbolSvgUrl(chunk.code) }}
+                  style={[styles.symbolImage, { width: symbolSize, height: symbolSize, marginTop: (fontSize * 1.5 - symbolSize) / 2 }]}
+                  contentFit="contain"
+                  cachePolicy="disk"
+                />
               );
             }
-            return <Text key={sIdx}>{seg.value}</Text>;
+            return (
+              <Text
+                key={cIdx}
+                style={{ fontSize, color, lineHeight: fontSize * 1.5 }}
+              >
+                {chunk.value}
+              </Text>
+            );
           })}
-        </Text>
+        </View>
       ))}
     </View>
   );
@@ -104,6 +105,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   paragraph: {
+    flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  symbolImage: {
+    marginHorizontal: 1,
   },
 });
