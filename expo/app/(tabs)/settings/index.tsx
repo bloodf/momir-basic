@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,29 +6,54 @@ import {
   ScrollView,
   Pressable,
   Switch,
+  Animated,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Printer, ChevronRight, Zap, Info, Bug, Globe } from 'lucide-react-native';
+import { Printer, ChevronRight, Zap, Info, Bug, Globe, ChevronDown, Github, Star, ExternalLink } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
-import { useI18n, LOCALE_LABELS, ALL_LOCALES, type Locale } from '@/i18n';
+import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/i18n';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings, updateSettings, updatePrinter } = useSettings();
   const { t, locale, setLocale } = useI18n();
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
 
-  const cycleLocale = useCallback(() => {
-    const currentIdx = ALL_LOCALES.indexOf(locale);
-    const nextIdx = (currentIdx + 1) % ALL_LOCALES.length;
-    setLocale(ALL_LOCALES[nextIdx]);
-  }, [locale, setLocale]);
+  useEffect(() => {
+    Animated.timing(dropdownAnim, {
+      toValue: langDropdownOpen ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [langDropdownOpen, dropdownAnim]);
 
   const togglePaperWidth = useCallback(() => {
     updatePrinter({ paperWidth: settings.printer.paperWidth === 58 ? 80 : 58 });
   }, [settings.printer.paperWidth, updatePrinter]);
+
+  const handleSelectLocale = useCallback((loc: Locale) => {
+    setLocale(loc);
+    setLangDropdownOpen(false);
+  }, [setLocale]);
+
+  const handleOpenGithub = useCallback(() => {
+    Linking.openURL('https://github.com/bloodf/momir-basic').catch(() => {});
+  }, []);
+
+  const dropdownHeight = dropdownAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, ALL_LOCALES.length * 48 + 8],
+  });
+
+  const chevronRotate = dropdownAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -134,33 +159,52 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-
-
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Globe size={16} color={Colors.gold} />
             <Text style={styles.sectionTitle}>{t.settings.languageSection}</Text>
           </View>
 
-          <Pressable onPress={cycleLocale} style={styles.settingRow}>
+          <Pressable
+            onPress={() => setLangDropdownOpen(prev => !prev)}
+            style={styles.settingRow}
+          >
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>{t.settings.language}</Text>
-              <Text style={styles.settingValue}>{LOCALE_LABELS[locale]}</Text>
             </View>
-            <View style={styles.localeRow}>
-              {ALL_LOCALES.map((loc: Locale) => (
-                <Pressable
-                  key={loc}
-                  onPress={() => setLocale(loc)}
-                  style={[styles.localeChip, loc === locale && styles.localeChipActive]}
-                >
-                  <Text style={[styles.localeChipText, loc === locale && styles.localeChipTextActive]}>
-                    {loc.toUpperCase()}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.langCurrentRow}>
+              <Text style={styles.langFlag}>{LOCALE_FLAGS[locale]}</Text>
+              <Text style={styles.langCurrentLabel}>{LOCALE_LABELS[locale]}</Text>
+              <Animated.View style={{ transform: [{ rotate: chevronRotate }] }}>
+                <ChevronDown size={16} color={Colors.textMuted} />
+              </Animated.View>
             </View>
           </Pressable>
+
+          <Animated.View style={[styles.dropdownWrap, { maxHeight: dropdownHeight }]}>
+            <View style={styles.dropdownInner}>
+              {ALL_LOCALES.map((loc) => {
+                const isActive = loc === locale;
+                return (
+                  <Pressable
+                    key={loc}
+                    onPress={() => handleSelectLocale(loc)}
+                    style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
+                  >
+                    <Text style={styles.dropdownFlag}>{LOCALE_FLAGS[loc]}</Text>
+                    <Text style={[styles.dropdownLabel, isActive && styles.dropdownLabelActive]}>
+                      {LOCALE_LABELS[loc]}
+                    </Text>
+                    {isActive && (
+                      <View style={styles.dropdownCheck}>
+                        <Text style={styles.dropdownCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
         </View>
 
         <View style={styles.section}>
@@ -194,12 +238,31 @@ export default function SettingsScreen() {
             <Text style={styles.settingValue}>1.0.0</Text>
           </View>
 
+          <Pressable onPress={handleOpenGithub} style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <View style={styles.githubRow}>
+                <Github size={16} color={Colors.textPrimary} />
+                <Text style={styles.settingLabel}>GitHub</Text>
+              </View>
+              <Text style={styles.settingValue}>bloodf/momir-basic</Text>
+            </View>
+            <ExternalLink size={16} color={Colors.textMuted} />
+          </Pressable>
+
+          <Pressable onPress={handleOpenGithub} style={styles.githubStarRow}>
+            <Star size={14} color={Colors.gold} />
+            <Text style={styles.githubStarText}>Star on GitHub</Text>
+          </Pressable>
+
           <View style={styles.aboutText}>
             <Text style={styles.aboutBody}>
               {t.settings.aboutBody}
             </Text>
             <Text style={styles.aboutCredit}>
               {t.settings.aboutCredit}
+            </Text>
+            <Text style={styles.aboutOpenSource}>
+              Open source project — contributions welcome!
             </Text>
           </View>
         </View>
@@ -296,6 +359,87 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gold,
     color: '#fff',
   },
+  langCurrentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  langFlag: {
+    fontSize: 20,
+  },
+  langCurrentLabel: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.textPrimary,
+  },
+  dropdownWrap: {
+    overflow: 'hidden',
+  },
+  dropdownInner: {
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  dropdownItemActive: {
+    backgroundColor: 'rgba(232, 105, 45, 0.1)',
+  },
+  dropdownFlag: {
+    fontSize: 22,
+  },
+  dropdownLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: Colors.textPrimary,
+  },
+  dropdownLabelActive: {
+    color: Colors.gold,
+    fontWeight: '700' as const,
+  },
+  dropdownCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownCheckText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700' as const,
+  },
+  githubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  githubStarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 4,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(232, 105, 45, 0.3)',
+    backgroundColor: 'rgba(232, 105, 45, 0.06)',
+  },
+  githubStarText: {
+    color: Colors.gold,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
   aboutText: {
     padding: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -312,25 +456,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
-  localeRow: {
-    flexDirection: 'row' as const,
-    gap: 6,
-  },
-  localeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: Colors.inputBackground,
-  },
-  localeChipActive: {
-    backgroundColor: Colors.gold,
-  },
-  localeChipText: {
-    fontSize: 12,
-    fontWeight: '700' as const,
+  aboutOpenSource: {
     color: Colors.textMuted,
-  },
-  localeChipTextActive: {
-    color: '#fff',
+    fontSize: 11,
+    lineHeight: 16,
+    fontStyle: 'italic' as const,
   },
 });

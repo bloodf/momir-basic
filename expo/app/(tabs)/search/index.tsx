@@ -310,8 +310,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 8,
   },
   searchBox: {
     flex: 1,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.cardBackground,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -333,8 +333,8 @@ const styles = StyleSheet.create({
   },
   searchBtn: {
     backgroundColor: Colors.gold,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
     borderRadius: 12,
   },
   searchBtnPressed: {
@@ -354,7 +354,8 @@ const styles = StyleSheet.create({
   },
   suggestionsContainer: {
     marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 2,
+    marginBottom: 4,
     backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     borderWidth: 1,
@@ -421,7 +422,8 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 12,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 6,
+    paddingBottom: 4,
   },
   emptyState: {
     flex: 1,

@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   ActivityIndicator,
+  Easing,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,9 +43,15 @@ export default function PrintPreviewScreen() {
   const receiptOpacity = useRef(new Animated.Value(0)).current;
   const printBtnScale = useRef(new Animated.Value(1)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
+  const printingProgress = useRef(new Animated.Value(0)).current;
+  const printingFeedAnim = useRef(new Animated.Value(0)).current;
+  const printingDotOpacity1 = useRef(new Animated.Value(0)).current;
+  const printingDotOpacity2 = useRef(new Animated.Value(0)).current;
+  const printingDotOpacity3 = useRef(new Animated.Value(0)).current;
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saved, setSaved] = useState<boolean>(false);
+  const [isPrintingAnim, setIsPrintingAnim] = useState<boolean>(false);
 
   const card = useMemo<Card | null>(() => {
     try {
@@ -113,6 +120,53 @@ export default function PrintPreviewScreen() {
     }
   }, [card, showSuccessFlash, t]);
 
+  const startPrintingAnimation = useCallback(() => {
+    setIsPrintingAnim(true);
+    printingProgress.setValue(0);
+    printingFeedAnim.setValue(0);
+
+    const dotLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(printingDotOpacity1, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(printingDotOpacity2, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(printingDotOpacity3, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(printingDotOpacity1, { toValue: 0.2, duration: 200, useNativeDriver: true }),
+          Animated.timing(printingDotOpacity2, { toValue: 0.2, duration: 200, useNativeDriver: true }),
+          Animated.timing(printingDotOpacity3, { toValue: 0.2, duration: 200, useNativeDriver: true }),
+        ]),
+      ]),
+    );
+    dotLoop.start();
+
+    if (Platform.OS !== 'web') {
+      const hapticInterval = setInterval(() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }, 400);
+      setTimeout(() => clearInterval(hapticInterval), 3000);
+    }
+
+    Animated.sequence([
+      Animated.timing(printingFeedAnim, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(printingProgress, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      dotLoop.stop();
+      if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsPrintingAnim(false);
+      showSuccessFlash();
+    });
+  }, [printingProgress, printingFeedAnim, printingDotOpacity1, printingDotOpacity2, printingDotOpacity3, showSuccessFlash]);
+
   const handlePrint = useCallback(() => {
     if (!card) return;
 
@@ -133,11 +187,8 @@ export default function PrintPreviewScreen() {
       return;
     }
 
-    Alert.alert(
-      t.printPreview.printing,
-      `${t.printPreview.sendingToPrinter(card.name, settings.printer.name)}\n\n${t.printPreview.bluetoothRequired}`,
-    );
-  }, [card, settings, printBtnScale, handleDevPrint, t]);
+    startPrintingAnimation();
+  }, [card, settings, printBtnScale, handleDevPrint, t, startPrintingAnimation]);
 
   if (!card) {
     return (
@@ -249,6 +300,77 @@ export default function PrintPreviewScreen() {
 
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {isPrintingAnim && (
+        <View style={styles.printingOverlay}>
+          <View style={styles.printingModal}>
+            <Animated.View style={[
+              styles.printingIconWrap,
+              {
+                transform: [{
+                  translateY: printingFeedAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+                opacity: printingFeedAnim,
+              },
+            ]}>
+              <View style={styles.printingPrinterIcon}>
+                <Printer size={32} color={Colors.gold} />
+              </View>
+            </Animated.View>
+
+            <View style={styles.printingDotsRow}>
+              <Animated.View style={[styles.printingDot, { opacity: printingDotOpacity1 }]} />
+              <Animated.View style={[styles.printingDot, { opacity: printingDotOpacity2 }]} />
+              <Animated.View style={[styles.printingDot, { opacity: printingDotOpacity3 }]} />
+            </View>
+
+            <Text style={styles.printingLabel}>{t.printPreview.printing}...</Text>
+            <Text style={styles.printingCardName} numberOfLines={1}>{card?.name}</Text>
+
+            <View style={styles.printingBarTrack}>
+              <Animated.View
+                style={[
+                  styles.printingBarFill,
+                  {
+                    width: printingProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+
+            <Animated.View style={[
+              styles.printingReceiptFeed,
+              {
+                opacity: printingProgress.interpolate({
+                  inputRange: [0, 0.1, 1],
+                  outputRange: [0, 1, 1],
+                }),
+                transform: [{
+                  scaleY: printingProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1],
+                  }),
+                }],
+              },
+            ]}>
+              <View style={styles.printingReceiptPaper}>
+                <View style={styles.printingReceiptLine} />
+                <View style={[styles.printingReceiptLine, { width: '80%' }]} />
+                <View style={[styles.printingReceiptLine, { width: '60%' }]} />
+                <View style={styles.printingReceiptBlock} />
+                <View style={[styles.printingReceiptLine, { width: '70%' }]} />
+                <View style={[styles.printingReceiptLine, { width: '90%' }]} />
+              </View>
+            </Animated.View>
+          </View>
+        </View>
+      )}
 
       {saved && (
         <Animated.View style={[styles.successOverlay, { opacity: successOpacity }]} pointerEvents="none">
@@ -559,5 +681,96 @@ const styles = StyleSheet.create({
     color: Colors.background,
     fontSize: 14,
     fontWeight: '700' as const,
+  },
+  printingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    zIndex: 20,
+  },
+  printingModal: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    alignItems: 'center' as const,
+    width: RECEIPT_WIDTH - 24,
+    gap: 12,
+  },
+  printingIconWrap: {
+    marginBottom: 4,
+  },
+  printingPrinterIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(232,105,45,0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(232,105,45,0.25)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  printingDotsRow: {
+    flexDirection: 'row' as const,
+    gap: 8,
+    marginBottom: 4,
+  },
+  printingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.gold,
+  },
+  printingLabel: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700' as const,
+  },
+  printingCardName: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '500' as const,
+  },
+  printingBarTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.inputBackground,
+    overflow: 'hidden' as const,
+    marginTop: 4,
+  },
+  printingBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: Colors.gold,
+  },
+  printingReceiptFeed: {
+    marginTop: 8,
+    width: 80,
+    alignItems: 'center' as const,
+  },
+  printingReceiptPaper: {
+    width: 60,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    gap: 4,
+    alignItems: 'flex-start' as const,
+  },
+  printingReceiptLine: {
+    height: 3,
+    width: '100%',
+    backgroundColor: '#CCCCCC',
+    borderRadius: 1,
+  },
+  printingReceiptBlock: {
+    height: 20,
+    width: '100%',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 1,
   },
 });
