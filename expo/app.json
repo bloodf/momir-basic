@@ -1,5 +1,8 @@
 {
   "expo": {
+    // NOTE: Thermal printer and Bluetooth features (react-native-thermal-pos-printer)
+    // require custom dev builds via expo-dev-client. These features will NOT work in Expo Go.
+    // Use `bun run start --dev-client` to run with a development build.
     "name": "Momir Basic",
     "slug": "khur2ml36fu56vvhu6tre",
     "version": "1.0.0",
@@ -15,14 +18,24 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.khur2ml36fu56vvhu6tre"
+      "bundleIdentifier": "app.rork.khur2ml36fu56vvhu6tre",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
+        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.khur2ml36fu56vvhu6tre"
+      "package": "app.rork.khur2ml36fu56vvhu6tre",
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN"
+      ]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -35,7 +48,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-dev-client"
     ],
     "experiments": {
       "typedRoutes": true
