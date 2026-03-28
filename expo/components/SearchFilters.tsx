@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { SlidersHorizontal, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useI18n } from '@/i18n';
+import { ManaSymbol } from '@/components/ManaSymbol';
 
 export interface SearchFilterState {
   colors: string[];
@@ -270,14 +271,12 @@ export const SearchFilters = React.memo(function SearchFilters({
                     onPress={() => handleColorToggle(opt.scryfallCode)}
                     style={[
                       styles.colorChip,
-                      { backgroundColor: opt.color, borderColor: isSelected ? Colors.gold : opt.borderColor },
+                      { borderColor: isSelected ? Colors.gold : opt.borderColor },
                       isSelected && styles.colorChipSelected,
                     ]}
                     testID={`filter-color-${opt.id}`}
                   >
-                    <Text style={[styles.colorChipText, { color: opt.id === 'B' ? '#ddd' : '#333' }]}>
-                      {opt.id}
-                    </Text>
+                    <ManaSymbol symbol={`{${opt.id}}`} size={26} />
                   </Pressable>
                 );
               })}
