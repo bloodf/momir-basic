@@ -380,30 +380,7 @@ export default function HomeScreen() {
         style={[styles.innerContainer, { opacity: fadeIn }]}
         {...swipePanResponder.panHandlers}
       >
-        <View style={styles.topBar}>
-          <View style={{ flex: 1 }} />
-          <Pressable
-            onPress={() => {
-              if (Platform.OS !== 'web') void Haptics.selectionAsync();
-              setHistoryVisible(true);
-            }}
-            style={({ pressed }) => [
-              styles.historyButton,
-              pressed && styles.historyButtonPressed,
-            ]}
-            hitSlop={8}
-            testID="open-history"
-          >
-            <ScrollText size={18} color={Colors.gold} />
-            {cards.length > 0 && (
-              <View style={styles.historyBadge}>
-                <Text style={styles.historyBadgeText}>
-                  {cards.length > 99 ? '99+' : cards.length}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
+
 
         <View style={styles.spacer} />
 
@@ -529,16 +506,35 @@ export default function HomeScreen() {
             </Pressable>
           </Animated.View>
 
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== 'web') void Haptics.selectionAsync();
+              setHistoryVisible(true);
+            }}
+            style={({ pressed }) => [
+              styles.historyButton,
+              pressed && styles.historyButtonPressed,
+            ]}
+            hitSlop={8}
+            testID="open-history"
+          >
+            <ScrollText size={16} color={Colors.gold} />
+            <Text style={styles.historyButtonLabel}>{t.history.title}</Text>
+            {cards.length > 0 && (
+              <View style={styles.historyBadge}>
+                <Text style={styles.historyBadgeText}>
+                  {cards.length > 99 ? '99+' : cards.length}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+
           <TypePicker
             visible={typePickerVisible}
             selected={cardType as CardType}
             onSelect={handleTypeSelect}
             onClose={() => setTypePickerVisible(false)}
           />
-
-
-
-
         </View>
       </Animated.View>
 
@@ -779,24 +775,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600' as const,
   },
-  topBar: {
+  historyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  historyButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(232,105,45,0.2)',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(232,105,45,0.15)',
+    marginTop: 4,
   },
   historyButtonPressed: {
-    backgroundColor: 'rgba(232,105,45,0.2)',
+    backgroundColor: 'rgba(232,105,45,0.15)',
+    borderColor: 'rgba(232,105,45,0.3)',
+  },
+  historyButtonLabel: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.gold,
   },
   historyBadge: {
     position: 'absolute',
