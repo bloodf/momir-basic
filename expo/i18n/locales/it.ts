@@ -61,6 +61,14 @@ const it: Translations = {
     printingsCount: (count: number) => `${count} stampe`,
     loadingPrintings: 'Caricamento stampe...',
     cardType: 'Tipo di Carta',
+    artBy: (artist: string) => `Arte di ${artist}`,
+    unknownArtist: 'Sconosciuto',
+    downloadTitle: 'Scarica',
+    downloadNotAvailable: 'Il download dell\'arte richiede un build di sviluppo con accesso al file system.\n\nPuoi condividere l\'arte usando il pulsante di condivisione.',
+    rarityCommon: 'Comune',
+    rarityUncommon: 'Non Comune',
+    rarityRare: 'Rara',
+    rarityMythic: 'Mitica',
   },
   printPreview: {
     title: 'Anteprima Stampa',
@@ -265,6 +273,8 @@ const it: Translations = {
     version: 'Versione',
     aboutBody: 'Momir Basic è un\'app compagna di Magic: The Gathering per il formato Momir Basic. Dati carte forniti dall\'API Scryfall.',
     aboutCredit: 'Scryfall non è affiliato a Wizards of the Coast. MTG è un marchio di Wizards of the Coast LLC.',
+    starOnGithub: 'Stella su GitHub',
+    openSourceContributions: 'Progetto open source — contributi benvenuti!',
   },
   errors: {
     fetchFailed: 'Ricerca carta fallita',

@@ -198,13 +198,13 @@ export default function CardDetailScreen() {
     if (!card) return;
     try {
       await Share.share({
-        message: `${card.name} — Art by ${card.artist ?? 'Unknown'}\n${card.scryfallUri}`,
+        message: `${card.printedName ?? card.name} — ${t.card.artBy(card.artist ?? t.card.unknownArtist)}\n${card.scryfallUri}`,
         url: card.artCropUrl,
       });
     } catch (e) {
       console.log('[CardDetail] Share error:', e);
     }
-  }, [card]);
+  }, [card, t]);
 
   const handleDownloadArt = useCallback(async () => {
     if (!card) return;
@@ -219,9 +219,9 @@ export default function CardDetailScreen() {
         console.log('[CardDetail] Download error:', e);
       }
     } else {
-      Alert.alert('Download', 'Art download requires a development build with file system access.\n\nYou can share the art using the share button instead.');
+      Alert.alert(t.card.downloadTitle, t.card.downloadNotAvailable);
     }
-  }, [card]);
+  }, [card, t]);
 
   if (!card) {
     return (
@@ -279,7 +279,13 @@ export default function CardDetailScreen() {
 
   const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
   const hasStats = card.power !== undefined && card.toughness !== undefined;
-  const rarityLabel = card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1);
+  const rarityLabels: Record<string, string> = {
+    common: t.card.rarityCommon,
+    uncommon: t.card.rarityUncommon,
+    rare: t.card.rarityRare,
+    mythic: t.card.rarityMythic,
+  };
+  const rarityLabel = rarityLabels[card.rarity] ?? card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1);
 
   const bodyTranslateY = cardEntryAnim.interpolate({
     inputRange: [0, 1],
@@ -535,7 +541,7 @@ export default function CardDetailScreen() {
             </Pressable>
             <View style={styles.modalFooter}>
               <Text style={styles.modalName}>{card.printedName ?? card.name}</Text>
-              <Text style={styles.modalMeta}>{card.setName} · #{card.collectorNumber}{card.artist ? ` · Art by ${card.artist}` : ''}</Text>
+              <Text style={styles.modalMeta}>{card.setName} · #{card.collectorNumber}{card.artist ? ` · ${t.card.artBy(card.artist)}` : ''}</Text>
             </View>
           </View>
         </Animated.View>
@@ -556,7 +562,7 @@ export default function CardDetailScreen() {
             </Pressable>
             <View style={styles.artModalFooter}>
               <Text style={styles.artModalTitle}>{card.printedName ?? card.name}</Text>
-              {card.artist && <Text style={styles.artModalArtist}>Art by {card.artist}</Text>}
+              {card.artist && <Text style={styles.artModalArtist}>{t.card.artBy(card.artist)}</Text>}
               <View style={styles.artModalActions}>
                 <Pressable onPress={handleDownloadArt} style={styles.artModalBtn}>
                   <Download size={18} color="#fff" />

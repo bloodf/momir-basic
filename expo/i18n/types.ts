@@ -59,6 +59,14 @@ export interface Translations {
     printingsCount: (count: number) => string;
     loadingPrintings: string;
     cardType: string;
+    artBy: (artist: string) => string;
+    unknownArtist: string;
+    downloadTitle: string;
+    downloadNotAvailable: string;
+    rarityCommon: string;
+    rarityUncommon: string;
+    rarityRare: string;
+    rarityMythic: string;
   };
   printPreview: {
     title: string;
@@ -263,6 +271,8 @@ export interface Translations {
     version: string;
     aboutBody: string;
     aboutCredit: string;
+    starOnGithub: string;
+    openSourceContributions: string;
   };
   errors: {
     fetchFailed: string;

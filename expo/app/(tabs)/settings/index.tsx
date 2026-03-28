@@ -251,7 +251,7 @@ export default function SettingsScreen() {
 
           <Pressable onPress={handleOpenGithub} style={styles.githubStarRow}>
             <Star size={14} color={Colors.gold} />
-            <Text style={styles.githubStarText}>Star on GitHub</Text>
+            <Text style={styles.githubStarText}>{t.settings.starOnGithub}</Text>
           </Pressable>
 
           <View style={styles.aboutText}>
@@ -262,7 +262,7 @@ export default function SettingsScreen() {
               {t.settings.aboutCredit}
             </Text>
             <Text style={styles.aboutOpenSource}>
-              Open source project — contributions welcome!
+              {t.settings.openSourceContributions}
             </Text>
           </View>
         </View>

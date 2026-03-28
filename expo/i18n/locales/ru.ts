@@ -61,6 +61,14 @@ const ru: Translations = {
     printingsCount: (count: number) => `${count} изданий`,
     loadingPrintings: 'Загрузка изданий...',
     cardType: 'Тип карты',
+    artBy: (artist: string) => `Арт: ${artist}`,
+    unknownArtist: 'Неизвестен',
+    downloadTitle: 'Скачать',
+    downloadNotAvailable: 'Загрузка арта требует сборки для разработки с доступом к файловой системе.\n\nВы можете поделиться артом через кнопку «Поделиться».',
+    rarityCommon: 'Обычная',
+    rarityUncommon: 'Необычная',
+    rarityRare: 'Редкая',
+    rarityMythic: 'Мифическая',
   },
   printPreview: {
     title: 'Предпросмотр печати',
@@ -265,6 +273,8 @@ const ru: Translations = {
     version: 'Версия',
     aboutBody: 'Momir Basic — приложение-компаньон Magic: The Gathering для формата Momir Basic. Данные карт предоставлены API Scryfall.',
     aboutCredit: 'Scryfall не связан с Wizards of the Coast. MTG является товарным знаком Wizards of the Coast LLC.',
+    starOnGithub: 'Звезда на GitHub',
+    openSourceContributions: 'Проект с открытым исходным кодом — вклад приветствуется!',
   },
   errors: {
     fetchFailed: 'Не удалось получить карту',

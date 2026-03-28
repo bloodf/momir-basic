@@ -305,7 +305,7 @@ export default function PrintPreviewScreen() {
           <View ref={receiptRef} collapsable={false} style={styles.receipt}>
             <View style={styles.receiptHeader}>
               <Text style={styles.receiptCardName} numberOfLines={2}>
-                {card.name}
+                {card.printedName ?? card.name}
               </Text>
               <PrintManaCost manaCost={card.manaCost} size={16} gap={2} />
             </View>
@@ -338,12 +338,12 @@ export default function PrintPreviewScreen() {
             </View>
 
             <Text style={styles.receiptTypeLine}>
-              {card.typeLine.replace('—', '\u2014')}
+              {(card.printedTypeLine ?? card.typeLine).replace('—', '\u2014')}
             </Text>
 
-            {card.oracleText ? (
+            {(card.printedText ?? card.oracleText) ? (
               <View style={styles.receiptOracleWrap}>
-                <PrintOracleText text={card.oracleText} fontSize={12} color="#000000" />
+                <PrintOracleText text={card.printedText ?? card.oracleText} fontSize={12} color="#000000" />
               </View>
             ) : null}
 
@@ -412,7 +412,7 @@ export default function PrintPreviewScreen() {
             </View>
 
             <Text style={styles.printingLabel}>{t.printPreview.printing}...</Text>
-            <Text style={styles.printingCardName} numberOfLines={1}>{card?.name}</Text>
+            <Text style={styles.printingCardName} numberOfLines={1}>{card?.printedName ?? card?.name}</Text>
 
             <Animated.View style={{ opacity: stepFadeAnim }}>
               <Text style={styles.printingStepLabel}>{getStepLabel(printStep)}</Text>

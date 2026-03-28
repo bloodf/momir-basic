@@ -61,6 +61,14 @@ const zhs: Translations = {
     printingsCount: (count: number) => `${count}个系列`,
     loadingPrintings: '正在加载收录系列...',
     cardType: '卡牌类别',
+    artBy: (artist: string) => `画师：${artist}`,
+    unknownArtist: '未知',
+    downloadTitle: '下载',
+    downloadNotAvailable: '下载画作需要具有文件系统访问权限的开发构建版本。\n\n您可以使用分享按钮分享画作。',
+    rarityCommon: '普通',
+    rarityUncommon: '非普通',
+    rarityRare: '稀有',
+    rarityMythic: '秘稀',
   },
   printPreview: {
     title: '打印预览',
@@ -265,6 +273,8 @@ const zhs: Translations = {
     version: '版本',
     aboutBody: 'Momir Basic是一款适用于Momir Basic赛制的万智牌伴侣应用。卡牌数据由Scryfall API提供。',
     aboutCredit: 'Scryfall与Wizards of the Coast无关。MTG是Wizards of the Coast LLC的商标。',
+    starOnGithub: '在GitHub上加星',
+    openSourceContributions: '开源项目 — 欢迎贡献！',
   },
   errors: {
     fetchFailed: '获取卡牌失败',
