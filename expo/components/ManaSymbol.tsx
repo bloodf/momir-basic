@@ -1,33 +1,38 @@
 import React, { memo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { getManaUnicode, getManaColor, isKnownSymbol, MANA_FONT_FAMILY } from '@/constants/manaSymbols';
 
 interface ManaSymbolProps {
   symbol: string;
   size?: number;
 }
 
-function getSymbolCode(symbol: string): string {
-  return symbol.replace(/[{}]/g, '').toUpperCase();
-}
-
-function getScryfallSvgUri(code: string): string {
-  const encoded = encodeURIComponent(code);
-  return `https://svgs.scryfall.io/card-symbols/${encoded}.svg`;
-}
-
 export const ManaSymbol = memo(function ManaSymbol({ symbol, size = 20 }: ManaSymbolProps) {
-  const code = getSymbolCode(symbol);
-  const uri = getScryfallSvgUri(code);
+  const code = symbol.replace(/[{}]/g, '').trim();
+
+  if (!isKnownSymbol(code)) {
+    return (
+      <View style={[styles.fallbackContainer, { width: size, height: size, borderRadius: size / 2 }]}>
+        <Text style={[styles.fallbackText, { fontSize: size * 0.55 }]}>{code}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      <Image
-        source={{ uri }}
-        style={{ width: size, height: size }}
-        contentFit="contain"
-        cachePolicy="disk"
-      />
+      <Text
+        style={[
+          styles.manaChar,
+          {
+            fontSize: size * 0.85,
+            color: getManaColor(code),
+            lineHeight: size,
+            fontFamily: Platform.OS === 'web' ? 'Mana' : MANA_FONT_FAMILY,
+          },
+        ]}
+      >
+        {getManaUnicode(code)}
+      </Text>
     </View>
   );
 });
@@ -41,5 +46,19 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  manaChar: {
+    textAlign: 'center' as const,
+    fontWeight: 'normal' as const,
+  },
+  fallbackContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  fallbackText: {
+    color: '#AAA',
+    fontWeight: '700' as const,
+    textAlign: 'center' as const,
   },
 });

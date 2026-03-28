@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { getManaUnicode, getManaColor, isKnownSymbol, MANA_FONT_FAMILY } from '@/constants/manaSymbols';
 
 interface PrintOracleTextProps {
   text: string;
@@ -37,37 +37,41 @@ function parseOracleText(text: string): TextSegment[][] {
   });
 }
 
-function getScryfallSvgUri(symbol: string): string {
-  const code = symbol.replace(/[{}]/g, '').toUpperCase();
-  return `https://svgs.scryfall.io/card-symbols/${encodeURIComponent(code)}.svg`;
-}
-
 export const PrintOracleText = memo(function PrintOracleText({
   text,
   fontSize = 13,
   color = '#000000',
 }: PrintOracleTextProps) {
   const paragraphs = useMemo(() => parseOracleText(text), [text]);
-  const symbolSize = fontSize + 1;
+  const symbolFontSize = fontSize + 1;
+  const lineH = fontSize * 1.55;
 
   return (
     <View style={styles.container}>
       {paragraphs.map((segments, pIdx) => (
-        <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: fontSize * 1.55 }]}>
+        <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: lineH }]}>
           {segments.map((seg, sIdx) => {
             if (seg.type === 'symbol') {
+              if (isKnownSymbol(seg.value)) {
+                return (
+                  <Text
+                    key={sIdx}
+                    style={{
+                      fontSize: symbolFontSize,
+                      color: getManaColor(seg.value),
+                      lineHeight: lineH,
+                      fontFamily: Platform.OS === 'web' ? 'Mana' : MANA_FONT_FAMILY,
+                      fontWeight: 'normal' as const,
+                    }}
+                  >
+                    {getManaUnicode(seg.value)}
+                  </Text>
+                );
+              }
               return (
-                <View
-                  key={sIdx}
-                  style={[styles.symbolWrap, { width: symbolSize, height: symbolSize }]}
-                >
-                  <Image
-                    source={{ uri: getScryfallSvgUri(seg.value) }}
-                    style={{ width: symbolSize, height: symbolSize }}
-                    contentFit="contain"
-                    cachePolicy="disk"
-                  />
-                </View>
+                <Text key={sIdx} style={{ fontSize: fontSize - 1, color: '#666', lineHeight: lineH }}>
+                  {`{${seg.value}}`}
+                </Text>
               );
             }
             return <Text key={sIdx}>{seg.value}</Text>;
@@ -84,10 +88,5 @@ const styles = StyleSheet.create({
   },
   paragraph: {
     flexWrap: 'wrap',
-  },
-  symbolWrap: {
-    marginHorizontal: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

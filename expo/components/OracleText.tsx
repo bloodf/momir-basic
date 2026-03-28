@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import Colors from '@/constants/colors';
+import { getManaUnicode, getManaColor, isKnownSymbol, MANA_FONT_FAMILY } from '@/constants/manaSymbols';
 
 interface OracleTextProps {
   text: string;
@@ -38,19 +38,14 @@ function parseOracleText(text: string): TextSegment[][] {
   });
 }
 
-function getSymbolUri(symbol: string): string {
-  const code = symbol.replace(/[{}]/g, '').toUpperCase();
-  return `https://svgs.scryfall.io/card-symbols/${encodeURIComponent(code)}.svg`;
-}
-
 export const OracleText = memo(function OracleText({
   text,
   fontSize = 14,
   color = Colors.textPrimary,
 }: OracleTextProps) {
   const paragraphs = useMemo(() => parseOracleText(text), [text]);
-  const symbolSize = fontSize + 2;
-  const lineH = fontSize * 1.5;
+  const lineH = fontSize * 1.6;
+  const symbolFontSize = fontSize + 1;
 
   return (
     <View style={styles.container}>
@@ -58,14 +53,28 @@ export const OracleText = memo(function OracleText({
         <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: lineH }]}>
           {segments.map((seg, sIdx) => {
             if (seg.type === 'symbol') {
+              if (isKnownSymbol(seg.value)) {
+                return (
+                  <Text
+                    key={sIdx}
+                    style={[
+                      styles.manaChar,
+                      {
+                        fontSize: symbolFontSize,
+                        color: getManaColor(seg.value),
+                        lineHeight: lineH,
+                        fontFamily: Platform.OS === 'web' ? 'Mana' : MANA_FONT_FAMILY,
+                      },
+                    ]}
+                  >
+                    {getManaUnicode(seg.value)}
+                  </Text>
+                );
+              }
               return (
-                <Image
-                  key={sIdx}
-                  source={{ uri: getSymbolUri(seg.value) }}
-                  style={{ width: symbolSize, height: symbolSize, marginBottom: -3 }}
-                  contentFit="contain"
-                  cachePolicy="disk"
-                />
+                <Text key={sIdx} style={[styles.fallbackSymbol, { fontSize: fontSize - 1, lineHeight: lineH }]}>
+                  {`{${seg.value}}`}
+                </Text>
               );
             }
             return <Text key={sIdx}>{seg.value}</Text>;
@@ -83,5 +92,11 @@ const styles = StyleSheet.create({
   paragraph: {
     flexWrap: 'wrap',
   },
-
+  manaChar: {
+    fontWeight: 'normal' as const,
+  },
+  fallbackSymbol: {
+    color: Colors.textMuted,
+    fontWeight: '600' as const,
+  },
 });
