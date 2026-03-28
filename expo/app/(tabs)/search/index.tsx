@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,13 @@ import { Card } from '@/types';
 import { searchCards, autocompleteCardName } from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
 import { useI18n } from '@/i18n';
+import {
+  SearchFilters,
+  SearchFilterState,
+  EMPTY_FILTERS,
+  getActiveFilterCount,
+  buildFilterQuery,
+} from '@/components/SearchFilters';
 
 const POPULAR_SEARCHES = [
   'Lightning Bolt',
@@ -45,6 +52,15 @@ export default function SearchScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const lastSearchQuery = useRef('');
+
+  const buildFullQuery = useCallback((textQuery: string, currentFilters: SearchFilterState): string => {
+    const filterStr = buildFilterQuery(currentFilters);
+    const parts = [textQuery, filterStr].filter(Boolean);
+    return parts.join(' ');
+  }, []);
 
   const searchMutation = useMutation({
     mutationFn: async ({ q, page }: { q: string; page: number }) => {
@@ -78,18 +94,20 @@ export default function SearchScreen() {
   });
 
   const handleSearch = useCallback((searchQuery?: string) => {
-    const q = searchQuery ?? query;
-    if (!q.trim()) return;
+    const textQ = searchQuery ?? query;
+    const fullQ = buildFullQuery(textQ.trim(), filters);
+    if (!fullQ) return;
     Keyboard.dismiss();
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSuggestions([]);
-    searchMutation.mutate({ q: q.trim(), page: 1 });
-  }, [query, searchMutation]);
+    lastSearchQuery.current = fullQ;
+    searchMutation.mutate({ q: fullQ, page: 1 });
+  }, [query, filters, buildFullQuery, searchMutation]);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || searchMutation.isPending) return;
-    searchMutation.mutate({ q: query.trim(), page: currentPage + 1 });
-  }, [hasMore, searchMutation, query, currentPage]);
+    searchMutation.mutate({ q: lastSearchQuery.current, page: currentPage + 1 });
+  }, [hasMore, searchMutation, currentPage]);
 
   const handleQueryChange = useCallback((text: string) => {
     setQuery(text);
@@ -105,8 +123,10 @@ export default function SearchScreen() {
     setSuggestions([]);
     Keyboard.dismiss();
     if (Platform.OS !== 'web') void Haptics.selectionAsync();
-    searchMutation.mutate({ q: suggestion, page: 1 });
-  }, [searchMutation]);
+    const fullQ = buildFullQuery(suggestion, filters);
+    lastSearchQuery.current = fullQ;
+    searchMutation.mutate({ q: fullQ, page: 1 });
+  }, [searchMutation, filters, buildFullQuery]);
 
   const handleCardPress = useCallback((card: Card) => {
     router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
@@ -122,6 +142,16 @@ export default function SearchScreen() {
     inputRef.current?.focus();
   }, []);
 
+  const handleFiltersChange = useCallback((newFilters: SearchFilterState) => {
+    setFilters(newFilters);
+  }, []);
+
+  const handleToggleFilters = useCallback(() => {
+    setFiltersVisible(prev => !prev);
+  }, []);
+
+  const activeFilterCount = useMemo(() => getActiveFilterCount(filters), [filters]);
+
   const renderItem = useCallback(({ item }: { item: Card }) => (
     <CardListItem card={item} onPress={handleCardPress} />
   ), [handleCardPress]);
@@ -129,7 +159,7 @@ export default function SearchScreen() {
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
   const showSuggestions = suggestions.length > 0 && !hasSearched;
-  const showPopular = !hasSearched && results.length === 0 && query.length === 0;
+  const showPopular = !hasSearched && results.length === 0 && query.length === 0 && !filtersVisible;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -167,6 +197,19 @@ export default function SearchScreen() {
           <Text style={styles.searchBtnText}>{t.common.go}</Text>
         </Pressable>
       </View>
+
+      <SearchFilters
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        visible={filtersVisible}
+        onToggleVisible={handleToggleFilters}
+      />
+
+      {activeFilterCount > 0 && !filtersVisible && (
+        <Text style={styles.activeFiltersHint}>
+          {t.search.activeFilters(activeFilterCount)}
+        </Text>
+      )}
 
       {showSuggestions && (
         <View style={styles.suggestionsContainer}>
@@ -300,6 +343,13 @@ const styles = StyleSheet.create({
     color: Colors.background,
     fontSize: 14,
     fontWeight: '700' as const,
+  },
+  activeFiltersHint: {
+    fontSize: 11,
+    color: Colors.gold,
+    fontWeight: '600' as const,
+    paddingHorizontal: 20,
+    paddingBottom: 4,
   },
   suggestionsContainer: {
     marginHorizontal: 16,
