@@ -4,13 +4,11 @@ import {
   Text,
   StyleSheet,
   Animated,
-  Pressable,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, WifiOff, AlertTriangle, CheckCircle, Info } from 'lucide-react-native';
+import { WifiOff, AlertTriangle, CheckCircle, Info } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Colors from '@/constants/colors';
 
 export type ToastType = 'error' | 'warning' | 'success' | 'info';
 
@@ -30,51 +28,42 @@ interface ToastItemProps {
 }
 
 const ICON_MAP: Record<ToastType, React.ReactNode> = {
-  error: <AlertTriangle size={18} color="#FF6B6B" />,
-  warning: <WifiOff size={18} color="#FFB347" />,
-  success: <CheckCircle size={18} color="#4CAF50" />,
-  info: <Info size={18} color="#5B9BD5" />,
-};
-
-const BG_MAP: Record<ToastType, string> = {
-  error: 'rgba(239,83,80,0.14)',
-  warning: 'rgba(255,179,71,0.14)',
-  success: 'rgba(76,175,80,0.14)',
-  info: 'rgba(91,155,213,0.14)',
-};
-
-const BORDER_MAP: Record<ToastType, string> = {
-  error: 'rgba(239,83,80,0.35)',
-  warning: 'rgba(255,179,71,0.35)',
-  success: 'rgba(76,175,80,0.35)',
-  info: 'rgba(91,155,213,0.35)',
+  error: <AlertTriangle size={16} color="#FF6B6B" />,
+  warning: <WifiOff size={16} color="#FFB347" />,
+  success: <CheckCircle size={16} color="#66BB6A" />,
+  info: <Info size={16} color="#64B5F6" />,
 };
 
 const ACCENT_MAP: Record<ToastType, string> = {
   error: '#FF6B6B',
   warning: '#FFB347',
-  success: '#4CAF50',
-  info: '#5B9BD5',
+  success: '#66BB6A',
+  info: '#64B5F6',
 };
 
+const MAX_DURATION = 8000;
+const DEFAULT_DURATION = 4000;
+
 function ToastItem({ toast, onDismiss }: ToastItemProps) {
-  const translateY = useRef(new Animated.Value(-80)).current;
+  const translateY = useRef(new Animated.Value(-60)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.92)).current;
+  const progressAnim = useRef(new Animated.Value(1)).current;
   const dismissedRef = useRef(false);
+
+  const duration = Math.min(toast.duration ?? DEFAULT_DURATION, MAX_DURATION);
 
   const dismissToast = useCallback(() => {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: -80,
-        duration: 250,
+        toValue: -60,
+        duration: 220,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -86,66 +75,68 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: 0,
-        tension: 120,
-        friction: 14,
+        tension: 140,
+        friction: 16,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 120,
-        friction: 14,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start();
 
-    if (!toast.persistent) {
-      const duration = toast.duration ?? 4000;
-      const timer = setTimeout(() => {
-        dismissToast();
-      }, duration);
-      return () => clearTimeout(timer);
-    }
-  }, [translateY, opacity, scale, toast.persistent, toast.duration, dismissToast]);
+    Animated.timing(progressAnim, {
+      toValue: 0,
+      duration: duration,
+      useNativeDriver: false,
+    }).start();
 
-  const dismissible = toast.dismissible !== false;
+    const timer = setTimeout(() => {
+      dismissToast();
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [translateY, opacity, progressAnim, duration, dismissToast]);
+
+  const accent = ACCENT_MAP[toast.type];
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <Animated.View
       style={[
         styles.toastItem,
         {
-          backgroundColor: BG_MAP[toast.type],
-          borderColor: BORDER_MAP[toast.type],
-          transform: [{ translateY }, { scale }],
+          transform: [{ translateY }],
           opacity,
         },
       ]}
     >
-      <View style={[styles.accentStrip, { backgroundColor: ACCENT_MAP[toast.type] }]} />
-      <View style={styles.toastIcon}>{ICON_MAP[toast.type]}</View>
-      <View style={styles.toastContent}>
-        <Text style={styles.toastTitle} numberOfLines={1}>{toast.title}</Text>
-        {toast.message ? (
-          <Text style={styles.toastMessage} numberOfLines={2}>{toast.message}</Text>
-        ) : null}
+      <View style={styles.toastInner}>
+        <View style={[styles.iconCircle, { backgroundColor: `${accent}18` }]}>
+          {ICON_MAP[toast.type]}
+        </View>
+        <View style={styles.toastContent}>
+          <Text style={styles.toastTitle} numberOfLines={1}>{toast.title}</Text>
+          {toast.message ? (
+            <Text style={styles.toastMessage} numberOfLines={1}>{toast.message}</Text>
+          ) : null}
+        </View>
       </View>
-      {dismissible && (
-        <Pressable
-          onPress={() => {
-            if (Platform.OS !== 'web') void Haptics.selectionAsync();
-            dismissToast();
-          }}
-          style={styles.toastClose}
-          hitSlop={8}
-        >
-          <X size={14} color={Colors.textSecondary} />
-        </Pressable>
-      )}
+      <View style={styles.progressTrack}>
+        <Animated.View
+          style={[
+            styles.progressBar,
+            {
+              width: progressWidth,
+              backgroundColor: accent,
+            },
+          ]}
+        />
+      </View>
     </Animated.View>
   );
 }
@@ -225,62 +216,56 @@ const styles = StyleSheet.create({
   },
   toastContainer: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 16,
+    right: 16,
     zIndex: 9999,
     gap: 6,
   },
   toastItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#1C1C1E',
     borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingRight: 12,
-    paddingLeft: 0,
-    gap: 10,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  accentStrip: {
-    width: 4,
-    alignSelf: 'stretch',
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
+  toastInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
   },
-  toastIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
   },
   toastContent: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   toastTitle: {
-    color: Colors.textPrimary,
+    color: '#F5F5F5',
     fontSize: 14,
     fontWeight: '600' as const,
+    letterSpacing: 0.1,
   },
   toastMessage: {
-    color: Colors.textSecondary,
+    color: '#8E8E93',
     fontSize: 12,
     lineHeight: 16,
   },
-  toastClose: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  progressTrack: {
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 1,
   },
 });

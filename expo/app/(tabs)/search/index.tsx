@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Search, X, TrendingUp, LayoutList, LayoutGrid } from 'lucide-react-native';
+import { Search, X, LayoutList, LayoutGrid } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { searchCards, autocompleteCardName, parseAdvancedSyntax } from '@/services/scryfall';
@@ -29,17 +29,6 @@ import {
   getActiveFilterCount,
   buildFilterQuery,
 } from '@/components/SearchFilters';
-
-const POPULAR_SEARCHES = [
-  'Lightning Bolt',
-  'Black Lotus',
-  'Jace, the Mind Sculptor',
-  'Sol Ring',
-  'Counterspell',
-  'Tarmogoyf',
-  'Birds of Paradise',
-  'Path to Exile',
-];
 
 type ViewMode = 'list' | 'grid';
 const CARDS_PER_PAGE = 175;
@@ -213,7 +202,7 @@ export default function SearchScreen() {
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
   const showSuggestions = suggestions.length > 0 && !hasSearched;
-  const showPopular = !hasSearched && results.length === 0 && query.length === 0 && !filtersVisible;
+
   const isFirstPageLoading = searchMutation.isPending && currentPage <= 1 && results.length === 0;
   const isLoadingMore = searchMutation.isPending && results.length > 0;
 
@@ -282,25 +271,7 @@ export default function SearchScreen() {
         </View>
       )}
 
-      {showPopular && (
-        <View style={styles.popularSection}>
-          <View style={styles.popularHeader}>
-            <TrendingUp size={14} color={Colors.gold} />
-            <Text style={styles.popularTitle}>{t.search.popularSearches}</Text>
-          </View>
-          <View style={styles.popularChips}>
-            {POPULAR_SEARCHES.map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => handleSuggestionTap(s)}
-                style={({ pressed }) => [styles.popularChip, pressed && styles.popularChipPressed]}
-              >
-                <Text style={styles.popularChipText}>{s}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
+
 
       {hasSearched && results.length === 0 && !searchMutation.isPending && (
         <View style={styles.emptyState}>
@@ -487,45 +458,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  popularSection: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    gap: 12,
-  },
-  popularHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  popularTitle: {
-    color: Colors.gold,
-    fontSize: 13,
-    fontWeight: '700' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  },
-  popularChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  popularChip: {
-    backgroundColor: Colors.cardBackground,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  popularChipPressed: {
-    backgroundColor: Colors.cardBackgroundLight,
-    borderColor: Colors.gold,
-  },
-  popularChipText: {
-    color: Colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '500' as const,
-  },
+
   resultBar: {
     flexDirection: 'row',
     alignItems: 'center',

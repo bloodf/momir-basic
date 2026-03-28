@@ -278,7 +278,6 @@ export default function CardDetailScreen() {
     outputRange: ['0deg', '180deg'],
   });
 
-  const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
   const hasStats = card.power !== undefined && card.toughness !== undefined;
   const rarityLabels: Record<string, string> = {
     common: t.card.rarityCommon,
@@ -286,7 +285,6 @@ export default function CardDetailScreen() {
     rare: t.card.rarityRare,
     mythic: t.card.rarityMythic,
   };
-  const rarityLabel = rarityLabels[card.rarity] ?? card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1);
 
   const bodyTranslateY = cardEntryAnim.interpolate({
     inputRange: [0, 1],
@@ -396,18 +394,10 @@ export default function CardDetailScreen() {
               >
                 <Text style={styles.detailLabel}>{t.card.set}</Text>
                 <View style={styles.detailValueRow}>
-                  <SetSymbol setCode={card.setCode} rarity={card.rarity} size={16} />
+                  <SetSymbol setCode={card.setCode} rarity={card.rarity} size={18} />
                   <Text style={[styles.detailValue, styles.tappableValue]} numberOfLines={1}>{card.setName}</Text>
                 </View>
               </Pressable>
-
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t.card.rarity}</Text>
-                <View style={styles.detailValueRow}>
-                  <SetSymbol setCode={card.setCode} rarity={card.rarity} size={14} />
-                  <Text style={[styles.detailValue, { color: rarityColor }]}>{rarityLabel}</Text>
-                </View>
-              </View>
 
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t.card.number}</Text>
@@ -487,7 +477,7 @@ export default function CardDetailScreen() {
                         <Text style={styles.printingMeta}>#{p.collectorNumber} · {p.setCode}{p.releasedAt ? ` · ${p.releasedAt.slice(0, 4)}` : ''}</Text>
                       </View>
                       <Text style={[styles.printingRarityLabel, { color: pRarityColor }]}>
-                        {rarityLabels[p.rarity] ?? p.rarity.charAt(0).toUpperCase()}
+                        {rarityLabels[p.rarity] ?? p.rarity.charAt(0).toUpperCase() + p.rarity.slice(1)}
                       </Text>
                     </View>
                   );

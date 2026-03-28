@@ -45,8 +45,7 @@ export const [NetworkProvider, useNetwork] = createContextHook(() => {
         type: 'warning',
         title: 'You are offline',
         message: 'Some features may not be available',
-        persistent: true,
-        dismissible: true,
+        duration: 6000,
       });
       console.log('[Network] Device went offline');
     }
