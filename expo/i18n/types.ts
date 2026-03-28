@@ -13,6 +13,9 @@ export interface Translations {
     mana: string;
     download: string;
     share: string;
+    done: string;
+    close: string;
+    go: string;
   };
   home: {
     fetchingCards: (count: number) => string;
@@ -54,6 +57,7 @@ export interface Translations {
     printings: string;
     printingsCount: (count: number) => string;
     loadingPrintings: string;
+    cardType: string;
   };
   printPreview: {
     title: string;
@@ -85,11 +89,110 @@ export interface Translations {
     game: string;
     settings: string;
   };
+  search: {
+    title: string;
+    placeholder: string;
+    popularSearches: string;
+    noCardsFound: string;
+    tryDifferentSearch: string;
+    cardsFound: (count: number) => string;
+    searchingScryfall: string;
+  };
+  history: {
+    title: string;
+    clearHistory: string;
+    deleteAll: (count: number) => string;
+    clearAll: string;
+    searchPlaceholder: string;
+    cardsCount: (count: number, inHistory: boolean) => string;
+    noCardsFound: string;
+    noCardsYet: string;
+    tryDifferentSearch: string;
+    castFirstCard: string;
+  };
+  game: {
+    title: string;
+    subtitle: string;
+    standard: string;
+    standardDesc: string;
+    commanderMode: string;
+    commanderDesc: string;
+    brawl: string;
+    brawlDesc: string;
+    twoHeadedGiant: string;
+    twoHeadedGiantDesc: string;
+    pauper: string;
+    pauperDesc: string;
+    custom: string;
+    customDesc: string;
+  };
+  lifeCounter: {
+    selectCounter: string;
+    life: string;
+    poison: string;
+    energy: string;
+    experience: string;
+    commanderDamage: string;
+    settings: string;
+    players: string;
+    startingLife: string;
+    resetAll: string;
+  };
+  printer: {
+    title: string;
+    paperWidth: string;
+    printCardArt: string;
+    printCardArtHint: string;
+    autoPrint: string;
+    autoPrintHint: string;
+    notConnected: string;
+    connected: string;
+    disconnect: string;
+    test: string;
+    iosBluetoothSetup: string;
+    step1Title: string;
+    step1Desc: string;
+    step2Title: string;
+    step2Desc: string;
+    step3Title: string;
+    step3Desc: string;
+    openBluetoothSettings: string;
+    scanForPrinters: string;
+    scanForPairedPrinters: string;
+    scanning: string;
+    lookingForPaired: string;
+    webSimulated: string;
+    pairedDevices: string;
+    nearbyDevices: string;
+    noPrintersFound: string;
+    iosEmptyHint: string;
+    androidEmptyHint: string;
+    worksOnBothPlatforms: string;
+    bluetoothInfo: string;
+    testPrint: string;
+    testPrintMsg: (name: string) => string;
+    bluetoothSettings: string;
+    bluetoothSettingsMsg: string;
+    connectedTo: (name: string) => string;
+  };
   settings: {
     title: string;
+    printerSection: string;
     printerSetup: string;
+    cardFetch: string;
     devMode: string;
     excludeFunnySets: string;
+    excludeFunnyHint: string;
+    excludeDigitalOnly: string;
+    excludeDigitalHint: string;
+    language: string;
+    languageSection: string;
+    developer: string;
+    devModeHint: string;
+    about: string;
+    version: string;
+    aboutBody: string;
+    aboutCredit: string;
   };
   errors: {
     fetchFailed: string;

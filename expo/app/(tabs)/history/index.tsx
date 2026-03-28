@@ -15,11 +15,13 @@ import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useHistory, useFilteredHistory } from '@/providers/HistoryProvider';
 import { CardListItem } from '@/components/CardListItem';
+import { useI18n } from '@/i18n';
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { clearHistory, cards } = useHistory();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const filteredCards = useFilteredHistory(search);
 
@@ -29,14 +31,14 @@ export default function HistoryScreen() {
 
   const handleClear = useCallback(() => {
     Alert.alert(
-      'Clear History',
-      `Delete all ${cards.length} cards from history?`,
+      t.history.clearHistory,
+      t.history.deleteAll(cards.length),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear All', style: 'destructive', onPress: clearHistory },
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.history.clearAll, style: 'destructive', onPress: clearHistory },
       ]
     );
-  }, [cards.length, clearHistory]);
+  }, [cards.length, clearHistory, t]);
 
   const renderItem = useCallback(({ item }: { item: Card }) => (
     <CardListItem card={item} onPress={handleCardPress} />
@@ -47,7 +49,7 @@ export default function HistoryScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>History</Text>
+        <Text style={styles.title}>{t.history.title}</Text>
         {cards.length > 0 && (
           <Pressable onPress={handleClear} hitSlop={12} testID="clear-history">
             <Trash2 size={20} color={Colors.error} />
@@ -59,7 +61,7 @@ export default function HistoryScreen() {
         <Search size={16} color={Colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search cards..."
+          placeholder={t.history.searchPlaceholder}
           placeholderTextColor={Colors.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -74,8 +76,7 @@ export default function HistoryScreen() {
       </View>
 
       <Text style={styles.countText}>
-        {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''}
-        {search ? ' found' : ' in history'}
+        {t.history.cardsCount(filteredCards.length, !search)}
       </Text>
 
       <FlatList
@@ -87,10 +88,10 @@ export default function HistoryScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📜</Text>
             <Text style={styles.emptyTitle}>
-              {search ? 'No cards found' : 'No cards yet'}
+              {search ? t.history.noCardsFound : t.history.noCardsYet}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {search ? 'Try a different search' : 'Cast your first card to see it here'}
+              {search ? t.history.tryDifferentSearch : t.history.castFirstCard}
             </Text>
           </View>
         }

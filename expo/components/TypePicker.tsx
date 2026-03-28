@@ -4,6 +4,7 @@ import { X, ChevronRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { CardType } from '@/types';
+import { useI18n } from '@/i18n';
 
 interface TypePickerProps {
   visible: boolean;
@@ -13,6 +14,7 @@ interface TypePickerProps {
 }
 
 export const TypePicker = memo(function TypePicker({ visible, selected, onSelect, onClose }: TypePickerProps) {
+  const { t } = useI18n();
   const handleSelect = useCallback((type: CardType) => {
     onSelect(type);
     onClose();
@@ -28,7 +30,7 @@ export const TypePicker = memo(function TypePicker({ visible, selected, onSelect
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>Card Type</Text>
+            <Text style={styles.title}>{t.card.cardType}</Text>
             <Pressable onPress={onClose} hitSlop={12} testID="type-picker-close">
               <X size={22} color={Colors.textSecondary} />
             </Pressable>
@@ -50,9 +52,9 @@ export const TypePicker = memo(function TypePicker({ visible, selected, onSelect
                 >
                   <View style={styles.itemContent}>
                     <Text style={[styles.itemLabel, isSelected && styles.itemLabelSelected]}>
-                      {ct.label}
+                      {t.cardTypes[ct.id as keyof typeof t.cardTypes] ?? ct.label}
                     </Text>
-                    <Text style={styles.itemDescription}>{ct.description}</Text>
+                    <Text style={styles.itemDescription}>{t.cardTypeDescriptions[ct.id as keyof typeof t.cardTypeDescriptions] ?? ct.description}</Text>
                   </View>
                   {ct.multiCard && (
                     <View style={styles.badge}>

@@ -99,6 +99,14 @@ const LOCALE_TO_SCRYFALL_LANG: Record<string, string> = {
   en: 'en',
   pt: 'pt',
   es: 'es',
+  fr: 'fr',
+  de: 'de',
+  it: 'it',
+  ja: 'ja',
+  ko: 'ko',
+  ru: 'ru',
+  zhs: 'zhs',
+  zht: 'zht',
 };
 
 async function fetchLocalizedCard(cardId: string, lang: string): Promise<ScryfallCard | null> {

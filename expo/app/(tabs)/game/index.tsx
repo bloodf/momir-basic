@@ -20,6 +20,7 @@ import {
   Flame,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { useI18n } from '@/i18n';
 
 interface GameMode {
   id: string;
@@ -33,11 +34,13 @@ interface GameMode {
   bgColor: string;
 }
 
-const GAME_MODES: GameMode[] = [
+function useGameModes(): GameMode[] {
+  const { t } = useI18n();
+  return React.useMemo(() => [
   {
     id: 'standard',
-    name: 'Standard',
-    description: '1v1 constructed format',
+    name: t.game.standard,
+    description: t.game.standardDesc,
     startingLife: 20,
     defaultPlayers: 2,
     icon: Swords,
@@ -47,8 +50,8 @@ const GAME_MODES: GameMode[] = [
   },
   {
     id: 'commander',
-    name: 'Commander',
-    description: '4 player singleton format',
+    name: t.game.commanderMode,
+    description: t.game.commanderDesc,
     startingLife: 40,
     defaultPlayers: 4,
     icon: Crown,
@@ -58,8 +61,8 @@ const GAME_MODES: GameMode[] = [
   },
   {
     id: 'brawl',
-    name: 'Brawl',
-    description: 'Standard meets Commander',
+    name: t.game.brawl,
+    description: t.game.brawlDesc,
     startingLife: 25,
     defaultPlayers: 2,
     icon: Shield,
@@ -69,8 +72,8 @@ const GAME_MODES: GameMode[] = [
   },
   {
     id: 'two-headed',
-    name: 'Two-Headed Giant',
-    description: 'Teams of two share life',
+    name: t.game.twoHeadedGiant,
+    description: t.game.twoHeadedGiantDesc,
     startingLife: 30,
     defaultPlayers: 2,
     icon: Users,
@@ -80,8 +83,8 @@ const GAME_MODES: GameMode[] = [
   },
   {
     id: 'pauper',
-    name: 'Pauper',
-    description: 'Commons only format',
+    name: t.game.pauper,
+    description: t.game.pauperDesc,
     startingLife: 20,
     defaultPlayers: 2,
     icon: Heart,
@@ -91,8 +94,8 @@ const GAME_MODES: GameMode[] = [
   },
   {
     id: 'custom',
-    name: 'Custom',
-    description: 'Set your own rules',
+    name: t.game.custom,
+    description: t.game.customDesc,
     startingLife: 20,
     defaultPlayers: 2,
     icon: Flame,
@@ -100,7 +103,8 @@ const GAME_MODES: GameMode[] = [
     accentColor: Colors.gold,
     bgColor: 'rgba(232,105,45,0.08)',
   },
-];
+], [t]);
+}
 
 interface ModeCardProps {
   mode: GameMode;
@@ -196,6 +200,8 @@ const ModeCard = React.memo(function ModeCard({ mode, onPress, index }: ModeCard
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useI18n();
+  const GAME_MODES = useGameModes();
 
   const handleSelectMode = useCallback((mode: GameMode) => {
     router.push({
@@ -211,8 +217,8 @@ export default function GameScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Game Mode</Text>
-        <Text style={styles.subtitle}>Choose a format to start</Text>
+        <Text style={styles.title}>{t.game.title}</Text>
+        <Text style={styles.subtitle}>{t.game.subtitle}</Text>
       </View>
 
       <ScrollView

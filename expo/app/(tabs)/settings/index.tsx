@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Printer, ChevronRight, Zap, Info, Bug, Globe } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
-import { useI18n, LOCALE_LABELS, ALL_LOCALES, Locale } from '@/i18n';
+import { useI18n, LOCALE_LABELS, ALL_LOCALES, type Locale } from '@/i18n';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,7 +40,7 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Printer size={16} color={Colors.gold} />
-            <Text style={styles.sectionTitle}>Printer</Text>
+            <Text style={styles.sectionTitle}>{t.settings.printerSection}</Text>
           </View>
 
           <Pressable
@@ -49,9 +49,9 @@ export default function SettingsScreen() {
             testID="printer-setup"
           >
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Printer Setup</Text>
+              <Text style={styles.settingLabel}>{t.settings.printerSetup}</Text>
               <Text style={styles.settingValue}>
-                {settings.printer.name || 'Not connected'}
+                {settings.printer.name || t.printer.notConnected}
               </Text>
             </View>
             <ChevronRight size={18} color={Colors.textMuted} />
@@ -59,7 +59,7 @@ export default function SettingsScreen() {
 
           <Pressable onPress={togglePaperWidth} style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Paper Width</Text>
+              <Text style={styles.settingLabel}>{t.printer.paperWidth}</Text>
               <Text style={styles.settingValue}>{settings.printer.paperWidth}mm</Text>
             </View>
             <View style={styles.togglePill}>
@@ -76,8 +76,8 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Print Card Art</Text>
-              <Text style={styles.settingHint}>Disable for faster text-only prints</Text>
+              <Text style={styles.settingLabel}>{t.printer.printCardArt}</Text>
+              <Text style={styles.settingHint}>{t.printer.printCardArtHint}</Text>
             </View>
             <Switch
               value={settings.printer.printArt}
@@ -89,8 +89,8 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Auto-Print After Fetch</Text>
-              <Text style={styles.settingHint}>Automatically print when a card is fetched</Text>
+              <Text style={styles.settingLabel}>{t.printer.autoPrint}</Text>
+              <Text style={styles.settingHint}>{t.printer.autoPrintHint}</Text>
             </View>
             <Switch
               value={settings.printer.autoPrint}
@@ -104,13 +104,13 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Zap size={16} color={Colors.gold} />
-            <Text style={styles.sectionTitle}>Card Fetch</Text>
+            <Text style={styles.sectionTitle}>{t.settings.cardFetch}</Text>
           </View>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Exclude Un-Sets</Text>
-              <Text style={styles.settingHint}>Remove funny/silver-bordered cards</Text>
+              <Text style={styles.settingLabel}>{t.settings.excludeFunnySets}</Text>
+              <Text style={styles.settingHint}>{t.settings.excludeFunnyHint}</Text>
             </View>
             <Switch
               value={settings.excludeFunnySets}
@@ -122,8 +122,8 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Exclude Digital-Only</Text>
-              <Text style={styles.settingHint}>Remove Alchemy and digital-only cards</Text>
+              <Text style={styles.settingLabel}>{t.settings.excludeDigitalOnly}</Text>
+              <Text style={styles.settingHint}>{t.settings.excludeDigitalHint}</Text>
             </View>
             <Switch
               value={settings.excludeDigitalOnly}
@@ -139,12 +139,12 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Globe size={16} color={Colors.gold} />
-            <Text style={styles.sectionTitle}>Language</Text>
+            <Text style={styles.sectionTitle}>{t.settings.languageSection}</Text>
           </View>
 
           <Pressable onPress={cycleLocale} style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Language</Text>
+              <Text style={styles.settingLabel}>{t.settings.language}</Text>
               <Text style={styles.settingValue}>{LOCALE_LABELS[locale]}</Text>
             </View>
             <View style={styles.localeRow}>
@@ -166,13 +166,13 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Bug size={16} color={Colors.gold} />
-            <Text style={styles.sectionTitle}>Developer</Text>
+            <Text style={styles.sectionTitle}>{t.settings.developer}</Text>
           </View>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Dev Mode</Text>
-              <Text style={styles.settingHint}>Fake print: saves card image to gallery</Text>
+              <Text style={styles.settingLabel}>{t.settings.devMode}</Text>
+              <Text style={styles.settingHint}>{t.settings.devModeHint}</Text>
             </View>
             <Switch
               value={settings.devMode}
@@ -186,22 +186,20 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Info size={16} color={Colors.gold} />
-            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.sectionTitle}>{t.settings.about}</Text>
           </View>
 
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Version</Text>
+            <Text style={styles.settingLabel}>{t.settings.version}</Text>
             <Text style={styles.settingValue}>1.0.0</Text>
           </View>
 
           <View style={styles.aboutText}>
             <Text style={styles.aboutBody}>
-              Momir Basic is a Magic: The Gathering companion app for the Momir Basic format.
-              Card data provided by the Scryfall API.
+              {t.settings.aboutBody}
             </Text>
             <Text style={styles.aboutCredit}>
-              Scryfall is not affiliated with Wizards of the Coast.
-              MTG is a trademark of Wizards of the Coast LLC.
+              {t.settings.aboutCredit}
             </Text>
           </View>
         </View>

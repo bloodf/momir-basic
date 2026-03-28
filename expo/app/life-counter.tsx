@@ -26,6 +26,7 @@ import {
   Shield,
   Droplets,
 } from 'lucide-react-native';
+import { useI18n } from '@/i18n';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -50,13 +51,16 @@ const PLAYER_THEMES: { gradient: readonly [string, string] }[] = [
   { gradient: ['#2d2815', '#1a180c'] as const },
 ];
 
-const COUNTER_CONFIG: Record<CounterType, { label: string; icon: typeof Heart; color: string }> = {
-  life: { label: 'Life', icon: Heart, color: '#ff6b6b' },
-  poison: { label: 'Poison', icon: Skull, color: '#51cf66' },
-  energy: { label: 'Energy', icon: Zap, color: '#ffd43b' },
-  experience: { label: 'Exp', icon: Crown, color: '#cc5de8' },
-  commander: { label: 'Cmd Dmg', icon: Shield, color: '#ff8787' },
-};
+function useCounterConfig(): Record<CounterType, { label: string; icon: typeof Heart; color: string }> {
+  const { t } = useI18n();
+  return React.useMemo(() => ({
+    life: { label: t.lifeCounter.life, icon: Heart, color: '#ff6b6b' },
+    poison: { label: t.lifeCounter.poison, icon: Skull, color: '#51cf66' },
+    energy: { label: t.lifeCounter.energy, icon: Zap, color: '#ffd43b' },
+    experience: { label: t.lifeCounter.experience, icon: Crown, color: '#cc5de8' },
+    commander: { label: t.lifeCounter.commanderDamage, icon: Shield, color: '#ff8787' },
+  }), [t]);
+}
 
 function hapticTap() {
   if (Platform.OS !== 'web') {
@@ -170,8 +174,9 @@ const PlayerPanel = React.memo(function PlayerPanel({
     onDecrement(player.id);
   }, [onDecrement, player.id, decrementAnim, pulseValue, showDeltaAnim]);
 
+  const counterConfig = useCounterConfig();
   const value = getActiveValue();
-  const counterConf = COUNTER_CONFIG[activeCounter];
+  const counterConf = counterConfig[activeCounter];
   const CounterIcon = counterConf.icon;
 
   const isLow = activeCounter === 'life' && value <= 5;
@@ -286,6 +291,8 @@ const PlayerPanel = React.memo(function PlayerPanel({
 
 export default function LifeCounterScreen() {
   const router = useRouter();
+  const { t } = useI18n();
+  const counterConfig = useCounterConfig();
   const params = useLocalSearchParams<{
     startingLife?: string;
     playerCount?: string;
@@ -524,9 +531,9 @@ export default function LifeCounterScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowCounterPicker(null)}>
           <View style={styles.counterPickerSheet}>
-            <Text style={styles.pickerTitle}>Select Counter</Text>
-            {(Object.keys(COUNTER_CONFIG) as CounterType[]).map((key) => {
-              const conf = COUNTER_CONFIG[key];
+            <Text style={styles.pickerTitle}>{t.lifeCounter.selectCounter}</Text>
+            {(Object.keys(counterConfig) as CounterType[]).map((key) => {
+              const conf = counterConfig[key];
               const Icon = conf.icon;
               const isActive = showCounterPicker !== null && activeCounters[showCounterPicker] === key;
               return (
@@ -559,9 +566,9 @@ export default function LifeCounterScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowSettings(false)}>
           <Pressable style={styles.settingsSheet} onPress={() => {}}>
-            <Text style={styles.settingsTitle}>Settings</Text>
+            <Text style={styles.settingsTitle}>{t.lifeCounter.settings}</Text>
 
-            <Text style={styles.settingLabel}>Players</Text>
+            <Text style={styles.settingLabel}>{t.lifeCounter.players}</Text>
             <View style={styles.optionRow}>
               {([2, 4] as PlayerCount[]).map((count) => (
                 <Pressable
@@ -577,7 +584,7 @@ export default function LifeCounterScreen() {
               ))}
             </View>
 
-            <Text style={styles.settingLabel}>Starting Life</Text>
+            <Text style={styles.settingLabel}>{t.lifeCounter.startingLife}</Text>
             <View style={styles.optionRow}>
               {[20, 25, 30, 40].map((life) => (
                 <Pressable
@@ -600,11 +607,11 @@ export default function LifeCounterScreen() {
               }}
             >
               <RotateCcw size={15} color="#ff6b6b" />
-              <Text style={styles.resetAllText}>Reset All</Text>
+              <Text style={styles.resetAllText}>{t.lifeCounter.resetAll}</Text>
             </Pressable>
 
             <Pressable style={styles.doneButton} onPress={() => setShowSettings(false)}>
-              <Text style={styles.doneButtonText}>Done</Text>
+              <Text style={styles.doneButtonText}>{t.common.done}</Text>
             </Pressable>
           </Pressable>
         </Pressable>

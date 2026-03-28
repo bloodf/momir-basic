@@ -36,7 +36,7 @@ export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Card[]>([]);
@@ -134,7 +134,7 @@ export default function SearchScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
+        <Text style={styles.title}>{t.search.title}</Text>
       </View>
 
       <View style={styles.searchRow}>
@@ -143,7 +143,7 @@ export default function SearchScreen() {
           <TextInput
             ref={inputRef}
             style={styles.searchInput}
-            placeholder="Search any Magic card..."
+            placeholder={t.search.placeholder}
             placeholderTextColor={Colors.textMuted}
             value={query}
             onChangeText={handleQueryChange}
@@ -164,7 +164,7 @@ export default function SearchScreen() {
           style={({ pressed }) => [styles.searchBtn, pressed && styles.searchBtnPressed]}
           testID="search-submit"
         >
-          <Text style={styles.searchBtnText}>Go</Text>
+          <Text style={styles.searchBtnText}>{t.common.go}</Text>
         </Pressable>
       </View>
 
@@ -187,7 +187,7 @@ export default function SearchScreen() {
         <View style={styles.popularSection}>
           <View style={styles.popularHeader}>
             <TrendingUp size={14} color={Colors.gold} />
-            <Text style={styles.popularTitle}>Popular Searches</Text>
+            <Text style={styles.popularTitle}>{t.search.popularSearches}</Text>
           </View>
           <View style={styles.popularChips}>
             {POPULAR_SEARCHES.map((s) => (
@@ -206,14 +206,14 @@ export default function SearchScreen() {
       {hasSearched && results.length === 0 && !searchMutation.isPending && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyTitle}>No cards found</Text>
-          <Text style={styles.emptySubtitle}>Try a different search term or check your spelling</Text>
+          <Text style={styles.emptyTitle}>{t.search.noCardsFound}</Text>
+          <Text style={styles.emptySubtitle}>{t.search.tryDifferentSearch}</Text>
         </View>
       )}
 
       {hasSearched && totalCount > 0 && (
         <Text style={styles.resultCount}>
-          {totalCount.toLocaleString()} card{totalCount !== 1 ? 's' : ''} found
+          {t.search.cardsFound(totalCount)}
         </Text>
       )}
 
@@ -240,7 +240,7 @@ export default function SearchScreen() {
       {searchMutation.isPending && currentPage === 1 && (
         <View style={styles.loadingState}>
           <ActivityIndicator color={Colors.gold} size="large" />
-          <Text style={styles.loadingText}>Searching Scryfall...</Text>
+          <Text style={styles.loadingText}>{t.search.searchingScryfall}</Text>
         </View>
       )}
     </View>

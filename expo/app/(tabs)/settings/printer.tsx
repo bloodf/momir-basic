@@ -45,7 +45,7 @@ export default function PrinterSetupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings, updatePrinter, updateSettings } = useSettings();
-  const { t: _t } = useI18n();
+  const { t } = useI18n();
 
   const [scanning, setScanning] = useState(false);
   const [devices, setDevices] = useState<PrinterDevice[]>([]);
@@ -85,9 +85,9 @@ export default function PrinterSetupScreen() {
         void Linking.openSettings();
       });
     } else {
-      Alert.alert('Bluetooth Settings', 'Open your device Bluetooth settings to pair the printer.');
+      Alert.alert(t.printer.bluetoothSettings, t.printer.bluetoothSettingsMsg);
     }
-  }, [isIOS]);
+  }, [isIOS, t]);
 
   const handleScan = useCallback(() => {
     setScanning(true);
@@ -120,9 +120,9 @@ export default function PrinterSetupScreen() {
       updateSettings({ printerConnected: true });
       setConnecting(null);
       console.log('[Printer] Connected to', device.name);
-      Alert.alert('Connected', `Connected to ${device.name}`);
+      Alert.alert(t.printer.connected, t.printer.connectedTo(device.name));
     }, 1500);
-  }, [updatePrinter, updateSettings]);
+  }, [updatePrinter, updateSettings, t]);
 
   const handleDisconnect = useCallback(() => {
     console.log('[Printer] Disconnecting from', settings.printer.name);
@@ -132,10 +132,10 @@ export default function PrinterSetupScreen() {
 
   const handleTestPrint = useCallback(() => {
     Alert.alert(
-      'Test Print',
-      `Sending test page to ${settings.printer.name}...\n\n(Bluetooth printing requires a development build)`
+      t.printer.testPrint,
+      t.printer.testPrintMsg(settings.printer.name)
     );
-  }, [settings.printer]);
+  }, [settings.printer, t]);
 
   const getSignalBars = (rssi?: number): number => {
     if (!rssi) return 0;
@@ -213,7 +213,7 @@ export default function PrinterSetupScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton} testID="back">
           <ArrowLeft size={20} color={Colors.textPrimary} />
         </Pressable>
-        <Text style={styles.title}>Printer Setup</Text>
+        <Text style={styles.title}>{t.printer.title}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -248,10 +248,10 @@ export default function PrinterSetupScreen() {
             <View style={styles.connectedActions}>
               <Pressable onPress={handleTestPrint} style={styles.testButton}>
                 <Printer size={14} color={Colors.gold} />
-                <Text style={styles.testButtonText}>Test</Text>
+                <Text style={styles.testButtonText}>{t.printer.test}</Text>
               </Pressable>
               <Pressable onPress={handleDisconnect} style={styles.disconnectButton}>
-                <Text style={styles.disconnectText}>Disconnect</Text>
+                <Text style={styles.disconnectText}>{t.printer.disconnect}</Text>
               </Pressable>
             </View>
           </View>
@@ -263,7 +263,7 @@ export default function PrinterSetupScreen() {
               <View style={styles.iosFlowIconWrap}>
                 <Bluetooth size={20} color="#5B9BD5" />
               </View>
-              <Text style={styles.iosFlowTitle}>iOS Bluetooth Setup</Text>
+              <Text style={styles.iosFlowTitle}>{t.printer.iosBluetoothSetup}</Text>
             </View>
 
             <View style={styles.stepsContainer}>
@@ -272,8 +272,8 @@ export default function PrinterSetupScreen() {
                   <Text style={styles.stepNumberText}>1</Text>
                 </View>
                 <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Turn on your printer</Text>
-                  <Text style={styles.stepDesc}>Make sure the thermal printer is powered on and in pairing mode</Text>
+                  <Text style={styles.stepTitle}>{t.printer.step1Title}</Text>
+                  <Text style={styles.stepDesc}>{t.printer.step1Desc}</Text>
                 </View>
               </View>
 
@@ -284,8 +284,8 @@ export default function PrinterSetupScreen() {
                   <Text style={styles.stepNumberText}>2</Text>
                 </View>
                 <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Pair via iOS Settings</Text>
-                  <Text style={styles.stepDesc}>Go to Settings → Bluetooth and connect to your printer</Text>
+                  <Text style={styles.stepTitle}>{t.printer.step2Title}</Text>
+                  <Text style={styles.stepDesc}>{t.printer.step2Desc}</Text>
                 </View>
               </View>
 
@@ -296,8 +296,8 @@ export default function PrinterSetupScreen() {
                   <Text style={styles.stepNumberText}>3</Text>
                 </View>
                 <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Select printer here</Text>
-                  <Text style={styles.stepDesc}>Come back and tap "Scan" below to find your paired printer</Text>
+                  <Text style={styles.stepTitle}>{t.printer.step3Title}</Text>
+                  <Text style={styles.stepDesc}>{t.printer.step3Desc}</Text>
                 </View>
               </View>
             </View>
@@ -311,7 +311,7 @@ export default function PrinterSetupScreen() {
               testID="open-bt-settings"
             >
               <ExternalLink size={16} color="#fff" />
-              <Text style={styles.openSettingsText}>Open Bluetooth Settings</Text>
+              <Text style={styles.openSettingsText}>{t.printer.openBluetoothSettings}</Text>
             </Pressable>
           </View>
         )}
@@ -320,7 +320,7 @@ export default function PrinterSetupScreen() {
           <View style={styles.infoCard}>
             <Info size={16} color="#5B9BD5" />
             <Text style={styles.infoText}>
-              Tap "Scan for Printers" to discover nearby Bluetooth printers. Make sure your printer is powered on and in pairing mode.
+              {t.printer.bluetoothInfo}
             </Text>
           </View>
         )}
@@ -342,14 +342,14 @@ export default function PrinterSetupScreen() {
                   <BluetoothSearching size={18} color={Colors.gold} />
                 </Animated.View>
                 <Text style={styles.scanButtonText}>
-                  {isIOS ? 'Looking for paired printers...' : 'Scanning...'}
+                  {isIOS ? t.printer.lookingForPaired : t.printer.scanning}
                 </Text>
               </View>
             ) : (
               <View style={styles.scanButtonContent}>
                 <BluetoothSearching size={18} color={Colors.gold} />
                 <Text style={styles.scanButtonText}>
-                  {isIOS ? 'Scan for Paired Printers' : 'Scan for Printers'}
+                  {isIOS ? t.printer.scanForPairedPrinters : t.printer.scanForPrinters}
                 </Text>
               </View>
             )}
@@ -359,7 +359,7 @@ export default function PrinterSetupScreen() {
             <View style={styles.webNotice}>
               <Wifi size={13} color={Colors.textSecondary} />
               <Text style={styles.webNoticeText}>
-                Bluetooth is simulated in web preview. Use a development build for real connectivity.
+                {t.printer.webSimulated}
               </Text>
             </View>
           )}
@@ -368,7 +368,7 @@ export default function PrinterSetupScreen() {
         {hasDevices && (
           <View style={styles.devicesSection}>
             <Text style={styles.sectionLabel}>
-              {isIOS ? 'PAIRED DEVICES' : 'NEARBY DEVICES'}
+              {isIOS ? t.printer.pairedDevices : t.printer.nearbyDevices}
             </Text>
             {devices.map(renderDevice)}
           </View>
@@ -377,16 +377,16 @@ export default function PrinterSetupScreen() {
         {!scanning && !hasDevices && !settings.printerConnected && (
           <View style={styles.emptyState}>
             <Signal size={36} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>No Printers Found</Text>
+            <Text style={styles.emptyTitle}>{t.printer.noPrintersFound}</Text>
             <Text style={styles.emptySubtitle}>
               {isIOS
-                ? 'Pair your printer in iOS Bluetooth Settings first, then tap "Scan for Paired Printers" above.'
-                : 'Tap "Scan for Printers" to search for nearby Bluetooth thermal printers.'}
+                ? t.printer.iosEmptyHint
+                : t.printer.androidEmptyHint}
             </Text>
             <View style={styles.compatRow}>
               <View style={styles.compatItem}>
                 <Smartphone size={14} color={Colors.textMuted} />
-                <Text style={styles.compatText}>Works on iOS & Android</Text>
+                <Text style={styles.compatText}>{t.printer.worksOnBothPlatforms}</Text>
               </View>
               <View style={styles.compatItem}>
                 <Radio size={14} color={Colors.textMuted} />
