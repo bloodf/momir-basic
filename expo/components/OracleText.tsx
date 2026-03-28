@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ManaSymbol } from './ManaSymbol';
+import { Image } from 'expo-image';
 import Colors from '@/constants/colors';
 
 interface OracleTextProps {
@@ -38,6 +38,11 @@ function parseOracleText(text: string): TextSegment[][] {
   });
 }
 
+function getSymbolUri(symbol: string): string {
+  const code = symbol.replace(/[{}]/g, '').toUpperCase();
+  return `https://svgs.scryfall.io/card-symbols/${encodeURIComponent(code)}.svg`;
+}
+
 export const OracleText = memo(function OracleText({
   text,
   fontSize = 14,
@@ -45,17 +50,22 @@ export const OracleText = memo(function OracleText({
 }: OracleTextProps) {
   const paragraphs = useMemo(() => parseOracleText(text), [text]);
   const symbolSize = fontSize + 2;
+  const lineH = fontSize * 1.5;
 
   return (
     <View style={styles.container}>
       {paragraphs.map((segments, pIdx) => (
-        <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: fontSize * 1.5 }]}>
+        <Text key={pIdx} style={[styles.paragraph, { fontSize, color, lineHeight: lineH }]}>
           {segments.map((seg, sIdx) => {
             if (seg.type === 'symbol') {
               return (
-                <View key={sIdx} style={[styles.symbolWrap, { width: symbolSize + 2, height: symbolSize + 2 }]}>
-                  <ManaSymbol symbol={seg.value} size={symbolSize} />
-                </View>
+                <Image
+                  key={sIdx}
+                  source={{ uri: getSymbolUri(seg.value) }}
+                  style={{ width: symbolSize, height: symbolSize, marginBottom: -3 }}
+                  contentFit="contain"
+                  cachePolicy="disk"
+                />
               );
             }
             return <Text key={sIdx}>{seg.value}</Text>;
@@ -73,9 +83,5 @@ const styles = StyleSheet.create({
   paragraph: {
     flexWrap: 'wrap',
   },
-  symbolWrap: {
-    marginHorizontal: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
 });
