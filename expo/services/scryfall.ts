@@ -210,6 +210,56 @@ export interface BgCardData {
   colors: string[];
 }
 
+export interface CardPrinting {
+  id: string;
+  setName: string;
+  setCode: string;
+  collectorNumber: string;
+  rarity: string;
+  releasedAt: string;
+  imageUrl: string;
+}
+
+export async function fetchCardPrintings(cardName: string): Promise<CardPrinting[]> {
+  const query = `!"${cardName}" unique:prints`;
+  const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&order=released&dir=asc&unique=prints`;
+  console.log('[Scryfall] Fetching printings:', url);
+
+  try {
+    const response = await rateLimitedFetch(url);
+    if (!response.ok) {
+      console.log('[Scryfall] Printings fetch failed:', response.status);
+      return [];
+    }
+
+    const data = await response.json() as {
+      data: Array<{
+        id: string;
+        set_name: string;
+        set: string;
+        collector_number: string;
+        rarity: string;
+        released_at?: string;
+        image_uris?: { small: string };
+        card_faces?: Array<{ image_uris?: { small: string } }>;
+      }>;
+    };
+
+    return data.data.map(p => ({
+      id: p.id,
+      setName: p.set_name,
+      setCode: p.set?.toUpperCase() ?? '',
+      collectorNumber: p.collector_number,
+      rarity: p.rarity,
+      releasedAt: p.released_at ?? '',
+      imageUrl: p.image_uris?.small ?? p.card_faces?.[0]?.image_uris?.small ?? '',
+    }));
+  } catch (e) {
+    console.log('[Scryfall] Printings error:', e);
+    return [];
+  }
+}
+
 export async function fetchRandomBgCardForType(cardType: CardType): Promise<BgCardData> {
   const typeFragment = getTypeQueryFragment(cardType);
   const query = `${typeFragment} is:highres game:paper`;

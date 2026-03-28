@@ -33,12 +33,14 @@ import {
   Share2,
   Sword,
   Shield,
+  ChevronDown,
+  BookOpen,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { ManaCost } from '@/components/ManaCost';
 import { OracleText } from '@/components/OracleText';
-import { fetchRandomCard } from '@/services/scryfall';
+import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/scryfall';
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
@@ -68,6 +70,11 @@ export default function CardDetailScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showFullCard, setShowFullCard] = useState(false);
   const [showArtView, setShowArtView] = useState(false);
+  const [printingsExpanded, setPrintingsExpanded] = useState(false);
+  const [printings, setPrintings] = useState<CardPrinting[]>([]);
+  const [printingsLoading, setPrintingsLoading] = useState(false);
+  const [printingsFetched, setPrintingsFetched] = useState(false);
+  const chevronRotation = useRef(new Animated.Value(0)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
   const artModalOpacity = useRef(new Animated.Value(0)).current;
   const cardEntryAnim = useRef(new Animated.Value(0)).current;
@@ -229,6 +236,47 @@ export default function CardDetailScreen() {
     );
   }
 
+  const togglePrintings = useCallback(async () => {
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+
+    if (!printingsFetched && !printingsLoading) {
+      setPrintingsLoading(true);
+      try {
+        const results = await fetchCardPrintings(card.name);
+        setPrintings(results);
+        setPrintingsFetched(true);
+        console.log('[CardDetail] Fetched printings:', results.length);
+      } catch (e) {
+        console.log('[CardDetail] Printings error:', e);
+      } finally {
+        setPrintingsLoading(false);
+      }
+    }
+
+    const expanding = !printingsExpanded;
+    setPrintingsExpanded(expanding);
+
+    Animated.parallel([
+      Animated.timing(chevronRotation, {
+        toValue: expanding ? 1 : 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [printingsExpanded, printingsFetched, printingsLoading, card.name, chevronRotation]);
+
+  useEffect(() => {
+    setPrintingsExpanded(false);
+    setPrintings([]);
+    setPrintingsFetched(false);
+    chevronRotation.setValue(0);
+  }, [card.id, chevronRotation]);
+
+  const chevronSpin = chevronRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
   const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
   const hasStats = card.power !== undefined && card.toughness !== undefined;
   const rarityLabel = card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1);
@@ -367,6 +415,58 @@ export default function CardDetailScreen() {
               </View>
             </View>
           </View>
+
+          <Pressable onPress={togglePrintings} style={styles.printingsHeader}>
+            <View style={styles.sectionHeaderRow}>
+              <BookOpen size={13} color={Colors.gold} />
+              <Text style={styles.sectionHeaderText}>{t.card.printings}</Text>
+              {printingsFetched && (
+                <View style={styles.printingsCountBadge}>
+                  <Text style={styles.printingsCountText}>{printings.length}</Text>
+                </View>
+              )}
+            </View>
+            <Animated.View style={{ transform: [{ rotate: chevronSpin }] }}>
+              <ChevronDown size={16} color={Colors.textMuted} />
+            </Animated.View>
+          </Pressable>
+
+          {printingsExpanded && (
+            <View style={styles.printingsList}>
+              {printingsLoading ? (
+                <View style={styles.printingsLoadingWrap}>
+                  <ActivityIndicator size="small" color={Colors.gold} />
+                  <Text style={styles.printingsLoadingText}>{t.card.loadingPrintings}</Text>
+                </View>
+              ) : (
+                printings.map((p) => {
+                  const isCurrentSet = p.id === card.id;
+                  const pRarityColor = Colors.rarity[p.rarity as keyof typeof Colors.rarity] ?? Colors.textSecondary;
+                  return (
+                    <View
+                      key={p.id}
+                      style={[
+                        styles.printingItem,
+                        isCurrentSet && styles.printingItemCurrent,
+                      ]}
+                    >
+                      <View style={[styles.printingRarityDot, { backgroundColor: pRarityColor }]} />
+                      <View style={styles.printingInfo}>
+                        <Text style={[
+                          styles.printingSetName,
+                          isCurrentSet && styles.printingSetNameCurrent,
+                        ]} numberOfLines={1}>{p.setName}</Text>
+                        <Text style={styles.printingMeta}>#{p.collectorNumber} · {p.setCode}{p.releasedAt ? ` · ${p.releasedAt.slice(0, 4)}` : ''}</Text>
+                      </View>
+                      <Text style={[styles.printingRarityLabel, { color: pRarityColor }]}>
+                        {p.rarity.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
 
           {isMulti && (
             <View style={styles.navRow}>
@@ -902,5 +1002,85 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600' as const,
+  },
+  printingsHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingRight: 14,
+  },
+  printingsCountBadge: {
+    backgroundColor: 'rgba(232,105,45,0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  printingsCountText: {
+    color: Colors.gold,
+    fontSize: 10,
+    fontWeight: '700' as const,
+  },
+  printingsList: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden' as const,
+    marginTop: -4,
+  },
+  printingsLoadingWrap: {
+    flexDirection: 'row' as const,
+    alignItems: 'center',
+    justifyContent: 'center' as const,
+    gap: 10,
+    paddingVertical: 20,
+  },
+  printingsLoadingText: {
+    color: Colors.textMuted,
+    fontSize: 13,
+  },
+  printingItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  printingItemCurrent: {
+    backgroundColor: 'rgba(232,105,45,0.06)',
+  },
+  printingRarityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  printingInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  printingSetName: {
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  printingSetNameCurrent: {
+    color: Colors.gold,
+  },
+  printingMeta: {
+    color: Colors.textMuted,
+    fontSize: 11,
+  },
+  printingRarityLabel: {
+    fontSize: 12,
+    fontWeight: '800' as const,
+    width: 18,
+    textAlign: 'center' as const,
   },
 });

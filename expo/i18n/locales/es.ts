@@ -53,6 +53,9 @@ const es: Translations = {
     cardNotFound: 'Datos de carta no encontrados',
     noCardData: 'Sin datos de carta',
     powerToughness: 'F/R',
+    printings: 'Ediciones',
+    printingsCount: (count: number) => `${count} ediciones`,
+    loadingPrintings: 'Cargando ediciones...',
   },
   printPreview: {
     title: 'Vista Previa',

@@ -51,6 +51,9 @@ export interface Translations {
     cardNotFound: string;
     noCardData: string;
     powerToughness: string;
+    printings: string;
+    printingsCount: (count: number) => string;
+    loadingPrintings: string;
   };
   printPreview: {
     title: string;
