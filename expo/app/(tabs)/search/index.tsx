@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Search, X, TrendingUp } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
-import { searchCards, autocompleteCardName } from '@/services/scryfall';
+import { searchCards, autocompleteCardName, parseAdvancedSyntax } from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
 import { useI18n } from '@/i18n';
 import {
@@ -57,8 +57,9 @@ export default function SearchScreen() {
   const lastSearchQuery = useRef('');
 
   const buildFullQuery = useCallback((textQuery: string, currentFilters: SearchFilterState): string => {
+    const parsed = parseAdvancedSyntax(textQuery);
     const filterStr = buildFilterQuery(currentFilters);
-    const parts = [textQuery, filterStr].filter(Boolean);
+    const parts = [parsed, filterStr].filter(Boolean);
     return parts.join(' ');
   }, []);
 

@@ -311,6 +311,93 @@ export async function fetchCardPrintings(cardName: string): Promise<CardPrinting
   }
 }
 
+export interface ScryfallSet {
+  code: string;
+  name: string;
+  set_type: string;
+  released_at?: string;
+  icon_svg_uri?: string;
+}
+
+export async function fetchSets(): Promise<ScryfallSet[]> {
+  const url = `${BASE_URL}/sets`;
+  console.log('[Scryfall] Fetching sets');
+
+  try {
+    const response = await rateLimitedFetch(url);
+    if (!response.ok) return [];
+    const data = await response.json() as { data: ScryfallSet[] };
+    const validTypes = ['core', 'expansion', 'masters', 'draft_innovation', 'commander', 'supplement'];
+    return data.data
+      .filter(s => validTypes.includes(s.set_type))
+      .sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''));
+  } catch (e) {
+    console.log('[Scryfall] Sets fetch error:', e);
+    return [];
+  }
+}
+
+export function parseAdvancedSyntax(input: string): string {
+  let query = input;
+
+  const shortcuts: Record<string, Record<string, string>> = {
+    'R': {
+      'C': 'r:common', 'U': 'r:uncommon', 'R': 'r:rare', 'M': 'r:mythic',
+    },
+    'T': {
+      'C': 't:creature', 'I': 't:instant', 'S': 't:sorcery', 'A': 't:artifact',
+      'E': 't:enchantment', 'P': 't:planeswalker', 'L': 't:land',
+    },
+    'F': {
+      'S': 'f:standard', 'M': 'f:modern', 'L': 'f:legacy', 'V': 'f:vintage',
+      'C': 'f:commander', 'P': 'f:pioneer', 'PA': 'f:pauper',
+    },
+  };
+
+  const parts = query.split(/\s+/);
+  const processed: string[] = [];
+
+  for (const part of parts) {
+    const shortcutMatch = part.match(/^([RTFSA]):(.+)$/i);
+    if (shortcutMatch) {
+      const prefix = shortcutMatch[1].toUpperCase();
+      const value = shortcutMatch[2].toUpperCase();
+
+      if (prefix === 'A') {
+        processed.push(`a:"${shortcutMatch[2]}"`);
+        continue;
+      }
+      if (prefix === 'S') {
+        processed.push(`s:${shortcutMatch[2].toLowerCase()}`);
+        continue;
+      }
+
+      const map = shortcuts[prefix];
+      if (map && map[value]) {
+        processed.push(map[value]);
+        continue;
+      }
+    }
+
+    const manaCostMatch = part.match(/^(\d+)([WUBRGC]+)$/i);
+    if (manaCostMatch) {
+      const num = manaCostMatch[1];
+      const colors = manaCostMatch[2].toUpperCase();
+      const totalMv = parseInt(num, 10) + colors.length;
+      processed.push(`mv=${totalMv}`);
+      const colorChars = colors.replace(/C/g, '');
+      if (colorChars.length > 0) {
+        processed.push(`c:${colorChars.toLowerCase()}`);
+      }
+      continue;
+    }
+
+    processed.push(part);
+  }
+
+  return processed.join(' ');
+}
+
 export async function fetchRandomBgCardForType(cardType: CardType): Promise<BgCardData> {
   const typeFragment = getTypeQueryFragment(cardType);
   const query = `${typeFragment} is:highres game:paper`;

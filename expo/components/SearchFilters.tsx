@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,15 @@ import {
   ScrollView,
   Animated,
   Platform,
+  TextInput,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { SlidersHorizontal, X, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { SlidersHorizontal, X, ChevronDown, ChevronUp, HelpCircle, Search } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useI18n } from '@/i18n';
 import { ManaSymbol } from '@/components/ManaSymbol';
+import { fetchSets } from '@/services/scryfall';
+import { useQuery } from '@tanstack/react-query';
 
 export interface SearchFilterState {
   colors: string[];
@@ -21,6 +24,8 @@ export interface SearchFilterState {
   cmcOperator: '=' | '<=' | '>=';
   rarity: string;
   format: string;
+  set: string;
+  artist: string;
 }
 
 export const EMPTY_FILTERS: SearchFilterState = {
@@ -30,6 +35,8 @@ export const EMPTY_FILTERS: SearchFilterState = {
   cmcOperator: '=',
   rarity: '',
   format: '',
+  set: '',
+  artist: '',
 };
 
 interface ColorOption {
@@ -58,6 +65,8 @@ export function getActiveFilterCount(filters: SearchFilterState): number {
   if (filters.cmcValue) count++;
   if (filters.rarity) count++;
   if (filters.format) count++;
+  if (filters.set) count++;
+  if (filters.artist) count++;
   return count;
 }
 
@@ -86,6 +95,14 @@ export function buildFilterQuery(filters: SearchFilterState): string {
     parts.push(`f:${filters.format}`);
   }
 
+  if (filters.set) {
+    parts.push(`s:${filters.set.toLowerCase()}`);
+  }
+
+  if (filters.artist) {
+    parts.push(`a:"${filters.artist}"`);
+  }
+
   return parts.join(' ');
 }
 
@@ -106,6 +123,22 @@ export const SearchFilters = React.memo(function SearchFilters({
 }: Props) {
   const { t } = useI18n();
   const animValue = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const [setSearch, setSetSearch] = useState('');
+  const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
+
+  const setsQuery = useQuery({
+    queryKey: ['scryfall-sets'],
+    queryFn: fetchSets,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const filteredSets = useMemo(() => {
+    if (!setsQuery.data || !setSearch) return [];
+    const lower = setSearch.toLowerCase();
+    return setsQuery.data
+      .filter(s => s.name.toLowerCase().includes(lower) || s.code.toLowerCase().includes(lower))
+      .slice(0, 8);
+  }, [setsQuery.data, setSearch]);
 
   useEffect(() => {
     Animated.timing(animValue, {
@@ -214,14 +247,25 @@ export const SearchFilters = React.memo(function SearchFilters({
     onFiltersChange({ ...filters, format: filters.format === formatCode ? '' : formatCode });
   }, [filters, onFiltersChange]);
 
+  const handleSetSelect = useCallback((setCode: string) => {
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+    onFiltersChange({ ...filters, set: filters.set === setCode ? '' : setCode });
+    setSetSearch('');
+  }, [filters, onFiltersChange]);
+
+  const handleArtistChange = useCallback((text: string) => {
+    onFiltersChange({ ...filters, artist: text });
+  }, [filters, onFiltersChange]);
+
   const handleClearAll = useCallback(() => {
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onFiltersChange(EMPTY_FILTERS);
+    setSetSearch('');
   }, [onFiltersChange]);
 
   const containerHeight = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 420],
+    outputRange: [0, 620],
   });
 
   const containerOpacity = animValue.interpolate({
@@ -231,28 +275,30 @@ export const SearchFilters = React.memo(function SearchFilters({
 
   return (
     <View>
-      <Pressable
-        onPress={onToggleVisible}
-        style={({ pressed }) => [styles.filterToggle, pressed && styles.filterTogglePressed]}
-        testID="filter-toggle"
-      >
-        <View style={styles.filterToggleLeft}>
-          <SlidersHorizontal size={15} color={activeCount > 0 ? Colors.gold : Colors.textMuted} />
-          <Text style={[styles.filterToggleText, activeCount > 0 && styles.filterToggleTextActive]}>
-            {visible ? t.search.hideFilters : t.search.filters}
-          </Text>
-          {activeCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeCount}</Text>
-            </View>
+      <View style={styles.filterToggleRow}>
+        <Pressable
+          onPress={onToggleVisible}
+          style={({ pressed }) => [styles.filterToggle, pressed && styles.filterTogglePressed]}
+          testID="filter-toggle"
+        >
+          <View style={styles.filterToggleLeft}>
+            <SlidersHorizontal size={15} color={activeCount > 0 ? Colors.gold : Colors.textMuted} />
+            <Text style={[styles.filterToggleText, activeCount > 0 && styles.filterToggleTextActive]}>
+              {visible ? t.search.hideFilters : t.search.filters}
+            </Text>
+            {activeCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeCount}</Text>
+              </View>
+            )}
+          </View>
+          {visible ? (
+            <ChevronUp size={14} color={Colors.textMuted} />
+          ) : (
+            <ChevronDown size={14} color={Colors.textMuted} />
           )}
-        </View>
-        {visible ? (
-          <ChevronUp size={14} color={Colors.textMuted} />
-        ) : (
-          <ChevronDown size={14} color={Colors.textMuted} />
-        )}
-      </Pressable>
+        </Pressable>
+      </View>
 
       <Animated.View style={[styles.filtersContainer, { maxHeight: containerHeight, opacity: containerOpacity }]}>
         <ScrollView
@@ -391,6 +437,127 @@ export const SearchFilters = React.memo(function SearchFilters({
             </ScrollView>
           </View>
 
+          <View style={styles.filterSection}>
+            <Text style={styles.filterLabel}>{t.search.set}</Text>
+            {filters.set ? (
+              <View style={styles.selectedSetRow}>
+                <View style={styles.selectedSetChip}>
+                  <Text style={styles.selectedSetCode}>{filters.set.toUpperCase()}</Text>
+                  <Text style={styles.selectedSetName} numberOfLines={1}>
+                    {setsQuery.data?.find(s => s.code === filters.set)?.name ?? filters.set}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => handleSetSelect(filters.set)}
+                  hitSlop={8}
+                  style={styles.removeSetBtn}
+                >
+                  <X size={14} color={Colors.error} />
+                </Pressable>
+              </View>
+            ) : (
+              <View>
+                <View style={styles.textInputContainer}>
+                  <Search size={13} color={Colors.textMuted} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder={t.search.setPlaceholder}
+                    placeholderTextColor={Colors.textMuted}
+                    value={setSearch}
+                    onChangeText={setSetSearch}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    testID="filter-set-input"
+                  />
+                </View>
+                {filteredSets.length > 0 && (
+                  <View style={styles.setDropdown}>
+                    {filteredSets.map((s) => (
+                      <Pressable
+                        key={s.code}
+                        onPress={() => handleSetSelect(s.code)}
+                        style={({ pressed }) => [styles.setDropdownItem, pressed && styles.setDropdownItemPressed]}
+                      >
+                        <Text style={styles.setDropdownCode}>{s.code.toUpperCase()}</Text>
+                        <Text style={styles.setDropdownName} numberOfLines={1}>{s.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.filterSection}>
+            <Text style={styles.filterLabel}>{t.search.artist}</Text>
+            <View style={styles.textInputContainer}>
+              <Search size={13} color={Colors.textMuted} />
+              <TextInput
+                style={styles.textInput}
+                placeholder={t.search.artistPlaceholder}
+                placeholderTextColor={Colors.textMuted}
+                value={filters.artist}
+                onChangeText={handleArtistChange}
+                autoCorrect={false}
+                autoCapitalize="none"
+                testID="filter-artist-input"
+              />
+              {filters.artist.length > 0 && (
+                <Pressable onPress={() => handleArtistChange('')} hitSlop={8}>
+                  <X size={14} color={Colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          <Pressable
+            onPress={() => setShowSyntaxHelp(prev => !prev)}
+            style={({ pressed }) => [styles.syntaxHelpToggle, pressed && { opacity: 0.7 }]}
+          >
+            <HelpCircle size={14} color={Colors.gold} />
+            <Text style={styles.syntaxHelpToggleText}>
+              {showSyntaxHelp ? t.search.hideSyntaxHelp : t.search.syntaxHelp}
+            </Text>
+          </Pressable>
+
+          {showSyntaxHelp && (
+            <View style={styles.syntaxHelpBox}>
+              <Text style={styles.syntaxHelpTitle}>{t.search.advancedSearch}</Text>
+              <Text style={styles.syntaxHelpDesc}>{t.search.advancedSearchHint}</Text>
+              <View style={styles.syntaxTable}>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>R:M</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxRarity}</Text>
+                </View>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>T:C</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxType}</Text>
+                </View>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>F:S</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxFormat}</Text>
+                </View>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>S:neo</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxSet}</Text>
+                </View>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>A:Seb</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxArtist}</Text>
+                </View>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>c:WU</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxColor}</Text>
+                </View>
+                <View style={styles.syntaxRow}>
+                  <Text style={styles.syntaxCode}>2RW</Text>
+                  <Text style={styles.syntaxDesc}>{t.search.syntaxMana}</Text>
+                </View>
+              </View>
+              <Text style={styles.syntaxExamples}>{t.search.syntaxExamples}</Text>
+            </View>
+          )}
+
           {activeCount > 0 && (
             <Pressable
               onPress={handleClearAll}
@@ -410,18 +577,20 @@ export const SearchFilters = React.memo(function SearchFilters({
 });
 
 const styles = StyleSheet.create({
+  filterToggleRow: {
+    marginHorizontal: 16,
+    marginBottom: 6,
+  },
   filterToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: Colors.cardBackground,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 6,
   },
   filterTogglePressed: {
     backgroundColor: Colors.cardBackgroundLight,
@@ -492,10 +661,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  colorChipText: {
-    fontSize: 13,
-    fontWeight: '800' as const,
-  },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -547,6 +712,151 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700' as const,
     color: Colors.textPrimary,
+  },
+  textInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textPrimary,
+    padding: 0,
+  },
+  selectedSetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedSetChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.gold,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  selectedSetCode: {
+    fontSize: 12,
+    fontWeight: '800' as const,
+    color: Colors.background,
+  },
+  selectedSetName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.background,
+  },
+  removeSetBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 83, 80, 0.12)',
+  },
+  setDropdown: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  setDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  setDropdownItemPressed: {
+    backgroundColor: Colors.cardBackgroundLight,
+  },
+  setDropdownCode: {
+    fontSize: 11,
+    fontWeight: '800' as const,
+    color: Colors.gold,
+    minWidth: 36,
+  },
+  setDropdownName: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textPrimary,
+  },
+  syntaxHelpToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  syntaxHelpToggleText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.gold,
+  },
+  syntaxHelpBox: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    marginHorizontal: 4,
+    marginBottom: 12,
+  },
+  syntaxHelpTitle: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: Colors.gold,
+    marginBottom: 4,
+  },
+  syntaxHelpDesc: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  syntaxTable: {
+    gap: 6,
+  },
+  syntaxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  syntaxCode: {
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: Colors.goldLight,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    minWidth: 60,
+    backgroundColor: 'rgba(232, 105, 45, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  syntaxDesc: {
+    flex: 1,
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  syntaxExamples: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 10,
+    lineHeight: 16,
+    fontStyle: 'italic' as const,
   },
   clearBtn: {
     flexDirection: 'row',

@@ -138,6 +138,22 @@ export interface Translations {
     formatPioneer: string;
     formatPauper: string;
     activeFilters: (count: number) => string;
+    set: string;
+    artist: string;
+    setPlaceholder: string;
+    artistPlaceholder: string;
+    advancedSearch: string;
+    advancedSearchHint: string;
+    syntaxHelp: string;
+    hideSyntaxHelp: string;
+    syntaxRarity: string;
+    syntaxType: string;
+    syntaxFormat: string;
+    syntaxSet: string;
+    syntaxArtist: string;
+    syntaxColor: string;
+    syntaxMana: string;
+    syntaxExamples: string;
   };
   history: {
     title: string;
