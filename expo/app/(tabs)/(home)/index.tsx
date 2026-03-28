@@ -29,6 +29,8 @@ import { HistorySheet } from '@/components/HistorySheet';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
+const MIN_MULTI_COUNT = 1;
+const MAX_MULTI_COUNT = 10;
 
 function getDominantColor(colors: string[]): string {
   if (colors.length === 0) return Colors.background;
@@ -56,12 +58,18 @@ export default function HomeScreen() {
   const [_lastCards, setLastCards] = useState<Card[]>([]);
   const [typePickerVisible, setTypePickerVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
+  const [multiCardCounts, setMultiCardCounts] = useState<Record<string, number>>({});
 
   const cardType = CARD_TYPES[typeIndex].id;
   const currentTypeConfig = CARD_TYPES[typeIndex];
   const showCmc = currentTypeConfig.useCmc;
+  const multiCount = currentTypeConfig.multiCard
+    ? (multiCardCounts[cardType] ?? currentTypeConfig.count)
+    : currentTypeConfig.count;
 
-  const typeLabel = t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes];
+  const typeLabel = currentTypeConfig.multiCard
+    ? t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes].replace(/^\d+/, String(multiCount))
+    : t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes];
   const typeDesc = t.cardTypeDescriptions[currentTypeConfig.id as keyof typeof t.cardTypeDescriptions];
 
   const bgCache = useRef<Record<string, BgCardData>>({});
@@ -235,10 +243,36 @@ export default function HomeScreen() {
     }
   }, [typeIndex, animateTypeChange]);
 
+  const incrementMultiCount = useCallback(() => {
+    if (!currentTypeConfig.multiCard) return;
+    setMultiCardCounts(prev => {
+      const current = prev[cardType] ?? currentTypeConfig.count;
+      const next = Math.min(MAX_MULTI_COUNT, current + 1);
+      if (next !== current) {
+        if (Platform.OS !== 'web') void Haptics.selectionAsync();
+        animateCmcChange();
+      }
+      return { ...prev, [cardType]: next };
+    });
+  }, [cardType, currentTypeConfig, animateCmcChange]);
+
+  const decrementMultiCount = useCallback(() => {
+    if (!currentTypeConfig.multiCard) return;
+    setMultiCardCounts(prev => {
+      const current = prev[cardType] ?? currentTypeConfig.count;
+      const next = Math.max(MIN_MULTI_COUNT, current - 1);
+      if (next !== current) {
+        if (Platform.OS !== 'web') void Haptics.selectionAsync();
+        animateCmcChange();
+      }
+      return { ...prev, [cardType]: next };
+    });
+  }, [cardType, currentTypeConfig, animateCmcChange]);
+
   const castMutation = useMutation({
     mutationFn: async () => {
       if (currentTypeConfig.multiCard) {
-        return fetchMultipleCards(cardType, currentTypeConfig.count, settings.excludeFunnySets, locale);
+        return fetchMultipleCards(cardType, multiCount, settings.excludeFunnySets, locale);
       } else {
         const card = await fetchRandomCard(cardType, cmc, settings.excludeFunnySets, 3, locale);
         return [card];
@@ -430,7 +464,41 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.multiCardSection}>
-              <Text style={styles.multiCardLabel}>{t.home.fetchingCards(currentTypeConfig.count)}</Text>
+              <View style={styles.cmcHeader}>
+                <Pressable
+                  onPress={decrementMultiCount}
+                  disabled={multiCount <= MIN_MULTI_COUNT}
+                  style={({ pressed }) => [
+                    styles.cmcStepButton,
+                    multiCount <= MIN_MULTI_COUNT && styles.cmcStepButtonDisabled,
+                    pressed && multiCount > MIN_MULTI_COUNT && styles.cmcStepButtonPressed,
+                  ]}
+                  hitSlop={10}
+                  testID="multi-count-decrement"
+                >
+                  <Minus size={18} color={multiCount <= MIN_MULTI_COUNT ? Colors.textMuted : Colors.gold} />
+                </Pressable>
+
+                <Animated.View style={[styles.cmcDisplay, { transform: [{ scale: cmcPulse }] }]}>
+                  <Text style={styles.cmcValue}>{multiCount}</Text>
+                  <Text style={styles.cmcLabel}>{t.home.cardCount}</Text>
+                </Animated.View>
+
+                <Pressable
+                  onPress={incrementMultiCount}
+                  disabled={multiCount >= MAX_MULTI_COUNT}
+                  style={({ pressed }) => [
+                    styles.cmcStepButton,
+                    multiCount >= MAX_MULTI_COUNT && styles.cmcStepButtonDisabled,
+                    pressed && multiCount < MAX_MULTI_COUNT && styles.cmcStepButtonPressed,
+                  ]}
+                  hitSlop={10}
+                  testID="multi-count-increment"
+                >
+                  <Plus size={18} color={multiCount >= MAX_MULTI_COUNT ? Colors.textMuted : Colors.gold} />
+                </Pressable>
+              </View>
+              <Text style={styles.multiCardLabel}>{t.home.fetchingCards(multiCount)}</Text>
             </View>
           )}
 

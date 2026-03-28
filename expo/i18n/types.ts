@@ -21,6 +21,7 @@ export interface Translations {
     fetchingCards: (count: number) => string;
     printerConnected: string;
     turn: string;
+    cardCount: string;
   };
   cardTypes: {
     creature: string;
@@ -81,6 +82,12 @@ export interface Translations {
     galleryAccessRequired: string;
     saveFailed: string;
     saveFailedMsg: string;
+    ditheredPreview: string;
+    oneBitMode: string;
+    preparingPrint: string;
+    sendingData: string;
+    printComplete: string;
+    feedingPaper: string;
   };
   tabs: {
     cast: string;
@@ -97,6 +104,12 @@ export interface Translations {
     tryDifferentSearch: string;
     cardsFound: (count: number) => string;
     searchingScryfall: string;
+    listView: string;
+    cardView: string;
+    page: (current: number, total: number) => string;
+    loadMore: string;
+    nextPage: string;
+    prevPage: string;
     filters: string;
     hideFilters: string;
     color: string;

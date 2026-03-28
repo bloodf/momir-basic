@@ -6,19 +6,21 @@ import {
   TextInput,
   Pressable,
   FlatList,
-  ActivityIndicator,
   Keyboard,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Search, X, TrendingUp } from 'lucide-react-native';
+import { Search, X, TrendingUp, LayoutList, LayoutGrid } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { searchCards, autocompleteCardName, parseAdvancedSyntax } from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
+import { CardGridItem } from '@/components/CardGridItem';
+import { SearchSkeleton, CardGridSkeleton } from '@/components/Skeleton';
 import { useI18n } from '@/i18n';
 import {
   SearchFilters,
@@ -39,6 +41,9 @@ const POPULAR_SEARCHES = [
   'Path to Exile',
 ];
 
+type ViewMode = 'list' | 'grid';
+const CARDS_PER_PAGE = 175;
+
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -54,7 +59,23 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const lastSearchQuery = useRef('');
+
+  const totalPages = useMemo(() => Math.ceil(totalCount / CARDS_PER_PAGE), [totalCount]);
+
+  const toggleAnim = useRef(new Animated.Value(0)).current;
+
+  const handleViewModeToggle = useCallback((mode: ViewMode) => {
+    if (mode === viewMode) return;
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+    setViewMode(mode);
+    Animated.timing(toggleAnim, {
+      toValue: mode === 'grid' ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [viewMode, toggleAnim]);
 
   const buildFullQuery = useCallback((textQuery: string, currentFilters: SearchFilterState): string => {
     const parsed = parseAdvancedSyntax(textQuery);
@@ -140,6 +161,7 @@ export default function SearchScreen() {
     setHasMore(false);
     setHasSearched(false);
     setSuggestions([]);
+    setCurrentPage(1);
     inputRef.current?.focus();
   }, []);
 
@@ -153,14 +175,20 @@ export default function SearchScreen() {
 
   const activeFilterCount = useMemo(() => getActiveFilterCount(filters), [filters]);
 
-  const renderItem = useCallback(({ item }: { item: Card }) => (
+  const renderListItem = useCallback(({ item }: { item: Card }) => (
     <CardListItem card={item} onPress={handleCardPress} />
+  ), [handleCardPress]);
+
+  const renderGridItem = useCallback(({ item }: { item: Card }) => (
+    <CardGridItem card={item} onPress={handleCardPress} />
   ), [handleCardPress]);
 
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
   const showSuggestions = suggestions.length > 0 && !hasSearched;
   const showPopular = !hasSearched && results.length === 0 && query.length === 0 && !filtersVisible;
+  const isFirstPageLoading = searchMutation.isPending && currentPage <= 1 && results.length === 0;
+  const isLoadingMore = searchMutation.isPending && results.length > 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -256,36 +284,89 @@ export default function SearchScreen() {
       )}
 
       {hasSearched && totalCount > 0 && (
-        <Text style={styles.resultCount}>
-          {t.search.cardsFound(totalCount)}
-        </Text>
+        <View style={styles.resultBar}>
+          <Text style={styles.resultCount}>
+            {t.search.cardsFound(totalCount)}
+          </Text>
+          <View style={styles.viewToggle}>
+            <Pressable
+              onPress={() => handleViewModeToggle('list')}
+              style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
+              testID="view-mode-list"
+            >
+              <LayoutList size={15} color={viewMode === 'list' ? Colors.gold : Colors.textMuted} />
+            </Pressable>
+            <Pressable
+              onPress={() => handleViewModeToggle('grid')}
+              style={[styles.viewToggleBtn, viewMode === 'grid' && styles.viewToggleBtnActive]}
+              testID="view-mode-grid"
+            >
+              <LayoutGrid size={15} color={viewMode === 'grid' ? Colors.gold : Colors.textMuted} />
+            </Pressable>
+          </View>
+        </View>
       )}
 
-      {results.length > 0 && (
+      {isFirstPageLoading && (
+        viewMode === 'list' ? <SearchSkeleton /> : <CardGridSkeleton />
+      )}
+
+      {results.length > 0 && viewMode === 'list' && (
         <FlatList
           data={results}
-          renderItem={renderItem}
+          renderItem={renderListItem}
           keyExtractor={keyExtractor}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.4}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
           ListFooterComponent={
-            searchMutation.isPending && currentPage > 1 ? (
-              <View style={styles.loadingMore}>
-                <ActivityIndicator color={Colors.gold} size="small" />
-              </View>
-            ) : null
+            <>
+              {isLoadingMore && (
+                <View style={styles.loadingMore}>
+                  <SearchSkeleton />
+                </View>
+              )}
+              {hasMore && !searchMutation.isPending && (
+                <View style={styles.paginationRow}>
+                  <Text style={styles.pageInfo}>
+                    {t.search.page(currentPage, totalPages)}
+                  </Text>
+                </View>
+              )}
+            </>
           }
           testID="search-results"
         />
       )}
 
-      {searchMutation.isPending && currentPage === 1 && (
-        <View style={styles.loadingState}>
-          <ActivityIndicator color={Colors.gold} size="large" />
-          <Text style={styles.loadingText}>{t.search.searchingScryfall}</Text>
-        </View>
+      {results.length > 0 && viewMode === 'grid' && (
+        <FlatList
+          data={results}
+          renderItem={renderGridItem}
+          keyExtractor={keyExtractor}
+          numColumns={2}
+          columnWrapperStyle={styles.gridRow}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          ListFooterComponent={
+            <>
+              {isLoadingMore && (
+                <CardGridSkeleton />
+              )}
+              {hasMore && !searchMutation.isPending && (
+                <View style={styles.paginationRow}>
+                  <Text style={styles.pageInfo}>
+                    {t.search.page(currentPage, totalPages)}
+                  </Text>
+                </View>
+              )}
+            </>
+          }
+          testID="search-results-grid"
+        />
       )}
     </View>
   );
@@ -418,12 +499,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500' as const,
   },
+  resultBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
   resultCount: {
     color: Colors.textMuted,
     fontSize: 12,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  viewToggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: 'rgba(232,105,45,0.15)',
+  },
+  gridRow: {
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 4,
+    gap: 8,
   },
   emptyState: {
     flex: 1,
@@ -447,18 +552,45 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     paddingHorizontal: 40,
   },
-  loadingState: {
-    flex: 1,
-    justifyContent: 'center',
+  loadingMore: {
+    paddingVertical: 8,
+  },
+  paginationRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     gap: 12,
   },
-  loadingText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
+  pageInfo: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '500' as const,
   },
-  loadingMore: {
-    paddingVertical: 20,
+  pageNavBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pageNavBtnPressed: {
+    backgroundColor: Colors.cardBackgroundLight,
+  },
+  pageNavBtnDisabled: {
+    opacity: 0.35,
+  },
+  pageNavText: {
+    color: Colors.gold,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  pageNavTextDisabled: {
+    color: Colors.textMuted,
   },
 });
