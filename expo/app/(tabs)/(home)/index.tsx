@@ -8,13 +8,14 @@ import {
   ActivityIndicator,
   Platform,
   ImageBackground,
+  PanResponder,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ChevronLeft, ChevronRight, Minus, Plus, Zap } from 'lucide-react-native';
+import { Minus, Plus, Zap } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
@@ -166,21 +167,32 @@ export default function HomeScreen() {
     });
   }, [animateCmcChange]);
 
-  const animateTypeChange = useCallback(() => {
+  const swipeSlide = useRef(new Animated.Value(0)).current;
+
+  const animateTypeChange = useCallback((direction: 'left' | 'right') => {
     typeTransition.setValue(0);
-    Animated.spring(typeTransition, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 200,
-      friction: 18,
-    }).start();
-  }, [typeTransition]);
+    swipeSlide.setValue(direction === 'left' ? 30 : -30);
+    Animated.parallel([
+      Animated.spring(typeTransition, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 18,
+      }),
+      Animated.spring(swipeSlide, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 18,
+      }),
+    ]).start();
+  }, [typeTransition, swipeSlide]);
 
   const nextType = useCallback(() => {
     setTypeIndex(prev => {
       const next = prev === CARD_TYPES.length - 1 ? 0 : prev + 1;
       if (Platform.OS !== 'web') void Haptics.selectionAsync();
-      animateTypeChange();
+      animateTypeChange('left');
       return next;
     });
   }, [animateTypeChange]);
@@ -189,10 +201,25 @@ export default function HomeScreen() {
     setTypeIndex(prev => {
       const next = prev === 0 ? CARD_TYPES.length - 1 : prev - 1;
       if (Platform.OS !== 'web') void Haptics.selectionAsync();
-      animateTypeChange();
+      animateTypeChange('right');
       return next;
     });
   }, [animateTypeChange]);
+
+  const swipePanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dy) < 30;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -40) {
+          nextType();
+        } else if (gestureState.dx > 40) {
+          prevType();
+        }
+      },
+    })
+  ).current;
 
   const castMutation = useMutation({
     mutationFn: async () => {
@@ -314,33 +341,14 @@ export default function HomeScreen() {
         <View style={styles.spacer} />
 
         <View style={[styles.bottomControls, { paddingBottom: Math.max(insets.bottom, 12) + 60 }]}>
-          <Animated.View style={[styles.typeRow, { opacity: typeOpacity, transform: [{ translateY: typeTranslateY }] }]}>
-            <Pressable
-              onPress={prevType}
-              style={({ pressed }) => [
-                styles.typeArrow,
-                pressed && styles.typeArrowPressed,
-              ]}
-              hitSlop={12}
-            >
-              <ChevronLeft size={18} color={Colors.gold} />
-            </Pressable>
-
+          <Animated.View
+            {...swipePanResponder.panHandlers}
+            style={[styles.typeRow, { opacity: typeOpacity, transform: [{ translateY: typeTranslateY }, { translateX: swipeSlide }] }]}
+          >
             <View style={styles.typeLabelWrap}>
               <Text style={styles.typeSelectorText}>{typeLabel}</Text>
               <Text style={styles.typeDescription}>{typeDesc}</Text>
             </View>
-
-            <Pressable
-              onPress={nextType}
-              style={({ pressed }) => [
-                styles.typeArrow,
-                pressed && styles.typeArrowPressed,
-              ]}
-              hitSlop={12}
-            >
-              <ChevronRight size={18} color={Colors.gold} />
-            </Pressable>
           </Animated.View>
 
           <View style={styles.typeIndicatorRow}>
@@ -449,7 +457,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: '58%',
+    height: '68%',
   },
   bgImage: {
     position: 'absolute',
@@ -509,21 +517,10 @@ const styles = StyleSheet.create({
   typeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     width: '100%',
     marginBottom: 12,
-  },
-  typeArrow: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(232,105,45,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(232,105,45,0.18)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  typeArrowPressed: {
-    backgroundColor: 'rgba(232,105,45,0.18)',
+    marginTop: 24,
   },
   typeLabelWrap: {
     flex: 1,
