@@ -1,6 +1,9 @@
 import React, { memo, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { Printer } from 'lucide-react-native';
 import { ManaCost } from './ManaCost';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
@@ -8,10 +11,20 @@ import { Card } from '@/types';
 interface CardListItemProps {
   card: Card;
   onPress: (card: Card) => void;
+  showPrint?: boolean;
 }
 
-export const CardListItem = memo(function CardListItem({ card, onPress }: CardListItemProps) {
+export const CardListItem = memo(function CardListItem({ card, onPress, showPrint = true }: CardListItemProps) {
+  const router = useRouter();
   const handlePress = useCallback(() => onPress(card), [card, onPress]);
+
+  const handlePrint = useCallback(() => {
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/print-preview',
+      params: { cardJson: JSON.stringify(card) },
+    });
+  }, [card, router]);
 
   const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
   const dateStr = new Date(card.fetchedAt).toLocaleDateString(undefined, {
@@ -49,6 +62,16 @@ export const CardListItem = memo(function CardListItem({ card, onPress }: CardLi
         <View style={styles.ptBox}>
           <Text style={styles.ptText}>{card.power}/{card.toughness}</Text>
         </View>
+      )}
+      {showPrint && (
+        <Pressable
+          onPress={handlePrint}
+          hitSlop={6}
+          style={({ pressed }) => [styles.printBtn, pressed && styles.printBtnPressed]}
+          testID={`print-card-${card.id}`}
+        >
+          <Printer size={15} color={Colors.gold} />
+        </Pressable>
       )}
     </Pressable>
   );
@@ -124,5 +147,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700' as const,
+  },
+  printBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(232,105,45,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(232,105,45,0.2)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  printBtnPressed: {
+    backgroundColor: 'rgba(232,105,45,0.2)',
   },
 });
