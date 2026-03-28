@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,6 @@ import {
   ArrowLeft,
   Bluetooth,
   BluetoothSearching,
-  Signal,
   Printer,
   Check,
   Smartphone,
@@ -28,34 +27,42 @@ import {
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
-import { PrinterDevice } from '@/types';
+import type { PrinterRecord } from '@/types';
 import { useI18n } from '@/i18n';
+import { registryService } from '@/services/printer/registry/service';
+import { createAdapter } from '@/services/printer/adapters/factory';
+import { createJob } from '@/services/printer/storage/repositories';
 
-const MOCK_BLE_DEVICES: PrinterDevice[] = [
-  { id: 'ble-1', name: 'POS-58 BLE', address: 'AA:BB:CC:DD:EE:01', rssi: -42, type: 'ble' },
-  { id: 'ble-2', name: 'Thermal Mini BLE', address: 'AA:BB:CC:DD:EE:04', rssi: -55, type: 'ble' },
-];
-
-const MOCK_CLASSIC_DEVICES: PrinterDevice[] = [
-  { id: 'classic-1', name: 'Thermal-80mm BT', address: 'AA:BB:CC:DD:EE:02', rssi: -62, type: 'classic' },
-  { id: 'classic-2', name: 'BT Printer Pro', address: 'AA:BB:CC:DD:EE:03', rssi: -71, type: 'classic' },
-];
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function PrinterSetupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { settings, updatePrinter, updateSettings } = useSettings();
+  const { settings, updateSettings, savePreferredPrinter } = useSettings();
   const { t } = useI18n();
 
   const [scanning, setScanning] = useState(false);
-  const [devices, setDevices] = useState<PrinterDevice[]>([]);
+  const [printers, setPrinters] = useState<PrinterRecord[]>([]);
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
 
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
+  const usesFakeAdapter = useMemo(() => {
+    const adapter = createAdapter() as { setFailureMode?: () => void };
+    return typeof adapter.setFailureMode === 'function';
+  }, []);
+  const preferredPrinter = useMemo(
+    () => printers.find((printer) => printer.id === settings.printer.preferredPrinterId) ?? null,
+    [printers, settings.printer.preferredPrinterId]
+  );
 
   useEffect(() => {
     Animated.timing(fadeIn, {
@@ -89,121 +96,193 @@ export default function PrinterSetupScreen() {
     }
   }, [isIOS, t]);
 
-  const handleScan = useCallback(() => {
+  const handleScan = useCallback(async () => {
     setScanning(true);
-    setDevices([]);
+    setErrorMessage(null);
 
-    console.log('[Printer] Starting scan for paired/nearby devices');
-
-    setTimeout(() => {
-      const mockDevices = [...MOCK_BLE_DEVICES, ...MOCK_CLASSIC_DEVICES];
-      console.log('[Printer] Devices found:', mockDevices.length);
-      setDevices(mockDevices);
-    }, 2000);
-
-    setTimeout(() => {
+    try {
+      const discovered = await registryService.discoverPrinters();
+      const merged = await registryService.mergeDiscoveredWithRegistry(
+        discovered.map((printer) => ({
+          ...printer,
+          lastSeenAt: new Date().toISOString(),
+        }))
+      );
+      setPrinters(merged);
+      setStatusMessage(
+        merged.length > 0
+          ? `Found ${merged.length} printer${merged.length === 1 ? '' : 's'}.`
+          : null
+      );
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to scan for printers.'));
+      setStatusMessage(null);
+    } finally {
       setScanning(false);
-      console.log('[Printer] Scan complete');
-    }, 3000);
+    }
   }, []);
 
-  const handleConnect = useCallback((device: PrinterDevice) => {
-    setConnecting(device.id);
-    console.log('[Printer] Connecting to', device.name, 'via', device.type);
+  useEffect(() => {
+    void handleScan();
+  }, [handleScan]);
 
-    setTimeout(() => {
-      updatePrinter({
-        name: device.name,
-        address: device.address,
-        type: device.type,
-      });
+  const handleConnect = useCallback(async (printer: PrinterRecord) => {
+    setConnecting(printer.id);
+    setErrorMessage(null);
+
+    try {
+      await registryService.connectPrinter(printer.id);
+      await savePreferredPrinter(printer.id);
       updateSettings({ printerConnected: true });
+      setStatusMessage(`Connected to ${printer.name}.`);
+      Alert.alert(t.printer.connected, t.printer.connectedTo(printer.name));
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, `Unable to connect to ${printer.name}.`));
+      setStatusMessage(null);
+    } finally {
       setConnecting(null);
-      console.log('[Printer] Connected to', device.name);
-      Alert.alert(t.printer.connected, t.printer.connectedTo(device.name));
-    }, 1500);
-  }, [updatePrinter, updateSettings, t]);
+    }
+  }, [savePreferredPrinter, t, updateSettings]);
 
-  const handleDisconnect = useCallback(() => {
-    console.log('[Printer] Disconnecting from', settings.printer.name);
-    updatePrinter({ name: '', address: '' });
-    updateSettings({ printerConnected: false });
-  }, [updatePrinter, updateSettings, settings.printer.name]);
+  const handleDisconnect = useCallback(async () => {
+    if (!settings.printer.preferredPrinterId) {
+      updateSettings({ printerConnected: false });
+      return;
+    }
 
-  const handleTestPrint = useCallback(() => {
-    Alert.alert(
-      t.printer.testPrint,
-      t.printer.testPrintMsg(settings.printer.name)
-    );
-  }, [settings.printer, t]);
+    try {
+      await registryService.disconnectPrinter(settings.printer.preferredPrinterId);
+      setStatusMessage('Printer disconnected.');
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to disconnect printer.'));
+      setStatusMessage(null);
+    } finally {
+      updateSettings({ printerConnected: false });
+    }
+  }, [settings.printer.preferredPrinterId, updateSettings]);
 
-  const getSignalBars = (rssi?: number): number => {
-    if (!rssi) return 0;
-    if (rssi > -50) return 3;
-    if (rssi > -70) return 2;
-    return 1;
-  };
+  const handleTestPrint = useCallback(async (printer: PrinterRecord) => {
+    setTesting(printer.id);
+    setErrorMessage(null);
 
-  const hasDevices = devices.length > 0;
+    try {
+      const jobId = `diag-${Date.now()}`;
+      await createJob({
+        id: jobId,
+        printerId: printer.id,
+        documentType: 'diagnostics',
+        payload: JSON.stringify({
+          appName: 'Rork',
+          platform: Platform.OS,
+          transport: printer.transport,
+          paperWidth: settings.printer.paperWidth,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      setStatusMessage(`Queued diagnostics print for ${printer.name}.`);
+      Alert.alert(t.printer.testPrint, `Queued diagnostics print for ${printer.name}.`);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to queue diagnostics print.'));
+      setStatusMessage(null);
+    } finally {
+      setTesting(null);
+    }
+  }, [settings.printer.paperWidth, t]);
 
-  const renderDevice = (device: PrinterDevice) => {
-    const isConnected = settings.printer.address === device.address && settings.printerConnected;
-    const isConnecting = connecting === device.id;
-    const bars = getSignalBars(device.rssi);
-    const isBle = device.type === 'ble';
+  const hasPrinters = printers.length > 0;
+
+  const renderDevice = (printer: PrinterRecord) => {
+    const isConnected = settings.printer.preferredPrinterId === printer.id && settings.printerConnected;
+    const isConnecting = connecting === printer.id;
+    const isTesting = testing === printer.id;
+    const isPreferred = settings.printer.preferredPrinterId === printer.id;
+    const isBle = printer.transport === 'ble';
+    const isTcp = printer.transport === 'tcp';
+    const transportLabel = isBle ? 'BLE' : isTcp ? 'TCP' : 'Classic';
 
     return (
-      <Pressable
-        key={device.id}
-        onPress={() => !isConnected && !isConnecting && handleConnect(device)}
-        style={({ pressed }) => [
+      <View
+        key={printer.id}
+        style={[
           styles.deviceItem,
-          isConnected && styles.deviceItemConnected,
-          pressed && !isConnected && styles.deviceItemPressed,
+          isPreferred && styles.deviceItemConnected,
         ]}
-        testID={`device-${device.id}`}
+        testID={`device-${printer.id}`}
       >
         <View style={[styles.deviceIcon, isBle ? styles.deviceIconBle : styles.deviceIconClassic]}>
           {isBle ? (
             <Radio size={16} color={isConnected ? Colors.success : '#5B9BD5'} />
+          ) : isTcp ? (
+            <Wifi size={16} color={isConnected ? Colors.success : Colors.gold} />
           ) : (
             <Bluetooth size={16} color={isConnected ? Colors.success : '#C084FC'} />
           )}
         </View>
         <View style={styles.deviceInfo}>
-          <Text style={[styles.deviceName, isConnected && styles.deviceNameConnected]} numberOfLines={1}>
-            {device.name}
-          </Text>
+          <View style={styles.deviceTitleRow}>
+            <Text style={[styles.deviceName, isConnected && styles.deviceNameConnected]} numberOfLines={1}>
+              {printer.name}
+            </Text>
+            {isPreferred && (
+              <View style={styles.preferredChip}>
+                <Text style={styles.preferredChipText}>Preferred</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.deviceMeta}>
             <View style={[styles.typeBadge, isBle ? styles.typeBadgeBle : styles.typeBadgeClassic]}>
               <Text style={[styles.typeBadgeText, isBle ? styles.typeBadgeTextBle : styles.typeBadgeTextClassic]}>
-                {isBle ? 'BLE' : 'Classic'}
+                {transportLabel}
               </Text>
             </View>
-            <Text style={styles.deviceAddress}>{device.address}</Text>
+            <Text style={styles.deviceAddress}>{printer.address}</Text>
           </View>
         </View>
-        <View style={styles.deviceRight}>
-          <View style={styles.deviceSignal}>
-            {[1, 2, 3].map(bar => (
-              <View
-                key={bar}
-                style={[
-                  styles.signalBar,
-                  { height: 4 + bar * 4 },
-                  bar <= bars && styles.signalBarActive,
-                ]}
-              />
-            ))}
-          </View>
-          {isConnecting && <ActivityIndicator color={Colors.gold} size="small" />}
+        <View style={styles.deviceActions}>
+          <Pressable
+            onPress={() => { void handleConnect(printer); }}
+            disabled={isConnecting || isConnected}
+            style={({ pressed }) => [
+              styles.deviceActionButton,
+              styles.deviceActionPrimary,
+              (isConnecting || isConnected) && styles.deviceActionDisabled,
+              pressed && !isConnecting && !isConnected && styles.deviceActionPressed,
+            ]}
+            testID={`connect-${printer.id}`}
+          >
+            {isConnecting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.deviceActionPrimaryText}>
+                {isConnected ? t.printer.connected : 'Connect'}
+              </Text>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => { void handleTestPrint(printer); }}
+            disabled={isTesting}
+            style={({ pressed }) => [
+              styles.deviceActionButton,
+              styles.deviceActionSecondary,
+              isTesting && styles.deviceActionDisabled,
+              pressed && !isTesting && styles.deviceActionPressed,
+            ]}
+            testID={`test-print-${printer.id}`}
+          >
+            {isTesting ? (
+              <ActivityIndicator color={Colors.gold} size="small" />
+            ) : (
+              <Text style={styles.deviceActionSecondaryText}>{t.printer.test}</Text>
+            )}
+          </Pressable>
           {isConnected && (
             <View style={styles.connectedCheck}>
               <Check size={14} color="#fff" />
             </View>
           )}
         </View>
-      </Pressable>
+      </View>
     );
   };
 
@@ -218,27 +297,64 @@ export default function PrinterSetupScreen() {
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {settings.printerConnected && (
+        <View style={styles.preferredCard}>
+          <View style={styles.preferredHeader}>
+            <View style={styles.preferredIconWrap}>
+              <Printer size={18} color="#fff" />
+            </View>
+            <View style={styles.preferredInfo}>
+              <Text style={styles.preferredLabel}>Preferred Printer</Text>
+              <Text style={styles.preferredName} numberOfLines={1}>
+                {preferredPrinter?.name ?? 'No preferred printer selected'}
+              </Text>
+              <Text style={styles.preferredMeta} numberOfLines={1}>
+                {preferredPrinter?.address ?? 'Connect a printer to save it for quick access'}
+              </Text>
+            </View>
+            <View style={[
+              styles.preferredStatusBadge,
+              settings.printerConnected ? styles.preferredStatusConnected : styles.preferredStatusIdle,
+            ]}>
+              <Text style={styles.preferredStatusText} testID="preferred-printer-status">
+                {settings.printerConnected ? t.printer.connected : t.printer.notConnected}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {errorMessage && (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorCardText}>{errorMessage}</Text>
+          </View>
+        )}
+
+        {!errorMessage && statusMessage && (
+          <View style={styles.successCard}>
+            <Text style={styles.successCardText}>{statusMessage}</Text>
+          </View>
+        )}
+
+        {preferredPrinter && settings.printerConnected && (
           <View style={styles.connectedCard}>
             <View style={styles.connectedHeader}>
               <View style={styles.connectedIconWrap}>
                 <Printer size={18} color="#fff" />
               </View>
               <View style={styles.connectedInfo}>
-                <Text style={styles.connectedName}>{settings.printer.name}</Text>
+                <Text style={styles.connectedName}>{preferredPrinter.name}</Text>
                 <View style={styles.connectedMeta}>
                   <View style={[
                     styles.connectedTypeBadge,
-                    settings.printer.type === 'ble' ? styles.typeBadgeBle : styles.typeBadgeClassic,
+                    preferredPrinter.transport === 'ble' ? styles.typeBadgeBle : styles.typeBadgeClassic,
                   ]}>
                     <Text style={[
                       styles.typeBadgeText,
-                      settings.printer.type === 'ble' ? styles.typeBadgeTextBle : styles.typeBadgeTextClassic,
+                      preferredPrinter.transport === 'ble' ? styles.typeBadgeTextBle : styles.typeBadgeTextClassic,
                     ]}>
-                      {settings.printer.type === 'ble' ? 'BLE' : 'Classic BT'}
+                      {preferredPrinter.transport === 'ble' ? 'BLE' : preferredPrinter.transport === 'tcp' ? 'TCP' : 'Classic BT'}
                     </Text>
                   </View>
-                  <Text style={styles.connectedAddress}>{settings.printer.address}</Text>
+                  <Text style={styles.connectedAddress}>{preferredPrinter.address}</Text>
                 </View>
               </View>
             </View>
@@ -246,11 +362,11 @@ export default function PrinterSetupScreen() {
             <View style={styles.connectedDivider} />
 
             <View style={styles.connectedActions}>
-              <Pressable onPress={handleTestPrint} style={styles.testButton}>
+              <Pressable onPress={() => { void handleTestPrint(preferredPrinter); }} style={styles.testButton}>
                 <Printer size={14} color={Colors.gold} />
                 <Text style={styles.testButtonText}>{t.printer.test}</Text>
               </Pressable>
-              <Pressable onPress={handleDisconnect} style={styles.disconnectButton}>
+              <Pressable onPress={() => { void handleDisconnect(); }} style={styles.disconnectButton}>
                 <Text style={styles.disconnectText}>{t.printer.disconnect}</Text>
               </Pressable>
             </View>
@@ -316,6 +432,15 @@ export default function PrinterSetupScreen() {
           </View>
         )}
 
+        {isIOS && (
+          <View style={styles.infoCard}>
+            <Info size={16} color="#5B9BD5" />
+            <Text style={styles.infoText}>
+              iOS only supports BLE thermal printers in this build. Classic Bluetooth devices are hidden from scan results.
+            </Text>
+          </View>
+        )}
+
         {!isIOS && !settings.printerConnected && (
           <View style={styles.infoCard}>
             <Info size={16} color="#5B9BD5" />
@@ -327,7 +452,7 @@ export default function PrinterSetupScreen() {
 
         <View style={styles.scanSection}>
           <Pressable
-            onPress={handleScan}
+            onPress={() => { void handleScan(); }}
             disabled={scanning}
             style={({ pressed }) => [
               styles.scanButton,
@@ -355,28 +480,30 @@ export default function PrinterSetupScreen() {
             )}
           </Pressable>
 
-          {isWeb && (
+          {usesFakeAdapter && (
             <View style={styles.webNotice}>
               <Wifi size={13} color={Colors.textSecondary} />
               <Text style={styles.webNoticeText}>
-                {t.printer.webSimulated}
+                {isWeb
+                  ? t.printer.webSimulated
+                  : 'Using the deterministic fake printer adapter in this environment.'}
               </Text>
             </View>
           )}
         </View>
 
-        {hasDevices && (
+        {hasPrinters && (
           <View style={styles.devicesSection}>
             <Text style={styles.sectionLabel}>
               {isIOS ? t.printer.pairedDevices : t.printer.nearbyDevices}
             </Text>
-            {devices.map(renderDevice)}
+            {printers.map(renderDevice)}
           </View>
         )}
 
-        {!scanning && !hasDevices && !settings.printerConnected && (
+        {!scanning && !hasPrinters && !settings.printerConnected && (
           <View style={styles.emptyState}>
-            <Signal size={36} color={Colors.textMuted} />
+            <BluetoothSearching size={36} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>{t.printer.noPrintersFound}</Text>
             <Text style={styles.emptySubtitle}>
               {isIOS
@@ -390,7 +517,7 @@ export default function PrinterSetupScreen() {
               </View>
               <View style={styles.compatItem}>
                 <Radio size={14} color={Colors.textMuted} />
-                <Text style={styles.compatText}>BLE + Classic BT</Text>
+                <Text style={styles.compatText}>{isIOS ? 'BLE only' : 'BLE + Classic BT'}</Text>
               </View>
             </View>
           </View>
@@ -432,6 +559,89 @@ const styles = StyleSheet.create({
   scrollContent: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  preferredCard: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 12,
+  },
+  preferredHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  preferredIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: Colors.gold,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  preferredInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  preferredLabel: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700' as const,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase' as const,
+  },
+  preferredName: {
+    color: Colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  preferredMeta: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+  },
+  preferredStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  preferredStatusConnected: {
+    backgroundColor: 'rgba(34,204,102,0.14)',
+  },
+  preferredStatusIdle: {
+    backgroundColor: Colors.inputBackground,
+  },
+  preferredStatusText: {
+    color: Colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '700' as const,
+  },
+  errorCard: {
+    backgroundColor: 'rgba(239,83,80,0.08)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(239,83,80,0.2)',
+    marginBottom: 12,
+  },
+  errorCardText: {
+    color: Colors.error,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  successCard: {
+    backgroundColor: 'rgba(76,175,80,0.08)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.2)',
+    marginBottom: 12,
+  },
+  successCardText: {
+    color: Colors.success,
+    fontSize: 13,
+    lineHeight: 18,
   },
   connectedCard: {
     backgroundColor: Colors.cardBackground,
@@ -713,6 +923,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
   },
+  deviceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   deviceName: {
     color: Colors.textPrimary,
     fontSize: 14,
@@ -752,23 +967,53 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 10,
   },
-  deviceRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  preferredChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(232,105,45,0.12)',
+  },
+  preferredChipText: {
+    color: Colors.gold,
+    fontSize: 10,
+    fontWeight: '700' as const,
+  },
+  deviceActions: {
+    alignItems: 'flex-end',
     gap: 8,
   },
-  deviceSignal: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
+  deviceActionButton: {
+    minWidth: 90,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  signalBar: {
-    width: 3,
-    backgroundColor: Colors.border,
-    borderRadius: 1.5,
+  deviceActionPrimary: {
+    backgroundColor: Colors.gold,
+    borderColor: Colors.goldDark,
   },
-  signalBarActive: {
-    backgroundColor: Colors.success,
+  deviceActionSecondary: {
+    backgroundColor: 'rgba(232,105,45,0.08)',
+    borderColor: 'rgba(232,105,45,0.2)',
+  },
+  deviceActionDisabled: {
+    opacity: 0.7,
+  },
+  deviceActionPressed: {
+    opacity: 0.85,
+  },
+  deviceActionPrimaryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700' as const,
+  },
+  deviceActionSecondaryText: {
+    color: Colors.gold,
+    fontSize: 12,
+    fontWeight: '700' as const,
   },
   connectedCheck: {
     width: 22,

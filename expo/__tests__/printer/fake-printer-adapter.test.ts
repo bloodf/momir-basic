@@ -33,6 +33,14 @@ describe('FakePrinterAdapter', () => {
       expect(await adapter.isConnected(deviceId)).toBe(false);
     });
 
+    it('connect and disconnect also work with device address', async () => {
+      const address = 'AA:BB:CC:DD:EE:FF';
+      await adapter.connectPrinter(address);
+      expect(await adapter.isConnected(address)).toBe(true);
+      await adapter.disconnectPrinter(address);
+      expect(await adapter.isConnected(address)).toBe(false);
+    });
+
     it('throws when connecting unknown device', async () => {
       await expect(adapter.connectPrinter('unknown-id')).rejects.toThrow('Device unknown-id not found');
     });

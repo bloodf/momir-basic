@@ -51,7 +51,9 @@ export default function SettingsScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>{t.settings.printerSetup}</Text>
               <Text style={styles.settingValue}>
-                {settings.printer.name || t.printer.notConnected}
+                {settings.printer.preferredPrinterId
+                  ? (settings.printerConnected ? t.printer.connected : 'Preferred printer saved')
+                  : t.printer.notConnected}
               </Text>
             </View>
             <ChevronRight size={18} color={Colors.textMuted} />

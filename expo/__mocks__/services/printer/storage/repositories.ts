@@ -7,4 +7,4 @@ const printerRepo = {
   resetPrinters: jest.fn(),
 };
 
-module.exports = { printerRepo };
+export { printerRepo };

@@ -24,11 +24,17 @@ import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
+import { createJob } from '../services/printer/storage/repositories';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
 const ART_WIDTH = RECEIPT_WIDTH - 32;
 const ART_HEIGHT = ART_WIDTH * 0.85;
+
+type EnqueueBanner = {
+  type: 'success' | 'error';
+  message: string;
+};
 
 export default function PrintPreviewScreen() {
   const insets = useSafeAreaInsets();
@@ -44,7 +50,9 @@ export default function PrintPreviewScreen() {
   const successOpacity = useRef(new Animated.Value(0)).current;
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isQueueing, setIsQueueing] = useState<boolean>(false);
   const [saved, setSaved] = useState<boolean>(false);
+  const [enqueueBanner, setEnqueueBanner] = useState<EnqueueBanner | null>(null);
 
   const card = useMemo<Card | null>(() => {
     try {
@@ -113,7 +121,7 @@ export default function PrintPreviewScreen() {
     }
   }, [card, showSuccessFlash, t]);
 
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback(async () => {
     if (!card) return;
 
     Animated.sequence([
@@ -121,22 +129,60 @@ export default function PrintPreviewScreen() {
       Animated.timing(printBtnScale, { toValue: 1, duration: 150, useNativeDriver: true }),
     ]).start();
 
-    if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setEnqueueBanner(null);
 
     if (settings.devMode) {
       void handleDevPrint();
       return;
     }
 
-    if (!settings.printerConnected) {
-      Alert.alert(t.printPreview.noPrinter, t.printPreview.noPrinterMsg);
+    const preferredPrinterId = settings.printer?.preferredPrinterId;
+
+    if (!preferredPrinterId) {
+      const message = 'Please select a printer in Settings first.';
+      setEnqueueBanner({ type: 'error', message });
+      Alert.alert('No Printer', message);
       return;
     }
 
-    Alert.alert(
-      t.printPreview.printing,
-      `${t.printPreview.sendingToPrinter(card.name, settings.printer.name)}\n\n${t.printPreview.bluetoothRequired}`,
-    );
+    const cardReceiptData = {
+      name: card.name,
+      manaCost: card.manaCost,
+      type: card.typeLine,
+      oracleText: card.oracleText,
+      flavorText: card.flavorText,
+      power: card.power,
+      toughness: card.toughness,
+      imageUrl: card.normalImageUrl || card.artCropUrl,
+      setCode: card.setCode,
+      scryfallId: card.id,
+    };
+
+    try {
+      setIsQueueing(true);
+
+      const jobId = `card-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      await createJob({
+        id: jobId,
+        printerId: preferredPrinterId,
+        documentType: 'card_receipt',
+        payload: JSON.stringify(cardReceiptData),
+      });
+
+      if (Platform.OS !== 'web') {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      const message = 'Your card receipt has been sent to the printer.';
+      setEnqueueBanner({ type: 'success', message });
+      Alert.alert('Print Queued', message);
+    } catch {
+      const message = 'Unable to queue the print job. Please try again.';
+      setEnqueueBanner({ type: 'error', message });
+      Alert.alert('Print Failed', message);
+    } finally {
+      setIsQueueing(false);
+    }
   }, [card, settings, printBtnScale, handleDevPrint, t]);
 
   if (!card) {
@@ -259,7 +305,19 @@ export default function PrintPreviewScreen() {
         </Animated.View>
       )}
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      {enqueueBanner && (
+        <View
+          style={[
+            styles.enqueueBanner,
+            enqueueBanner.type === 'success' ? styles.enqueueBannerSuccess : styles.enqueueBannerError,
+          ]}
+          testID={enqueueBanner.type === 'success' ? 'enqueue-success' : 'enqueue-error'}
+        >
+          <Text style={styles.enqueueBannerText}>{enqueueBanner.message}</Text>
+        </View>
+      )}
+
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}> 
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
@@ -269,16 +327,16 @@ export default function PrintPreviewScreen() {
         <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
           <Pressable
             onPress={handlePrint}
-            disabled={isSaving}
+            disabled={isSaving || isQueueing}
             style={({ pressed }) => [
               styles.footerBtn,
               isDevMode ? styles.footerBtnDev : styles.footerBtnPrimary,
               pressed && styles.footerPressed,
-              isSaving && styles.footerBtnDisabled,
+              (isSaving || isQueueing) && styles.footerBtnDisabled,
             ]}
             testID="confirm-print"
           >
-            {isSaving ? (
+            {isSaving || isQueueing ? (
               <ActivityIndicator size="small" color={Colors.background} />
             ) : (
               <>
@@ -465,6 +523,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center' as const,
     fontStyle: 'italic' as const,
+  },
+  enqueueBanner: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  enqueueBannerSuccess: {
+    backgroundColor: Colors.cardBackground,
+    borderColor: Colors.success,
+  },
+  enqueueBannerError: {
+    backgroundColor: Colors.cardBackground,
+    borderColor: Colors.error,
+  },
+  enqueueBannerText: {
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
   },
   successOverlay: {
     ...StyleSheet.absoluteFillObject,

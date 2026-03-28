@@ -64,16 +64,17 @@ function getTypeQueryFragment(cardType: CardType): string {
 function mapScryfallCard(data: ScryfallCard): Card {
   const face = data.card_faces?.[0];
   const imageUris = data.image_uris ?? face?.image_uris;
+  const prefersFaceData = data.card_faces != null && data.card_faces.length > 0;
 
   return {
     id: data.id,
     name: data.name,
-    manaCost: data.mana_cost ?? face?.mana_cost ?? '',
-    typeLine: data.type_line ?? face?.type_line ?? '',
-    oracleText: data.oracle_text ?? face?.oracle_text ?? '',
-    flavorText: data.flavor_text ?? face?.flavor_text,
-    power: data.power ?? face?.power,
-    toughness: data.toughness ?? face?.toughness,
+    manaCost: (prefersFaceData ? face?.mana_cost : data.mana_cost) ?? data.mana_cost ?? face?.mana_cost ?? '',
+    typeLine: (prefersFaceData ? face?.type_line : data.type_line) ?? data.type_line ?? face?.type_line ?? '',
+    oracleText: (prefersFaceData ? face?.oracle_text : data.oracle_text) ?? data.oracle_text ?? face?.oracle_text ?? '',
+    flavorText: (prefersFaceData ? face?.flavor_text : data.flavor_text) ?? data.flavor_text ?? face?.flavor_text,
+    power: (prefersFaceData ? face?.power : data.power) ?? data.power ?? face?.power,
+    toughness: (prefersFaceData ? face?.toughness : data.toughness) ?? data.toughness ?? face?.toughness,
     scryfallUri: data.scryfall_uri,
     artCropUrl: imageUris?.art_crop ?? '',
     normalImageUrl: imageUris?.normal ?? '',
@@ -88,9 +89,9 @@ function mapScryfallCard(data: ScryfallCard): Card {
     colors: data.colors ?? [],
     cmc: data.cmc,
     fetchedAt: new Date().toISOString(),
-    printedName: data.printed_name ?? face?.printed_name,
-    printedTypeLine: data.printed_type_line ?? face?.printed_type_line,
-    printedText: data.printed_text ?? face?.printed_text,
+    printedName: (prefersFaceData ? face?.printed_name : data.printed_name) ?? data.printed_name ?? face?.printed_name,
+    printedTypeLine: (prefersFaceData ? face?.printed_type_line : data.printed_type_line) ?? data.printed_type_line ?? face?.printed_type_line,
+    printedText: (prefersFaceData ? face?.printed_text : data.printed_text) ?? data.printed_text ?? face?.printed_text,
     lang: data.lang,
   };
 }

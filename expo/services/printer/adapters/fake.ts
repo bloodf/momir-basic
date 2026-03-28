@@ -32,6 +32,12 @@ export class FakePrinterAdapter implements PrinterPort {
   private failureMode: FailureMode = null;
   private connectedDevices: Set<string> = new Set();
 
+  private resolveDevice(deviceId: string): PrinterDiscoveryResult | undefined {
+    return FIXTURE_DEVICES.find(
+      (device) => device.id === deviceId || device.address === deviceId
+    );
+  }
+
   setFailureMode(mode: FailureMode): void {
     this.failureMode = mode;
   }
@@ -47,19 +53,21 @@ export class FakePrinterAdapter implements PrinterPort {
     if (this.failureMode === 'connect-timeout') {
       throw new Error('Connection timeout');
     }
-    const device = FIXTURE_DEVICES.find(d => d.id === deviceId);
+    const device = this.resolveDevice(deviceId);
     if (!device) {
       throw new Error(`Device ${deviceId} not found`);
     }
-    this.connectedDevices.add(deviceId);
+    this.connectedDevices.add(device.address);
   }
 
   async disconnectPrinter(deviceId: string): Promise<void> {
-    this.connectedDevices.delete(deviceId);
+    const device = this.resolveDevice(deviceId);
+    this.connectedDevices.delete(device?.address ?? deviceId);
   }
 
   async isConnected(deviceId: string): Promise<boolean> {
-    return this.connectedDevices.has(deviceId);
+    const device = this.resolveDevice(deviceId);
+    return this.connectedDevices.has(device?.address ?? deviceId);
   }
 
   async sendText(_text: string): Promise<void> {
