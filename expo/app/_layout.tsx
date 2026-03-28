@@ -5,7 +5,6 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HistoryProvider } from "@/providers/HistoryProvider";
 import { SettingsProvider } from "@/providers/SettingsProvider";
-import { GameProvider } from "@/providers/GameProvider";
 import { I18nProvider } from "@/i18n";
 
 void SplashScreen.preventAutoHideAsync();
@@ -53,9 +52,7 @@ export default function RootLayout() {
         <I18nProvider>
           <SettingsProvider>
             <HistoryProvider>
-              <GameProvider>
-                <RootLayoutNav />
-              </GameProvider>
+              <RootLayoutNav />
             </HistoryProvider>
           </SettingsProvider>
         </I18nProvider>

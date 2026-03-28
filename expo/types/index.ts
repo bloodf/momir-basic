@@ -46,25 +46,6 @@ export interface CardTypeConfig {
   count: number;
 }
 
-export interface GameSession {
-  id: string;
-  startedAt: string;
-  endedAt?: string;
-  players: string[];
-  turns: Turn[];
-  currentTurn: number;
-  currentPlayerIndex: number;
-}
-
-export interface Turn {
-  turnNumber: number;
-  playerName: string;
-  cmc: number;
-  cardId: string;
-  cardName: string;
-  timestamp: string;
-}
-
 export interface PrinterDevice {
   id: string;
   name: string;

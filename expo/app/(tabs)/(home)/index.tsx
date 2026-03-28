@@ -15,14 +15,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Minus, Plus, Zap, ChevronDown } from 'lucide-react-native';
+import { Minus, Plus, ChevronDown } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
 import { fetchRandomCard, fetchMultipleCards, fetchRandomBgCardForType, BgCardData } from '@/services/scryfall';
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
-import { useGame } from '@/providers/GameProvider';
+
 import { useI18n } from '@/i18n';
 import { TypePicker } from '@/components/TypePicker';
 
@@ -47,7 +47,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const { addCard, addCards } = useHistory();
   const { settings } = useSettings();
-  const { activeSession, addTurn } = useGame();
+
   const { t, locale } = useI18n();
 
   const [cmc, setCmc] = useState(3);
@@ -246,14 +246,6 @@ export default function HomeScreen() {
       setLastCards(cards);
       if (cards.length === 1) {
         addCard(cards[0]);
-        if (activeSession) {
-          addTurn({
-            playerName: activeSession.players[activeSession.currentPlayerIndex],
-            cmc,
-            cardId: cards[0].id,
-            cardName: cards[0].name,
-          });
-        }
         router.push({ pathname: '/card', params: { cardJson: JSON.stringify(cards[0]) } });
       } else {
         addCards(cards);
@@ -344,15 +336,6 @@ export default function HomeScreen() {
         style={[styles.innerContainer, { opacity: fadeIn }]}
         {...swipePanResponder.panHandlers}
       >
-        {activeSession && (
-          <View style={[styles.sessionBanner, { marginTop: safeTopHeight + 12 }]}>
-            <Zap size={13} color="#fff" />
-            <Text style={styles.sessionText}>
-              {t.home.turn} {activeSession.currentTurn} · {activeSession.players[activeSession.currentPlayerIndex]}
-            </Text>
-          </View>
-        )}
-
         <View style={styles.spacer} />
 
         <View style={[styles.bottomControls, { paddingBottom: Math.max(insets.bottom, 12) + 60 }]}>

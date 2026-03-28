@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import {
@@ -18,15 +18,14 @@ import {
   Settings,
   Skull,
   Zap,
-  Shield,
   Heart,
   Minus,
   Plus,
   Users,
   Crown,
+  Shield,
   Droplets,
 } from 'lucide-react-native';
-import Colors from '@/constants/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -41,25 +40,22 @@ interface PlayerState {
   energy: number;
   experience: number;
   commanderDamage: number[];
-  color: string;
-  bgColor: string;
+  gradient: readonly [string, string];
 }
 
-const PLAYER_COLORS = [
-  { color: '#e8e8e8', bgColor: '#1a2a3a' },
-  { color: '#e8e8e8', bgColor: '#2a1a1a' },
-  { color: '#e8e8e8', bgColor: '#1a2a1a' },
-  { color: '#e8e8e8', bgColor: '#2a2a1a' },
+const PLAYER_THEMES: { gradient: readonly [string, string] }[] = [
+  { gradient: ['#1b2838', '#0f1923'] as const },
+  { gradient: ['#2d1520', '#1a0c14'] as const },
+  { gradient: ['#152d1b', '#0c1a0f'] as const },
+  { gradient: ['#2d2815', '#1a180c'] as const },
 ];
 
-const STARTING_LIFE_OPTIONS = [20, 30, 40];
-
 const COUNTER_CONFIG: Record<CounterType, { label: string; icon: typeof Heart; color: string }> = {
-  life: { label: 'Life', icon: Heart, color: '#E8692D' },
-  poison: { label: 'Poison', icon: Skull, color: '#88dd44' },
-  energy: { label: 'Energy', icon: Zap, color: '#ffaa00' },
-  experience: { label: 'Exp', icon: Crown, color: '#aa88ff' },
-  commander: { label: 'Cmd Dmg', icon: Shield, color: '#ff6666' },
+  life: { label: 'Life', icon: Heart, color: '#ff6b6b' },
+  poison: { label: 'Poison', icon: Skull, color: '#51cf66' },
+  energy: { label: 'Energy', icon: Zap, color: '#ffd43b' },
+  experience: { label: 'Exp', icon: Crown, color: '#cc5de8' },
+  commander: { label: 'Cmd Dmg', icon: Shield, color: '#ff8787' },
 };
 
 function hapticTap() {
@@ -77,13 +73,13 @@ function hapticHeavy() {
 function createPlayers(count: PlayerCount, startingLife: number): PlayerState[] {
   return Array.from({ length: count }, (_, i) => ({
     id: i,
-    name: `Player ${i + 1}`,
+    name: `P${i + 1}`,
     life: startingLife,
     poison: 0,
     energy: 0,
     experience: 0,
     commanderDamage: Array.from({ length: count }, () => 0),
-    ...PLAYER_COLORS[i],
+    gradient: PLAYER_THEMES[i].gradient,
   }));
 }
 
@@ -112,9 +108,11 @@ const PlayerPanel = React.memo(function PlayerPanel({
 }: PlayerPanelProps) {
   const incrementAnim = useRef(new Animated.Value(0)).current;
   const decrementAnim = useRef(new Animated.Value(0)).current;
+  const valueScale = useRef(new Animated.Value(1)).current;
   const [showDelta, setShowDelta] = useState<number | null>(null);
   const deltaTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deltaAccumulator = useRef(0);
+  const deltaFade = useRef(new Animated.Value(0)).current;
 
   const getActiveValue = useCallback(() => {
     switch (activeCounter) {
@@ -126,39 +124,51 @@ const PlayerPanel = React.memo(function PlayerPanel({
     }
   }, [activeCounter, player]);
 
+  const pulseValue = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(valueScale, { toValue: 1.08, duration: 60, useNativeDriver: true }),
+      Animated.spring(valueScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }),
+    ]).start();
+  }, [valueScale]);
+
+  const showDeltaAnim = useCallback((delta: number) => {
+    deltaAccumulator.current = delta;
+    setShowDelta(delta);
+    deltaFade.setValue(1);
+    if (deltaTimeout.current) clearTimeout(deltaTimeout.current);
+    deltaTimeout.current = setTimeout(() => {
+      Animated.timing(deltaFade, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+        deltaAccumulator.current = 0;
+        setShowDelta(null);
+      });
+    }, 1200);
+  }, [deltaFade]);
+
   const handleIncrement = useCallback(() => {
     hapticTap();
     deltaAccumulator.current += 1;
-    setShowDelta(deltaAccumulator.current);
-    if (deltaTimeout.current) clearTimeout(deltaTimeout.current);
-    deltaTimeout.current = setTimeout(() => {
-      deltaAccumulator.current = 0;
-      setShowDelta(null);
-    }, 1500);
+    showDeltaAnim(deltaAccumulator.current);
+    pulseValue();
 
     Animated.sequence([
-      Animated.timing(incrementAnim, { toValue: 1, duration: 60, useNativeDriver: true }),
-      Animated.timing(incrementAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(incrementAnim, { toValue: 1, duration: 50, useNativeDriver: true }),
+      Animated.timing(incrementAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
     ]).start();
     onIncrement(player.id);
-  }, [onIncrement, player.id, incrementAnim]);
+  }, [onIncrement, player.id, incrementAnim, pulseValue, showDeltaAnim]);
 
   const handleDecrement = useCallback(() => {
     hapticTap();
     deltaAccumulator.current -= 1;
-    setShowDelta(deltaAccumulator.current);
-    if (deltaTimeout.current) clearTimeout(deltaTimeout.current);
-    deltaTimeout.current = setTimeout(() => {
-      deltaAccumulator.current = 0;
-      setShowDelta(null);
-    }, 1500);
+    showDeltaAnim(deltaAccumulator.current);
+    pulseValue();
 
     Animated.sequence([
-      Animated.timing(decrementAnim, { toValue: 1, duration: 60, useNativeDriver: true }),
-      Animated.timing(decrementAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(decrementAnim, { toValue: 1, duration: 50, useNativeDriver: true }),
+      Animated.timing(decrementAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
     ]).start();
     onDecrement(player.id);
-  }, [onDecrement, player.id, decrementAnim]);
+  }, [onDecrement, player.id, decrementAnim, pulseValue, showDeltaAnim]);
 
   const value = getActiveValue();
   const counterConf = COUNTER_CONFIG[activeCounter];
@@ -169,17 +179,16 @@ const PlayerPanel = React.memo(function PlayerPanel({
   const isDead = activeCounter === 'life' && value <= 0;
 
   const is4Player = playerCount === 4;
-  const mainFontSize = is4Player ? 64 : 88;
-  const nameFontSize = is4Player ? 11 : 13;
-  const counterIconSize = is4Player ? 12 : 14;
+  const mainFontSize = is4Player ? 56 : 80;
+  const counterIconSize = is4Player ? 11 : 13;
 
   const incBg = incrementAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.08)'],
+    outputRange: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.06)'],
   });
   const decBg = decrementAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.08)'],
+    outputRange: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.06)'],
   });
 
   const containerStyle = [
@@ -187,53 +196,54 @@ const PlayerPanel = React.memo(function PlayerPanel({
     {
       height: panelHeight,
       width: panelWidth,
-      backgroundColor: player.bgColor,
-      transform: isRotated ? [{ rotate: '180deg' }] : [],
+      backgroundColor: player.gradient[0],
+      transform: isRotated ? [{ rotate: '180deg' as const }] : [],
     },
     isDead && styles.playerDead,
   ];
 
+  const valueColor = isDead ? '#ef4444' : isLow ? '#f97316' : isPoisoned ? '#51cf66' : '#e8e8e8';
+
   return (
     <View style={containerStyle}>
       <View style={styles.panelContent}>
+        <View style={[styles.panelInnerGlow, { backgroundColor: player.gradient[1] }]} />
+
         <Animated.View style={[styles.halfZone, styles.incrementZone, { backgroundColor: incBg }]}>
           <Pressable style={styles.zonePress} onPress={handleIncrement} testID={`p${player.id}-inc`}>
-            <Plus size={is4Player ? 16 : 20} color="rgba(255,255,255,0.15)" />
+            <Plus size={is4Player ? 14 : 18} color="rgba(255,255,255,0.1)" />
           </Pressable>
         </Animated.View>
 
         <Animated.View style={[styles.halfZone, styles.decrementZone, { backgroundColor: decBg }]}>
           <Pressable style={styles.zonePress} onPress={handleDecrement} testID={`p${player.id}-dec`}>
-            <Minus size={is4Player ? 16 : 20} color="rgba(255,255,255,0.15)" />
+            <Minus size={is4Player ? 14 : 18} color="rgba(255,255,255,0.1)" />
           </Pressable>
         </Animated.View>
 
         <View style={styles.centerDisplay} pointerEvents="none">
           <View style={styles.playerNameRow}>
-            <Text style={[styles.playerName, { fontSize: nameFontSize }]}>{player.name}</Text>
+            <Text style={[styles.playerName, is4Player && styles.playerName4p]}>{player.name}</Text>
           </View>
 
-          <Text
+          <Animated.Text
             style={[
               styles.mainValue,
-              { fontSize: mainFontSize, color: player.color },
-              isLow && styles.lowLife,
-              isPoisoned && styles.poisoned,
-              isDead && styles.deadText,
+              { fontSize: mainFontSize, color: valueColor, transform: [{ scale: valueScale }] },
             ]}
           >
             {value}
-          </Text>
+          </Animated.Text>
 
           {showDelta !== null && showDelta !== 0 && (
-            <View style={styles.deltaContainer}>
+            <Animated.View style={[styles.deltaContainer, { opacity: deltaFade }]}>
               <Text style={[styles.deltaText, showDelta > 0 ? styles.deltaPositive : styles.deltaNegative]}>
                 {showDelta > 0 ? `+${showDelta}` : showDelta}
               </Text>
-            </View>
+            </Animated.View>
           )}
 
-          <View style={styles.counterIndicator}>
+          <View style={[styles.counterIndicator, { borderColor: `${counterConf.color}33` }]}>
             <CounterIcon size={counterIconSize} color={counterConf.color} />
             <Text style={[styles.counterLabel, { color: counterConf.color }]}>{counterConf.label}</Text>
           </View>
@@ -250,43 +260,60 @@ const PlayerPanel = React.memo(function PlayerPanel({
           <View style={styles.miniCounters}>
             {player.poison > 0 && (
               <View style={styles.miniCounter}>
-                <Skull size={10} color="#88dd44" />
-                <Text style={[styles.miniCounterText, { color: '#88dd44' }]}>{player.poison}</Text>
+                <Skull size={9} color="#51cf66" />
+                <Text style={[styles.miniCounterText, { color: '#51cf66' }]}>{player.poison}</Text>
               </View>
             )}
             {player.energy > 0 && (
               <View style={styles.miniCounter}>
-                <Zap size={10} color="#ffaa00" />
-                <Text style={[styles.miniCounterText, { color: '#ffaa00' }]}>{player.energy}</Text>
+                <Zap size={9} color="#ffd43b" />
+                <Text style={[styles.miniCounterText, { color: '#ffd43b' }]}>{player.energy}</Text>
               </View>
             )}
             {player.experience > 0 && (
               <View style={styles.miniCounter}>
-                <Crown size={10} color="#aa88ff" />
-                <Text style={[styles.miniCounterText, { color: '#aa88ff' }]}>{player.experience}</Text>
+                <Crown size={9} color="#cc5de8" />
+                <Text style={[styles.miniCounterText, { color: '#cc5de8' }]}>{player.experience}</Text>
               </View>
             )}
           </View>
-          <Droplets size={is4Player ? 12 : 14} color="rgba(255,255,255,0.35)" />
+          <Droplets size={is4Player ? 11 : 13} color="rgba(255,255,255,0.25)" />
         </Pressable>
       </View>
-
-      <View style={[styles.panelEdge, { backgroundColor: counterConf.color }]} />
     </View>
   );
 });
 
 export default function LifeCounterScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    startingLife?: string;
+    playerCount?: string;
+    modeName?: string;
+  }>();
 
-  const [playerCount, setPlayerCount] = useState<PlayerCount>(2);
-  const [startingLife, setStartingLife] = useState(20);
-  const [players, setPlayers] = useState<PlayerState[]>(() => createPlayers(2, 20));
+  const initialLife = params.startingLife ? parseInt(params.startingLife, 10) : 20;
+  const initialPlayers = (params.playerCount === '4' ? 4 : 2) as PlayerCount;
+  const modeName = params.modeName ?? 'Standard';
+
+  const [playerCount, setPlayerCount] = useState<PlayerCount>(initialPlayers);
+  const [startingLife, setStartingLife] = useState(initialLife);
+  const [players, setPlayers] = useState<PlayerState[]>(() => createPlayers(initialPlayers, initialLife));
   const [activeCounters, setActiveCounters] = useState<Record<number, CounterType>>({
     0: 'life', 1: 'life', 2: 'life', 3: 'life',
   });
   const [showSettings, setShowSettings] = useState(false);
   const [showCounterPicker, setShowCounterPicker] = useState<number | null>(null);
+
+  const enterAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(enterAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [enterAnim]);
 
   const resetGame = useCallback((count: PlayerCount, life: number) => {
     hapticHeavy();
@@ -347,18 +374,18 @@ export default function LifeCounterScreen() {
   const panelDimensions = React.useMemo(() => {
     if (playerCount === 2) {
       return {
-        height: (SCREEN_HEIGHT - 48) / 2,
+        height: (SCREEN_HEIGHT - 52) / 2,
         width: SCREEN_WIDTH,
       };
     }
     return {
-      height: (SCREEN_HEIGHT - 48) / 2,
+      height: (SCREEN_HEIGHT - 52) / 2,
       width: SCREEN_WIDTH / 2,
     };
   }, [playerCount]);
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: enterAnim }]}>
       <StatusBar style="light" />
 
       {playerCount === 2 ? (
@@ -380,21 +407,26 @@ export default function LifeCounterScreen() {
               style={styles.centerButton}
               testID="life-settings"
             >
-              <Settings size={16} color={Colors.gold} />
+              <Settings size={15} color="rgba(255,255,255,0.5)" />
             </Pressable>
+
+            <View style={styles.modeIndicator}>
+              <Text style={styles.modeText}>{modeName}</Text>
+            </View>
+
             <Pressable
               onPress={() => resetGame(playerCount, startingLife)}
               style={styles.centerButton}
               testID="life-reset"
             >
-              <RotateCcw size={16} color="rgba(255,255,255,0.5)" />
+              <RotateCcw size={15} color="rgba(255,255,255,0.5)" />
             </Pressable>
             <Pressable
               onPress={() => router.back()}
               style={styles.centerButton}
               testID="life-close"
             >
-              <X size={16} color="rgba(255,255,255,0.5)" />
+              <X size={15} color="rgba(255,255,255,0.5)" />
             </Pressable>
           </View>
           <PlayerPanel
@@ -441,13 +473,16 @@ export default function LifeCounterScreen() {
           </View>
           <View style={styles.fourPlayerDivider}>
             <Pressable onPress={() => setShowSettings(true)} style={styles.centerButton}>
-              <Settings size={14} color={Colors.gold} />
+              <Settings size={13} color="rgba(255,255,255,0.5)" />
             </Pressable>
+            <View style={styles.modeIndicator}>
+              <Text style={styles.modeTextSmall}>{modeName}</Text>
+            </View>
             <Pressable onPress={() => resetGame(playerCount, startingLife)} style={styles.centerButton}>
-              <RotateCcw size={14} color="rgba(255,255,255,0.5)" />
+              <RotateCcw size={13} color="rgba(255,255,255,0.5)" />
             </Pressable>
             <Pressable onPress={() => router.back()} style={styles.centerButton}>
-              <X size={14} color="rgba(255,255,255,0.5)" />
+              <X size={13} color="rgba(255,255,255,0.5)" />
             </Pressable>
           </View>
           <View style={styles.fourPlayerRow}>
@@ -497,13 +532,15 @@ export default function LifeCounterScreen() {
               return (
                 <Pressable
                   key={key}
-                  style={[styles.counterOption, isActive && styles.counterOptionActive]}
+                  style={[styles.counterOption, isActive && { backgroundColor: `${conf.color}15`, borderColor: `${conf.color}30` }]}
                   onPress={() => {
                     if (showCounterPicker !== null) selectCounter(showCounterPicker, key);
                   }}
                 >
-                  <Icon size={20} color={conf.color} />
-                  <Text style={[styles.counterOptionText, { color: isActive ? conf.color : Colors.textPrimary }]}>
+                  <View style={[styles.counterIconWrap, { backgroundColor: `${conf.color}18` }]}>
+                    <Icon size={18} color={conf.color} />
+                  </View>
+                  <Text style={[styles.counterOptionText, isActive && { color: conf.color }]}>
                     {conf.label}
                   </Text>
                   {isActive && <View style={[styles.activeDot, { backgroundColor: conf.color }]} />}
@@ -522,7 +559,7 @@ export default function LifeCounterScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowSettings(false)}>
           <Pressable style={styles.settingsSheet} onPress={() => {}}>
-            <Text style={styles.settingsTitle}>Life Counter Settings</Text>
+            <Text style={styles.settingsTitle}>Settings</Text>
 
             <Text style={styles.settingLabel}>Players</Text>
             <View style={styles.optionRow}>
@@ -532,9 +569,9 @@ export default function LifeCounterScreen() {
                   style={[styles.optionButton, playerCount === count && styles.optionButtonActive]}
                   onPress={() => resetGame(count, startingLife)}
                 >
-                  <Users size={16} color={playerCount === count ? Colors.background : Colors.textPrimary} />
+                  <Users size={15} color={playerCount === count ? '#111' : '#aaa'} />
                   <Text style={[styles.optionText, playerCount === count && styles.optionTextActive]}>
-                    {count} Players
+                    {count}P
                   </Text>
                 </Pressable>
               ))}
@@ -542,13 +579,12 @@ export default function LifeCounterScreen() {
 
             <Text style={styles.settingLabel}>Starting Life</Text>
             <View style={styles.optionRow}>
-              {STARTING_LIFE_OPTIONS.map((life) => (
+              {[20, 25, 30, 40].map((life) => (
                 <Pressable
                   key={life}
                   style={[styles.optionButton, startingLife === life && styles.optionButtonActive]}
                   onPress={() => resetGame(playerCount, life)}
                 >
-                  <Heart size={14} color={startingLife === life ? Colors.background : Colors.textPrimary} />
                   <Text style={[styles.optionText, startingLife === life && styles.optionTextActive]}>
                     {life}
                   </Text>
@@ -563,24 +599,24 @@ export default function LifeCounterScreen() {
                 setShowSettings(false);
               }}
             >
-              <RotateCcw size={16} color={Colors.gold} />
-              <Text style={styles.resetAllText}>Reset All Counters</Text>
+              <RotateCcw size={15} color="#ff6b6b" />
+              <Text style={styles.resetAllText}>Reset All</Text>
             </Pressable>
 
-            <Pressable style={styles.closeSettingsButton} onPress={() => setShowSettings(false)}>
-              <Text style={styles.closeSettingsText}>Done</Text>
+            <Pressable style={styles.doneButton} onPress={() => setShowSettings(false)}>
+              <Text style={styles.doneButtonText}>Done</Text>
             </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#080a0f',
   },
   twoPlayerLayout: {
     flex: 1,
@@ -597,31 +633,53 @@ const styles = StyleSheet.create({
   fourPlayerCell: {
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   divider: {
-    height: 48,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
-    backgroundColor: '#0e0e0e',
+    gap: 16,
+    backgroundColor: '#0a0c11',
     zIndex: 10,
   },
   fourPlayerDivider: {
-    height: 48,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
-    backgroundColor: '#0e0e0e',
+    gap: 12,
+    backgroundColor: '#0a0c11',
     zIndex: 10,
   },
+  modeIndicator: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  modeText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 11,
+    fontWeight: '600' as const,
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+  },
+  modeTextSmall: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10,
+    fontWeight: '600' as const,
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+  },
   centerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -631,11 +689,20 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   playerDead: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   panelContent: {
     flex: 1,
     position: 'relative',
+  },
+  panelInnerGlow: {
+    position: 'absolute',
+    top: '20%',
+    left: '15%',
+    right: '15%',
+    bottom: '20%',
+    borderRadius: 999,
+    opacity: 0.3,
   },
   halfZone: {
     position: 'absolute',
@@ -667,79 +734,72 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   playerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   playerName: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 12,
     fontWeight: '700' as const,
-    letterSpacing: 2,
+    letterSpacing: 3,
     textTransform: 'uppercase' as const,
   },
+  playerName4p: {
+    fontSize: 10,
+    letterSpacing: 2,
+  },
   mainValue: {
-    fontWeight: '200' as const,
-    lineHeight: 100,
+    fontWeight: '100' as const,
     includeFontPadding: false,
-  },
-  lowLife: {
-    color: '#ff6644',
-  },
-  poisoned: {
-    color: '#88dd44',
-  },
-  deadText: {
-    color: '#ff2222',
   },
   deltaContainer: {
     position: 'absolute',
-    right: 20,
+    right: 24,
     top: '50%',
-    marginTop: -14,
+    marginTop: -12,
   },
   deltaText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700' as const,
   },
   deltaPositive: {
-    color: '#44cc88',
+    color: '#51cf66',
   },
   deltaNegative: {
-    color: '#ff6644',
+    color: '#ff6b6b',
   },
   counterIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    paddingHorizontal: 12,
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1,
   },
   counterLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600' as const,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     textTransform: 'uppercase' as const,
   },
   switchCounterButton: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
+    bottom: 10,
+    right: 10,
     zIndex: 5,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   miniCounters: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   miniCounter: {
     flexDirection: 'row',
@@ -747,135 +807,138 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   miniCounterText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700' as const,
-  },
-  panelEdge: {
-    height: 3,
-    width: '100%',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   counterPickerSheet: {
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#161820',
     borderRadius: 20,
-    padding: 24,
+    padding: 22,
     width: SCREEN_WIDTH * 0.8,
     maxWidth: 340,
-    gap: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   pickerTitle: {
-    color: Colors.gold,
-    fontSize: 18,
+    color: '#e8e8e8',
+    fontSize: 17,
     fontWeight: '700' as const,
     textAlign: 'center' as const,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   counterOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.03)',
-  },
-  counterOptionActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'transparent',
+  },
+  counterIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   counterOptionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500' as const,
     flex: 1,
+    color: '#aaa',
   },
   activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   settingsSheet: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 24,
-    padding: 28,
+    backgroundColor: '#161820',
+    borderRadius: 22,
+    padding: 24,
     width: SCREEN_WIDTH * 0.88,
     maxWidth: 400,
-    gap: 16,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   settingsTitle: {
-    color: Colors.gold,
-    fontSize: 20,
+    color: '#e8e8e8',
+    fontSize: 19,
     fontWeight: '800' as const,
     textAlign: 'center' as const,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   settingLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
     fontWeight: '600' as const,
     letterSpacing: 1.5,
     textTransform: 'uppercase' as const,
   },
   optionRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   optionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   optionButtonActive: {
-    backgroundColor: Colors.gold,
-    borderColor: Colors.gold,
+    backgroundColor: '#e8e8e8',
+    borderColor: '#e8e8e8',
   },
   optionText: {
-    color: Colors.textPrimary,
+    color: '#aaa',
     fontSize: 14,
     fontWeight: '600' as const,
   },
   optionTextActive: {
-    color: Colors.background,
+    color: '#111',
   },
   resetAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: 'rgba(232,105,45,0.1)',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,107,107,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(232,105,45,0.25)',
-    marginTop: 4,
+    borderColor: 'rgba(255,107,107,0.2)',
   },
   resetAllText: {
-    color: Colors.gold,
+    color: '#ff6b6b',
     fontSize: 14,
     fontWeight: '600' as const,
   },
-  closeSettingsButton: {
+  doneButton: {
     alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: Colors.gold,
-    marginTop: 4,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#e8e8e8',
   },
-  closeSettingsText: {
-    color: Colors.background,
-    fontSize: 16,
+  doneButtonText: {
+    color: '#111',
+    fontSize: 15,
     fontWeight: '700' as const,
   },
 });
