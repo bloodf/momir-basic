@@ -280,6 +280,20 @@ const fr: Translations = {
     fetchFailed: 'Échec de la recherche de carte',
     noCardFound: (type: string, cmc: number) => `Aucun ${type} trouvé à CMC ${cmc}`,
   },
+  toast: {
+    offline: 'Hors ligne',
+    offlineMessage: 'Certaines fonctionnalités peuvent ne pas être disponibles',
+    backOnline: 'De retour en ligne',
+    connectionRestored: 'Connexion restaurée',
+    printerDisconnected: 'Imprimante déconnectée',
+    printerDisconnectedMessage: 'Vérifiez votre connexion Bluetooth',
+    printerConnected: 'Imprimante connectée',
+    printFailed: "Échec de l'impression",
+    saveFailed: 'Échec de la sauvegarde',
+    permissionDenied: 'Permission refusée',
+    noPrinter: 'Aucune imprimante connectée',
+    noPrinterMessage: 'Connectez une imprimante Bluetooth dans les Paramètres pour imprimer des cartes',
+  },
 };
 
 export default fr;

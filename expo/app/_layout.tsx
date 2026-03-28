@@ -6,7 +6,9 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HistoryProvider } from "@/providers/HistoryProvider";
 import { SettingsProvider } from "@/providers/SettingsProvider";
+import { NetworkProvider } from "@/providers/NetworkProvider";
 import { I18nProvider } from "@/i18n";
+import { ToastProvider } from "@/components/Toast";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -61,7 +63,11 @@ export default function RootLayout() {
         <I18nProvider>
           <SettingsProvider>
             <HistoryProvider>
-              <RootLayoutNav />
+              <NetworkProvider>
+                <ToastProvider>
+                  <RootLayoutNav />
+                </ToastProvider>
+              </NetworkProvider>
             </HistoryProvider>
           </SettingsProvider>
         </I18nProvider>

@@ -278,4 +278,18 @@ export interface Translations {
     fetchFailed: string;
     noCardFound: (type: string, cmc: number) => string;
   };
+  toast: {
+    offline: string;
+    offlineMessage: string;
+    backOnline: string;
+    connectionRestored: string;
+    printerDisconnected: string;
+    printerDisconnectedMessage: string;
+    printerConnected: string;
+    printFailed: string;
+    saveFailed: string;
+    permissionDenied: string;
+    noPrinter: string;
+    noPrinterMessage: string;
+  };
 }

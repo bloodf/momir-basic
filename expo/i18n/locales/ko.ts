@@ -280,6 +280,20 @@ const ko: Translations = {
     fetchFailed: '카드 검색 실패',
     noCardFound: (type: string, cmc: number) => `CMC ${cmc}의 ${type}을(를) 찾을 수 없습니다`,
   },
+  toast: {
+    offline: '오프라인',
+    offlineMessage: '일부 기능을 사용할 수 없습니다',
+    backOnline: '다시 온라인',
+    connectionRestored: '연결이 복원되었습니다',
+    printerDisconnected: '프린터 연결 끊김',
+    printerDisconnectedMessage: 'Bluetooth 연결을 확인하세요',
+    printerConnected: '프린터 연결됨',
+    printFailed: '인쇄 실패',
+    saveFailed: '저장 실패',
+    permissionDenied: '권한 거부',
+    noPrinter: '프린터 미연결',
+    noPrinterMessage: '설정에서 Bluetooth 프린터를 연결하세요',
+  },
 };
 
 export default ko;

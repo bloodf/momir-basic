@@ -280,6 +280,20 @@ const ja: Translations = {
     fetchFailed: 'カード取得に失敗しました',
     noCardFound: (type: string, cmc: number) => `CMC ${cmc}の${type}が見つかりません`,
   },
+  toast: {
+    offline: 'オフラインです',
+    offlineMessage: '一部の機能が利用できない場合があります',
+    backOnline: 'オンラインに復帰',
+    connectionRestored: '接続が復旧しました',
+    printerDisconnected: 'プリンター切断',
+    printerDisconnectedMessage: 'Bluetooth接続を確認してください',
+    printerConnected: 'プリンター接続済み',
+    printFailed: '印刷失敗',
+    saveFailed: '保存失敗',
+    permissionDenied: '権限が拒否されました',
+    noPrinter: 'プリンター未接続',
+    noPrinterMessage: '設定でBluetoothプリンターを接続してください',
+  },
 };
 
 export default ja;

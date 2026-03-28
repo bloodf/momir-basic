@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   Dimensions,
   Platform,
   Animated,
@@ -25,6 +24,7 @@ import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
+import { showToast } from '@/components/Toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
@@ -92,7 +92,7 @@ export default function PrintPreviewScreen() {
   const handleDevPrint = useCallback(async () => {
     if (!card || !receiptRef.current) return;
     if (Platform.OS as string === 'web') {
-      Alert.alert(t.printPreview.notAvailable, t.printPreview.devPrintNotSupported);
+      showToast({ type: 'info', title: t.printPreview.notAvailable, message: t.printPreview.devPrintNotSupported });
       return;
     }
 
@@ -102,7 +102,7 @@ export default function PrintPreviewScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t.printPreview.permissionDenied, t.printPreview.galleryAccessRequired);
+        showToast({ type: 'error', title: t.toast.permissionDenied, message: t.printPreview.galleryAccessRequired });
         setIsSaving(false);
         return;
       }
@@ -125,7 +125,7 @@ export default function PrintPreviewScreen() {
       showSuccessFlash();
     } catch (err) {
       console.log('[PrintPreview] Dev print error:', err);
-      Alert.alert(t.printPreview.saveFailed, t.printPreview.saveFailedMsg);
+      showToast({ type: 'error', title: t.toast.saveFailed, message: t.printPreview.saveFailedMsg });
     } finally {
       setIsSaving(false);
     }
@@ -242,7 +242,7 @@ export default function PrintPreviewScreen() {
     }
 
     if (!settings.printerConnected) {
-      Alert.alert(t.printPreview.noPrinter, t.printPreview.noPrinterMsg);
+      showToast({ type: 'warning', title: t.toast.noPrinter, message: t.toast.noPrinterMessage });
       return;
     }
 

@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Alert,
   Platform,
   Animated,
   Linking,
@@ -30,6 +29,7 @@ import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
 import { PrinterDevice } from '@/types';
 import { useI18n } from '@/i18n';
+import { showToast } from '@/components/Toast';
 
 const MOCK_BLE_DEVICES: PrinterDevice[] = [
   { id: 'ble-1', name: 'POS-58 BLE', address: 'AA:BB:CC:DD:EE:01', rssi: -42, type: 'ble' },
@@ -85,7 +85,7 @@ export default function PrinterSetupScreen() {
         void Linking.openSettings();
       });
     } else {
-      Alert.alert(t.printer.bluetoothSettings, t.printer.bluetoothSettingsMsg);
+      showToast({ type: 'info', title: t.printer.bluetoothSettings, message: t.printer.bluetoothSettingsMsg });
     }
   }, [isIOS, t]);
 
@@ -120,7 +120,7 @@ export default function PrinterSetupScreen() {
       updateSettings({ printerConnected: true });
       setConnecting(null);
       console.log('[Printer] Connected to', device.name);
-      Alert.alert(t.printer.connected, t.printer.connectedTo(device.name));
+      showToast({ type: 'success', title: t.toast.printerConnected, message: t.printer.connectedTo(device.name) });
     }, 1500);
   }, [updatePrinter, updateSettings, t]);
 
@@ -128,13 +128,11 @@ export default function PrinterSetupScreen() {
     console.log('[Printer] Disconnecting from', settings.printer.name);
     updatePrinter({ name: '', address: '' });
     updateSettings({ printerConnected: false });
-  }, [updatePrinter, updateSettings, settings.printer.name]);
+    showToast({ type: 'warning', title: t.toast.printerDisconnected, message: t.toast.printerDisconnectedMessage });
+  }, [updatePrinter, updateSettings, settings.printer.name, t]);
 
   const handleTestPrint = useCallback(() => {
-    Alert.alert(
-      t.printer.testPrint,
-      t.printer.testPrintMsg(settings.printer.name)
-    );
+    showToast({ type: 'info', title: t.printer.testPrint, message: t.printer.testPrintMsg(settings.printer.name) });
   }, [settings.printer, t]);
 
   const getSignalBars = (rssi?: number): number => {

@@ -280,6 +280,20 @@ const es: Translations = {
     fetchFailed: 'Error al buscar carta',
     noCardFound: (type: string, cmc: number) => `No se encontró ${type} con CMC ${cmc}`,
   },
+  toast: {
+    offline: 'Sin conexión',
+    offlineMessage: 'Algunas funciones pueden no estar disponibles',
+    backOnline: 'Conectado de nuevo',
+    connectionRestored: 'Conexión restaurada',
+    printerDisconnected: 'Impresora desconectada',
+    printerDisconnectedMessage: 'Verifica tu conexión Bluetooth',
+    printerConnected: 'Impresora conectada',
+    printFailed: 'Error de impresión',
+    saveFailed: 'Error al guardar',
+    permissionDenied: 'Permiso denegado',
+    noPrinter: 'Sin impresora conectada',
+    noPrinterMessage: 'Conecta una impresora Bluetooth en Ajustes para imprimir cartas',
+  },
 };
 
 export default es;

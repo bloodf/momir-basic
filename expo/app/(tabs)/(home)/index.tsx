@@ -26,6 +26,8 @@ import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
 import { TypePicker } from '@/components/TypePicker';
 import { HistorySheet } from '@/components/HistorySheet';
+import { showToast } from '@/components/Toast';
+import { useNetwork } from '@/providers/NetworkProvider';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
@@ -52,6 +54,7 @@ export default function HomeScreen() {
   const { settings } = useSettings();
 
   const { t, locale } = useI18n();
+  const { isOnline: _isOnline } = useNetwork();
 
   const [cmc, setCmc] = useState(3);
   const [typeIndex, setTypeIndex] = useState(0);
@@ -290,6 +293,11 @@ export default function HomeScreen() {
     },
     onError: (error) => {
       console.log('[Cast] Error:', error);
+      showToast({
+        type: 'error',
+        title: t.errors.fetchFailed,
+        message: error?.message ?? t.errors.fetchFailed,
+      });
     },
   });
 
@@ -528,16 +536,7 @@ export default function HomeScreen() {
             onClose={() => setTypePickerVisible(false)}
           />
 
-          {castMutation.isError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>
-                {castMutation.error?.message ?? t.errors.fetchFailed}
-              </Text>
-              <Pressable onPress={() => castMutation.reset()} style={styles.retryButton}>
-                <Text style={styles.retryText}>{t.common.dismiss}</Text>
-              </Pressable>
-            </View>
-          )}
+
 
 
         </View>

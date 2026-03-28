@@ -280,6 +280,20 @@ const de: Translations = {
     fetchFailed: 'Kartensuche fehlgeschlagen',
     noCardFound: (type: string, cmc: number) => `Kein ${type} bei CMC ${cmc} gefunden`,
   },
+  toast: {
+    offline: 'Offline',
+    offlineMessage: 'Einige Funktionen sind möglicherweise nicht verfügbar',
+    backOnline: 'Wieder online',
+    connectionRestored: 'Verbindung wiederhergestellt',
+    printerDisconnected: 'Drucker getrennt',
+    printerDisconnectedMessage: 'Prüfen Sie Ihre Bluetooth-Verbindung',
+    printerConnected: 'Drucker verbunden',
+    printFailed: 'Druckfehler',
+    saveFailed: 'Speichern fehlgeschlagen',
+    permissionDenied: 'Berechtigung verweigert',
+    noPrinter: 'Kein Drucker verbunden',
+    noPrinterMessage: 'Verbinden Sie einen Bluetooth-Drucker in den Einstellungen',
+  },
 };
 
 export default de;

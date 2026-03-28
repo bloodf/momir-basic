@@ -280,6 +280,20 @@ const ru: Translations = {
     fetchFailed: 'Не удалось получить карту',
     noCardFound: (type: string, cmc: number) => `${type} с CMC ${cmc} не найден`,
   },
+  toast: {
+    offline: 'Нет сети',
+    offlineMessage: 'Некоторые функции могут быть недоступны',
+    backOnline: 'Снова онлайн',
+    connectionRestored: 'Соединение восстановлено',
+    printerDisconnected: 'Принтер отключён',
+    printerDisconnectedMessage: 'Проверьте Bluetooth-соединение',
+    printerConnected: 'Принтер подключён',
+    printFailed: 'Ошибка печати',
+    saveFailed: 'Ошибка сохранения',
+    permissionDenied: 'Доступ запрещён',
+    noPrinter: 'Принтер не подключён',
+    noPrinterMessage: 'Подключите Bluetooth-принтер в настройках',
+  },
 };
 
 export default ru;

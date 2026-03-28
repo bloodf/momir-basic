@@ -280,6 +280,20 @@ const zhs: Translations = {
     fetchFailed: '获取卡牌失败',
     noCardFound: (type: string, cmc: number) => `未找到CMC为${cmc}的${type}`,
   },
+  toast: {
+    offline: '已离线',
+    offlineMessage: '部分功能可能不可用',
+    backOnline: '已恢复在线',
+    connectionRestored: '连接已恢复',
+    printerDisconnected: '打印机已断开',
+    printerDisconnectedMessage: '请检查蓝牙连接',
+    printerConnected: '打印机已连接',
+    printFailed: '打印失败',
+    saveFailed: '保存失败',
+    permissionDenied: '权限被拒绝',
+    noPrinter: '未连接打印机',
+    noPrinterMessage: '请在设置中连接蓝牙打印机',
+  },
 };
 
 export default zhs;
