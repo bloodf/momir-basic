@@ -88,7 +88,35 @@ function mapScryfallCard(data: ScryfallCard): Card {
     colors: data.colors ?? [],
     cmc: data.cmc,
     fetchedAt: new Date().toISOString(),
+    printedName: data.printed_name ?? face?.printed_name,
+    printedTypeLine: data.printed_type_line ?? face?.printed_type_line,
+    printedText: data.printed_text ?? face?.printed_text,
+    lang: data.lang,
   };
+}
+
+const LOCALE_TO_SCRYFALL_LANG: Record<string, string> = {
+  en: 'en',
+  pt: 'pt',
+  es: 'es',
+};
+
+async function fetchLocalizedCard(cardId: string, lang: string): Promise<ScryfallCard | null> {
+  const scryfallLang = LOCALE_TO_SCRYFALL_LANG[lang] ?? lang;
+  const url = `${BASE_URL}/cards/${cardId}/${scryfallLang}`;
+  console.log('[Scryfall] Fetching localized card:', url);
+
+  try {
+    const response = await rateLimitedFetch(url);
+    if (!response.ok) {
+      console.log('[Scryfall] Localized fetch failed:', response.status);
+      return null;
+    }
+    return await response.json() as ScryfallCard;
+  } catch (e) {
+    console.log('[Scryfall] Localized fetch error:', e);
+    return null;
+  }
 }
 
 export async function fetchRandomCard(
@@ -96,11 +124,12 @@ export async function fetchRandomCard(
   cmc: number,
   excludeFunny: boolean = true,
   retries: number = 3,
+  lang?: string,
 ): Promise<Card> {
   const query = buildQuery(cardType, cmc, excludeFunny);
   const url = `${BASE_URL}/cards/random?q=${encodeURIComponent(query)}`;
 
-  console.log('[Scryfall] Fetching:', url);
+  console.log('[Scryfall] Fetching:', url, lang ? `(lang: ${lang})` : '');
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
@@ -126,6 +155,16 @@ export async function fetchRandomCard(
 
       const data: ScryfallCard = await response.json();
       console.log('[Scryfall] Got card:', data.name);
+
+      if (lang && lang !== 'en') {
+        const localized = await fetchLocalizedCard(data.id, lang);
+        if (localized) {
+          console.log('[Scryfall] Localized card found:', localized.printed_name ?? data.name);
+          return mapScryfallCard(localized);
+        }
+        console.log('[Scryfall] No localized version, using English');
+      }
+
       return mapScryfallCard(data);
     } catch (error) {
       if (attempt === retries - 1) throw error;
@@ -140,10 +179,11 @@ export async function fetchMultipleCards(
   cardType: CardType,
   count: number,
   excludeFunny: boolean = true,
+  lang?: string,
 ): Promise<Card[]> {
   const cards: Card[] = [];
   for (let i = 0; i < count; i++) {
-    const card = await fetchRandomCard(cardType, 0, excludeFunny);
+    const card = await fetchRandomCard(cardType, 0, excludeFunny, 3, lang);
     cards.push(card);
   }
   return cards;
@@ -159,8 +199,11 @@ export interface SearchResult {
 export async function searchCards(
   query: string,
   page: number = 1,
+  lang?: string,
 ): Promise<SearchResult> {
-  const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&page=${page}&unique=cards`;
+  const langFilter = lang && lang !== 'en' ? ` lang:${LOCALE_TO_SCRYFALL_LANG[lang] ?? lang}` : '';
+  const fullQuery = langFilter ? `${query}${langFilter}` : query;
+  const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(fullQuery)}&page=${page}&unique=cards`;
   console.log('[Scryfall] Search:', url);
 
   const response = await rateLimitedFetch(url);

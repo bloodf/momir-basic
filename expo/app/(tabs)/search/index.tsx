@@ -19,6 +19,7 @@ import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { searchCards, autocompleteCardName } from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
+import { useI18n } from '@/i18n';
 
 const POPULAR_SEARCHES = [
   'Lightning Bolt',
@@ -35,6 +36,7 @@ export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
+  const { locale } = useI18n();
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Card[]>([]);
@@ -46,7 +48,7 @@ export default function SearchScreen() {
 
   const searchMutation = useMutation({
     mutationFn: async ({ q, page }: { q: string; page: number }) => {
-      return searchCards(q, page);
+      return searchCards(q, page, locale);
     },
     onSuccess: (data, variables) => {
       if (variables.page === 1) {

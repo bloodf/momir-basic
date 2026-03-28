@@ -48,7 +48,7 @@ export default function HomeScreen() {
   const { addCard, addCards } = useHistory();
   const { settings } = useSettings();
   const { activeSession, addTurn } = useGame();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const [cmc, setCmc] = useState(3);
   const [typeIndex, setTypeIndex] = useState(0);
@@ -236,9 +236,9 @@ export default function HomeScreen() {
   const castMutation = useMutation({
     mutationFn: async () => {
       if (currentTypeConfig.multiCard) {
-        return fetchMultipleCards(cardType, currentTypeConfig.count, settings.excludeFunnySets);
+        return fetchMultipleCards(cardType, currentTypeConfig.count, settings.excludeFunnySets, locale);
       } else {
-        const card = await fetchRandomCard(cardType, cmc, settings.excludeFunnySets);
+        const card = await fetchRandomCard(cardType, cmc, settings.excludeFunnySets, 3, locale);
         return [card];
       }
     },

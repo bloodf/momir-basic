@@ -54,7 +54,7 @@ export default function CardDetailScreen() {
   const params = useLocalSearchParams<{ cardJson: string; multiCards?: string }>();
   const { addCard } = useHistory();
   const { settings } = useSettings();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const initialCards = useMemo<Card[]>(() => {
     try {
@@ -105,7 +105,7 @@ export default function CardDetailScreen() {
       let cardType: 'creature' | 'artifact' | 'enchantment' = 'creature';
       if (typeLine.includes('artifact')) cardType = 'artifact';
       else if (typeLine.includes('enchantment')) cardType = 'enchantment';
-      return fetchRandomCard(cardType, card.cmc, settings.excludeFunnySets);
+      return fetchRandomCard(cardType, card.cmc, settings.excludeFunnySets, 3, locale);
     },
     onSuccess: (newCard) => {
       if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -334,14 +334,14 @@ export default function CardDetailScreen() {
 
           <Animated.View style={[styles.heroContent, { opacity: cardEntryAnim }]}>
             <ManaCost manaCost={card.manaCost} size={22} gap={3} />
-            <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+            <Text style={styles.cardName} numberOfLines={2}>{card.printedName ?? card.name}</Text>
           </Animated.View>
         </Pressable>
 
         <Animated.View style={[styles.body, { opacity: cardEntryAnim, transform: [{ translateY: bodyTranslateY }] }]}>
           <View style={styles.typeAndPtRow}>
             <View style={[styles.typeCard, hasStats ? styles.typeCardWithPt : undefined]}>
-              <Text style={styles.typeCardText}>{card.typeLine}</Text>
+              <Text style={styles.typeCardText}>{card.printedTypeLine ?? card.typeLine}</Text>
             </View>
             {hasStats && (
               <View style={styles.ptCompactCard}>
@@ -358,9 +358,9 @@ export default function CardDetailScreen() {
             )}
           </View>
 
-          {card.oracleText ? (
+          {(card.printedText ?? card.oracleText) ? (
             <View style={styles.oracleSection}>
-              <OracleText text={card.oracleText} fontSize={14.5} />
+              <OracleText text={card.printedText ?? card.oracleText} fontSize={14.5} />
             </View>
           ) : null}
 
@@ -534,7 +534,7 @@ export default function CardDetailScreen() {
               <X size={22} color="#fff" />
             </Pressable>
             <View style={styles.modalFooter}>
-              <Text style={styles.modalName}>{card.name}</Text>
+              <Text style={styles.modalName}>{card.printedName ?? card.name}</Text>
               <Text style={styles.modalMeta}>{card.setName} · #{card.collectorNumber}{card.artist ? ` · Art by ${card.artist}` : ''}</Text>
             </View>
           </View>
@@ -555,7 +555,7 @@ export default function CardDetailScreen() {
               <X size={22} color="#fff" />
             </Pressable>
             <View style={styles.artModalFooter}>
-              <Text style={styles.artModalTitle}>{card.name}</Text>
+              <Text style={styles.artModalTitle}>{card.printedName ?? card.name}</Text>
               {card.artist && <Text style={styles.artModalArtist}>Art by {card.artist}</Text>}
               <View style={styles.artModalActions}>
                 <Pressable onPress={handleDownloadArt} style={styles.artModalBtn}>

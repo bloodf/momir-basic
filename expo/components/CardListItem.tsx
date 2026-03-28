@@ -35,10 +35,10 @@ export const CardListItem = memo(function CardListItem({ card, onPress }: CardLi
       />
       <View style={styles.info}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>{card.name}</Text>
+          <Text style={styles.name} numberOfLines={1}>{card.printedName ?? card.name}</Text>
           <ManaCost manaCost={card.manaCost} size={14} gap={1} />
         </View>
-        <Text style={styles.typeLine} numberOfLines={1}>{card.typeLine}</Text>
+        <Text style={styles.typeLine} numberOfLines={1}>{card.printedTypeLine ?? card.typeLine}</Text>
         <View style={styles.metaRow}>
           <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
           <Text style={styles.setName}>{card.setName}</Text>

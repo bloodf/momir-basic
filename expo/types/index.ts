@@ -20,6 +20,10 @@ export interface Card {
   cmc: number;
   fetchedAt: string;
   sessionId?: string;
+  printedName?: string;
+  printedTypeLine?: string;
+  printedText?: string;
+  lang?: string;
 }
 
 export type CardType =
@@ -109,6 +113,10 @@ export interface ScryfallCard {
   rarity: string;
   colors?: string[];
   cmc: number;
+  lang?: string;
+  printed_name?: string;
+  printed_type_line?: string;
+  printed_text?: string;
   card_faces?: Array<{
     name: string;
     mana_cost?: string;
@@ -118,6 +126,9 @@ export interface ScryfallCard {
     power?: string;
     toughness?: string;
     artist?: string;
+    printed_name?: string;
+    printed_type_line?: string;
+    printed_text?: string;
     image_uris?: {
       art_crop: string;
       normal: string;
