@@ -26,7 +26,7 @@ import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const RECEIPT_WIDTH = SCREEN_WIDTH - 48;
+const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
 const ART_WIDTH = RECEIPT_WIDTH - 32;
 const ART_HEIGHT = ART_WIDTH * 0.85;
 
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     alignItems: 'center' as const,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 8,
   },
   previewLabel: {

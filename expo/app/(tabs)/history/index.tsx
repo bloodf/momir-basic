@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 10,
   },
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   countText: {
     color: Colors.textMuted,
     fontSize: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 8,
   },
   emptyContainer: {
@@ -168,5 +168,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center' as const,
+    paddingHorizontal: 32,
   },
 });

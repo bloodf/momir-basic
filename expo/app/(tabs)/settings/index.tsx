@@ -216,9 +216,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 10,
+    paddingBottom: 12,
   },
   title: {
     fontSize: 28,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginTop: 20,
+    marginTop: 16,
     marginHorizontal: 16,
     backgroundColor: Colors.cardBackground,
     borderRadius: 16,

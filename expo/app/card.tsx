@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollInner: {
-    paddingBottom: 24,
+    paddingBottom: 16,
   },
   heroBanner: {
     width: '100%',
@@ -649,8 +649,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
     zIndex: 10,
     gap: 6,
   },
@@ -665,8 +665,8 @@ const styles = StyleSheet.create({
   },
   body: {
     paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 12,
+    paddingTop: 12,
+    gap: 10,
   },
   typeAndPtRow: {
     flexDirection: 'row' as const,
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignItems: 'center' as const,
     gap: 4,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   modalName: {
     color: '#ffffff',

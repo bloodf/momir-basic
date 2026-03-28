@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 10,
   },
@@ -348,8 +348,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.gold,
     fontWeight: '600' as const,
-    paddingHorizontal: 20,
-    paddingBottom: 4,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
   },
   suggestionsContainer: {
     marginHorizontal: 16,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   popularSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 20,
     gap: 12,
   },
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   resultCount: {
     color: Colors.textMuted,
     fontSize: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 8,
   },
   emptyState: {
