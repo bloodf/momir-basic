@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Minus, Plus, ChevronDown } from 'lucide-react-native';
+import { Minus, Plus, ChevronDown, ScrollText } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
@@ -25,6 +25,7 @@ import { useSettings } from '@/providers/SettingsProvider';
 
 import { useI18n } from '@/i18n';
 import { TypePicker } from '@/components/TypePicker';
+import { HistorySheet } from '@/components/HistorySheet';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
@@ -45,7 +46,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { addCard, addCards } = useHistory();
+  const { addCard, addCards, cards } = useHistory();
   const { settings } = useSettings();
 
   const { t, locale } = useI18n();
@@ -54,6 +55,7 @@ export default function HomeScreen() {
   const [typeIndex, setTypeIndex] = useState(0);
   const [_lastCards, setLastCards] = useState<Card[]>([]);
   const [typePickerVisible, setTypePickerVisible] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
 
   const cardType = CARD_TYPES[typeIndex].id;
   const currentTypeConfig = CARD_TYPES[typeIndex];
@@ -336,6 +338,31 @@ export default function HomeScreen() {
         style={[styles.innerContainer, { opacity: fadeIn }]}
         {...swipePanResponder.panHandlers}
       >
+        <View style={styles.topBar}>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== 'web') void Haptics.selectionAsync();
+              setHistoryVisible(true);
+            }}
+            style={({ pressed }) => [
+              styles.historyButton,
+              pressed && styles.historyButtonPressed,
+            ]}
+            hitSlop={8}
+            testID="open-history"
+          >
+            <ScrollText size={18} color={Colors.gold} />
+            {cards.length > 0 && (
+              <View style={styles.historyBadge}>
+                <Text style={styles.historyBadgeText}>
+                  {cards.length > 99 ? '99+' : cards.length}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+
         <View style={styles.spacer} />
 
         <View style={[styles.bottomControls, { paddingBottom: Math.max(insets.bottom, 12) + 60 }]}>
@@ -447,6 +474,8 @@ export default function HomeScreen() {
 
         </View>
       </Animated.View>
+
+      <HistorySheet visible={historyVisible} onClose={() => setHistoryVisible(false)} />
     </View>
   );
 }
@@ -683,5 +712,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600' as const,
   },
-
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  historyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(232,105,45,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  historyButtonPressed: {
+    backgroundColor: 'rgba(232,105,45,0.2)',
+  },
+  historyBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.gold,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  historyBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700' as const,
+  },
 });
