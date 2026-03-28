@@ -9,7 +9,7 @@ import {
   Alert,
   Platform,
   Animated,
-  Switch,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +23,8 @@ import {
   Smartphone,
   Radio,
   Wifi,
-  AlertTriangle,
+  ExternalLink,
+  Info,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
@@ -40,8 +41,6 @@ const MOCK_CLASSIC_DEVICES: PrinterDevice[] = [
   { id: 'classic-2', name: 'BT Printer Pro', address: 'AA:BB:CC:DD:EE:03', rssi: -71, type: 'classic' },
 ];
 
-type ScanMode = 'all' | 'ble' | 'classic';
-
 export default function PrinterSetupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -49,15 +48,14 @@ export default function PrinterSetupScreen() {
   const { t: _t } = useI18n();
 
   const [scanning, setScanning] = useState(false);
-  const [bleDevices, setBleDevices] = useState<PrinterDevice[]>([]);
-  const [classicDevices, setClassicDevices] = useState<PrinterDevice[]>([]);
+  const [devices, setDevices] = useState<PrinterDevice[]>([]);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [scanMode, setScanMode] = useState<ScanMode>('all');
-  const [scanBle, setScanBle] = useState(true);
-  const [scanClassic, setScanClassic] = useState(true);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
+
+  const isIOS = Platform.OS === 'ios';
+  const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
     Animated.timing(fadeIn, {
@@ -79,35 +77,35 @@ export default function PrinterSetupScreen() {
     return () => loop.stop();
   }, [scanning, pulseAnim]);
 
+  const openBluetoothSettings = useCallback(() => {
+    if (isIOS) {
+      void Linking.openURL('App-Prefs:Bluetooth');
+    } else if (Platform.OS === 'android') {
+      void Linking.sendIntent?.('android.settings.BLUETOOTH_SETTINGS').catch(() => {
+        void Linking.openSettings();
+      });
+    } else {
+      Alert.alert('Bluetooth Settings', 'Open your device Bluetooth settings to pair the printer.');
+    }
+  }, [isIOS]);
+
   const handleScan = useCallback(() => {
     setScanning(true);
-    setBleDevices([]);
-    setClassicDevices([]);
+    setDevices([]);
 
-    const shouldScanBle = scanMode === 'all' || scanMode === 'ble';
-    const shouldScanClassic = scanMode === 'all' || scanMode === 'classic';
+    console.log('[Printer] Starting scan for paired/nearby devices');
 
-    console.log('[Printer] Starting scan — BLE:', shouldScanBle, 'Classic:', shouldScanClassic);
-
-    if (shouldScanBle) {
-      setTimeout(() => {
-        console.log('[Printer] BLE devices found:', MOCK_BLE_DEVICES.length);
-        setBleDevices(MOCK_BLE_DEVICES);
-      }, 1500);
-    }
-
-    if (shouldScanClassic) {
-      setTimeout(() => {
-        console.log('[Printer] Classic devices found:', MOCK_CLASSIC_DEVICES.length);
-        setClassicDevices(MOCK_CLASSIC_DEVICES);
-      }, 2500);
-    }
+    setTimeout(() => {
+      const mockDevices = [...MOCK_BLE_DEVICES, ...MOCK_CLASSIC_DEVICES];
+      console.log('[Printer] Devices found:', mockDevices.length);
+      setDevices(mockDevices);
+    }, 2000);
 
     setTimeout(() => {
       setScanning(false);
       console.log('[Printer] Scan complete');
-    }, 3500);
-  }, [scanMode]);
+    }, 3000);
+  }, []);
 
   const handleConnect = useCallback((device: PrinterDevice) => {
     setConnecting(device.id);
@@ -122,7 +120,7 @@ export default function PrinterSetupScreen() {
       updateSettings({ printerConnected: true });
       setConnecting(null);
       console.log('[Printer] Connected to', device.name);
-      Alert.alert('Connected', `Connected to ${device.name} via ${device.type === 'ble' ? 'BLE' : 'Classic Bluetooth'}`);
+      Alert.alert('Connected', `Connected to ${device.name}`);
     }, 1500);
   }, [updatePrinter, updateSettings]);
 
@@ -135,7 +133,7 @@ export default function PrinterSetupScreen() {
   const handleTestPrint = useCallback(() => {
     Alert.alert(
       'Test Print',
-      `Sending test page to ${settings.printer.name} via ${settings.printer.type === 'ble' ? 'BLE' : 'Classic BT'}...\n\n(Bluetooth printing requires a development build)`
+      `Sending test page to ${settings.printer.name}...\n\n(Bluetooth printing requires a development build)`
     );
   }, [settings.printer]);
 
@@ -146,26 +144,7 @@ export default function PrinterSetupScreen() {
     return 1;
   };
 
-  const allDevices = [
-    ...(scanMode === 'classic' ? [] : bleDevices),
-    ...(scanMode === 'ble' ? [] : classicDevices),
-  ];
-  const hasDevices = allDevices.length > 0;
-
-  const isIOS = Platform.OS === 'ios';
-
-  const updateScanMode = useCallback((ble: boolean, classic: boolean) => {
-    setScanBle(ble);
-    setScanClassic(classic);
-    if (ble && classic) setScanMode('all');
-    else if (ble) setScanMode('ble');
-    else if (classic) setScanMode('classic');
-    else {
-      setScanBle(true);
-      setScanClassic(true);
-      setScanMode('all');
-    }
-  }, []);
+  const hasDevices = devices.length > 0;
 
   const renderDevice = (device: PrinterDevice) => {
     const isConnected = settings.printer.address === device.address && settings.printerConnected;
@@ -278,59 +257,73 @@ export default function PrinterSetupScreen() {
           </View>
         )}
 
-        <View style={styles.protocolSection}>
-          <Text style={styles.sectionLabel}>SCAN PROTOCOLS</Text>
-          <View style={styles.protocolCard}>
-            <View style={styles.protocolRow}>
-              <View style={styles.protocolLeft}>
-                <View style={[styles.protocolIcon, styles.protocolIconBle]}>
-                  <Radio size={14} color="#5B9BD5" />
-                </View>
-                <View>
-                  <Text style={styles.protocolName}>Bluetooth LE</Text>
-                  <Text style={styles.protocolDesc}>Low energy, iOS & Android</Text>
-                </View>
+        {isIOS && !settings.printerConnected && (
+          <View style={styles.iosFlowCard}>
+            <View style={styles.iosFlowHeader}>
+              <View style={styles.iosFlowIconWrap}>
+                <Bluetooth size={20} color="#5B9BD5" />
               </View>
-              <Switch
-                value={scanBle}
-                onValueChange={(val) => updateScanMode(val, scanClassic)}
-                trackColor={{ false: Colors.border, true: 'rgba(91,155,213,0.4)' }}
-                thumbColor={scanBle ? '#5B9BD5' : Colors.textMuted}
-              />
+              <Text style={styles.iosFlowTitle}>iOS Bluetooth Setup</Text>
             </View>
 
-            <View style={styles.protocolDivider} />
-
-            <View style={styles.protocolRow}>
-              <View style={styles.protocolLeft}>
-                <View style={[styles.protocolIcon, styles.protocolIconClassic]}>
-                  <Bluetooth size={14} color="#C084FC" />
+            <View style={styles.stepsContainer}>
+              <View style={styles.stepRow}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>1</Text>
                 </View>
-                <View>
-                  <Text style={styles.protocolName}>Classic Bluetooth</Text>
-                  <Text style={styles.protocolDesc}>
-                    {isIOS ? 'iOS (MFi printers)' : 'Android supported'}
-                  </Text>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Turn on your printer</Text>
+                  <Text style={styles.stepDesc}>Make sure the thermal printer is powered on and in pairing mode</Text>
                 </View>
               </View>
-              <Switch
-                value={scanClassic}
-                onValueChange={(val) => updateScanMode(scanBle, val)}
-                trackColor={{ false: Colors.border, true: 'rgba(192,132,252,0.4)' }}
-                thumbColor={scanClassic ? '#C084FC' : Colors.textMuted}
-              />
+
+              <View style={styles.stepConnector} />
+
+              <View style={styles.stepRow}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>2</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Pair via iOS Settings</Text>
+                  <Text style={styles.stepDesc}>Go to Settings → Bluetooth and connect to your printer</Text>
+                </View>
+              </View>
+
+              <View style={styles.stepConnector} />
+
+              <View style={styles.stepRow}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>3</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Select printer here</Text>
+                  <Text style={styles.stepDesc}>Come back and tap "Scan" below to find your paired printer</Text>
+                </View>
+              </View>
             </View>
+
+            <Pressable
+              onPress={openBluetoothSettings}
+              style={({ pressed }) => [
+                styles.openSettingsButton,
+                pressed && styles.openSettingsButtonPressed,
+              ]}
+              testID="open-bt-settings"
+            >
+              <ExternalLink size={16} color="#fff" />
+              <Text style={styles.openSettingsText}>Open Bluetooth Settings</Text>
+            </Pressable>
           </View>
+        )}
 
-          {isIOS && scanClassic && (
-            <View style={styles.iosNotice}>
-              <AlertTriangle size={13} color="#F59E0B" />
-              <Text style={styles.iosNoticeText}>
-                Classic BT on iOS requires MFi-certified printers. Most thermal printers use BLE.
-              </Text>
-            </View>
-          )}
-        </View>
+        {!isIOS && !settings.printerConnected && (
+          <View style={styles.infoCard}>
+            <Info size={16} color="#5B9BD5" />
+            <Text style={styles.infoText}>
+              Tap "Scan for Printers" to discover nearby Bluetooth printers. Make sure your printer is powered on and in pairing mode.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.scanSection}>
           <Pressable
@@ -348,17 +341,21 @@ export default function PrinterSetupScreen() {
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                   <BluetoothSearching size={18} color={Colors.gold} />
                 </Animated.View>
-                <Text style={styles.scanButtonText}>Scanning...</Text>
+                <Text style={styles.scanButtonText}>
+                  {isIOS ? 'Looking for paired printers...' : 'Scanning...'}
+                </Text>
               </View>
             ) : (
               <View style={styles.scanButtonContent}>
                 <BluetoothSearching size={18} color={Colors.gold} />
-                <Text style={styles.scanButtonText}>Scan for Printers</Text>
+                <Text style={styles.scanButtonText}>
+                  {isIOS ? 'Scan for Paired Printers' : 'Scan for Printers'}
+                </Text>
               </View>
             )}
           </Pressable>
 
-          {Platform.OS === 'web' && (
+          {isWeb && (
             <View style={styles.webNotice}>
               <Wifi size={13} color={Colors.textSecondary} />
               <Text style={styles.webNoticeText}>
@@ -370,29 +367,10 @@ export default function PrinterSetupScreen() {
 
         {hasDevices && (
           <View style={styles.devicesSection}>
-            {bleDevices.length > 0 && scanMode !== 'classic' && (
-              <>
-                <View style={styles.deviceSectionHeader}>
-                  <Radio size={13} color="#5B9BD5" />
-                  <Text style={[styles.deviceSectionTitle, { color: '#5B9BD5' }]}>
-                    BLE Devices ({bleDevices.length})
-                  </Text>
-                </View>
-                {bleDevices.map(renderDevice)}
-              </>
-            )}
-
-            {classicDevices.length > 0 && scanMode !== 'ble' && (
-              <>
-                <View style={[styles.deviceSectionHeader, bleDevices.length > 0 && { marginTop: 14 }]}>
-                  <Bluetooth size={13} color="#C084FC" />
-                  <Text style={[styles.deviceSectionTitle, { color: '#C084FC' }]}>
-                    Classic BT Devices ({classicDevices.length})
-                  </Text>
-                </View>
-                {classicDevices.map(renderDevice)}
-              </>
-            )}
+            <Text style={styles.sectionLabel}>
+              {isIOS ? 'PAIRED DEVICES' : 'NEARBY DEVICES'}
+            </Text>
+            {devices.map(renderDevice)}
           </View>
         )}
 
@@ -401,7 +379,9 @@ export default function PrinterSetupScreen() {
             <Signal size={36} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No Printers Found</Text>
             <Text style={styles.emptySubtitle}>
-              Tap "Scan for Printers" to search for nearby Bluetooth thermal printers.
+              {isIOS
+                ? 'Pair your printer in iOS Bluetooth Settings first, then tap "Scan for Paired Printers" above.'
+                : 'Tap "Scan for Printers" to search for nearby Bluetooth thermal printers.'}
             </Text>
             <View style={styles.compatRow}>
               <View style={styles.compatItem}>
@@ -538,8 +518,109 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
   },
-  protocolSection: {
-    marginBottom: 16,
+  iosFlowCard: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(91,155,213,0.2)',
+    marginBottom: 20,
+  },
+  iosFlowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  iosFlowIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(91,155,213,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iosFlowTitle: {
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  stepsContainer: {
+    marginBottom: 18,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(91,155,213,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepNumberText: {
+    color: '#5B9BD5',
+    fontSize: 13,
+    fontWeight: '700' as const,
+  },
+  stepContent: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  stepTitle: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600' as const,
+    marginBottom: 2,
+  },
+  stepDesc: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  stepConnector: {
+    width: 2,
+    height: 14,
+    backgroundColor: 'rgba(91,155,213,0.15)',
+    marginLeft: 12,
+    borderRadius: 1,
+  },
+  openSettingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#5B9BD5',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  openSettingsButtonPressed: {
+    opacity: 0.8,
+  },
+  openSettingsText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(91,155,213,0.06)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(91,155,213,0.12)',
+    marginBottom: 20,
+  },
+  infoText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 19,
   },
   sectionLabel: {
     color: Colors.textMuted,
@@ -548,67 +629,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 8,
     marginLeft: 2,
-  },
-  protocolCard: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-  },
-  protocolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  protocolLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  protocolIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  protocolIconBle: {
-    backgroundColor: 'rgba(91,155,213,0.12)',
-  },
-  protocolIconClassic: {
-    backgroundColor: 'rgba(192,132,252,0.12)',
-  },
-  protocolName: {
-    color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  protocolDesc: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  protocolDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: 14,
-  },
-  iosNotice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  iosNoticeText: {
-    color: '#F59E0B',
-    fontSize: 11,
-    flex: 1,
-    lineHeight: 16,
   },
   scanSection: {
     marginBottom: 16,
@@ -657,18 +677,6 @@ const styles = StyleSheet.create({
   },
   devicesSection: {
     marginBottom: 16,
-  },
-  deviceSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-    marginLeft: 2,
-  },
-  deviceSectionTitle: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    letterSpacing: 0.5,
   },
   deviceItem: {
     flexDirection: 'row',
