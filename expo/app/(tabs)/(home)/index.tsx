@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Minus, Plus, Zap } from 'lucide-react-native';
+import { Minus, Plus, Zap, ChevronDown } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
@@ -24,6 +24,7 @@ import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useGame } from '@/providers/GameProvider';
 import { useI18n } from '@/i18n';
+import { TypePicker } from '@/components/TypePicker';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
@@ -52,6 +53,7 @@ export default function HomeScreen() {
   const [cmc, setCmc] = useState(3);
   const [typeIndex, setTypeIndex] = useState(0);
   const [_lastCards, setLastCards] = useState<Card[]>([]);
+  const [typePickerVisible, setTypePickerVisible] = useState(false);
 
   const cardType = CARD_TYPES[typeIndex].id;
   const currentTypeConfig = CARD_TYPES[typeIndex];
@@ -206,7 +208,7 @@ export default function HomeScreen() {
     });
   }, [animateTypeChange]);
 
-  const swipePanResponder = useRef(
+  const swipePanResponder = useMemo(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dy) < 30;
@@ -219,7 +221,17 @@ export default function HomeScreen() {
         }
       },
     })
-  ).current;
+  , [nextType, prevType]);
+
+  const handleTypeSelect = useCallback((type: CardType) => {
+    const idx = CARD_TYPES.findIndex(ct => ct.id === type);
+    if (idx !== -1 && idx !== typeIndex) {
+      const direction = idx > typeIndex ? 'left' : 'right';
+      setTypeIndex(idx);
+      if (Platform.OS !== 'web') void Haptics.selectionAsync();
+      animateTypeChange(direction);
+    }
+  }, [typeIndex, animateTypeChange]);
 
   const castMutation = useMutation({
     mutationFn: async () => {
@@ -328,7 +340,10 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <Animated.View style={[styles.innerContainer, { opacity: fadeIn }]}>
+      <Animated.View
+        style={[styles.innerContainer, { opacity: fadeIn }]}
+        {...swipePanResponder.panHandlers}
+      >
         {activeSession && (
           <View style={[styles.sessionBanner, { marginTop: safeTopHeight + 12 }]}>
             <Zap size={13} color="#fff" />
@@ -342,13 +357,19 @@ export default function HomeScreen() {
 
         <View style={[styles.bottomControls, { paddingBottom: Math.max(insets.bottom, 12) + 60 }]}>
           <Animated.View
-            {...swipePanResponder.panHandlers}
             style={[styles.typeRow, { opacity: typeOpacity, transform: [{ translateY: typeTranslateY }, { translateX: swipeSlide }] }]}
           >
-            <View style={styles.typeLabelWrap}>
-              <Text style={styles.typeSelectorText}>{typeLabel}</Text>
+            <Pressable
+              onPress={() => setTypePickerVisible(true)}
+              style={styles.typeLabelWrap}
+              testID="type-label-tap"
+            >
+              <View style={styles.typeLabelRow}>
+                <Text style={styles.typeSelectorText}>{typeLabel}</Text>
+                <ChevronDown size={14} color={Colors.gold} style={{ marginLeft: 4 }} />
+              </View>
               <Text style={styles.typeDescription}>{typeDesc}</Text>
-            </View>
+            </Pressable>
           </Animated.View>
 
           <View style={styles.typeIndicatorRow}>
@@ -421,6 +442,13 @@ export default function HomeScreen() {
               )}
             </Pressable>
           </Animated.View>
+
+          <TypePicker
+            visible={typePickerVisible}
+            selected={cardType as CardType}
+            onSelect={handleTypeSelect}
+            onClose={() => setTypePickerVisible(false)}
+          />
 
           {castMutation.isError && (
             <View style={styles.errorContainer}>
@@ -526,6 +554,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 12,
+  },
+  typeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   typeSelectorText: {
     fontSize: 16,
