@@ -1,212 +1,168 @@
-import { AppSettings, PrinterConfig } from '@/types';
-
-const DEFAULT_PRINTER: PrinterConfig = {
-  name: '',
-  address: '',
-  type: 'ble',
-  paperWidth: 58,
-  printArt: true,
-  autoPrint: false,
-};
-
-const DEFAULT_SETTINGS: AppSettings = {
-  printer: DEFAULT_PRINTER,
-  excludeDigitalOnly: true,
-  excludeFunnySets: true,
-  uniqueCardsOnly: false,
-  printerConnected: false,
-  devMode: false,
-};
-
-function migrateLegacySettings(stored: Record<string, unknown>): AppSettings {
-  const migrated = { ...DEFAULT_SETTINGS, ...stored };
-  
-  if (stored.printer && typeof stored.printer === 'object') {
-    const oldPrinter = stored.printer as Record<string, unknown>;
-    migrated.printer = {
-      name: typeof oldPrinter.name === 'string' ? oldPrinter.name : '',
-      address: typeof oldPrinter.address === 'string' ? oldPrinter.address : '',
-      type: oldPrinter.type === 'classic' || oldPrinter.type === 'ble' ? oldPrinter.type : 'ble',
-      paperWidth: oldPrinter.paperWidth === 58 || oldPrinter.paperWidth === 80 ? oldPrinter.paperWidth : 58,
-      printArt: oldPrinter.printArt !== undefined ? Boolean(oldPrinter.printArt) : true,
-      autoPrint: oldPrinter.autoPrint !== undefined ? Boolean(oldPrinter.autoPrint) : false,
-    };
-  }
-  
-  if (typeof migrated.printerConnected !== 'boolean') {
-    migrated.printerConnected = false;
-  }
-  
-  return migrated;
-}
+import {
+  LegacyPrinterConfig,
+  PrinterPreferences,
+  migratePrinterPreferences,
+  DEFAULT_PRINTER_PREFERENCES,
+} from '@/types';
 
 describe('Printer Settings Migration', () => {
-  it('migrates empty legacy settings to defaults', () => {
-    const legacy = {};
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated.printer).toEqual(DEFAULT_PRINTER);
-    expect(migrated.excludeDigitalOnly).toBe(true);
-    expect(migrated.excludeFunnySets).toBe(true);
-    expect(migrated.uniqueCardsOnly).toBe(false);
-    expect(migrated.printerConnected).toBe(false);
-    expect(migrated.devMode).toBe(false);
-  });
-
-  it('preserves paper width preference from legacy settings', () => {
-    const legacy = {
-      printer: {
+  describe('migratePrinterPreferences', () => {
+    it('migrates legacy config to preferences with null printer id', () => {
+      const legacy: LegacyPrinterConfig = {
         name: 'Test Printer',
         address: 'AA:BB:CC:DD:EE:01',
         type: 'ble',
         paperWidth: 80,
-      },
-    };
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated.printer.paperWidth).toBe(80);
-    expect(migrated.printer.name).toBe('Test Printer');
-  });
+        printArt: true,
+        autoPrint: true,
+      };
 
-  it('preserves print art preference', () => {
-    const legacy = {
-      printer: {
+      const result = migratePrinterPreferences(legacy);
+
+      expect(result.preferredPrinterId).toBeNull();
+      expect(result.paperWidth).toBe(80);
+      expect(result.printArt).toBe(true);
+      expect(result.autoPrint).toBe(true);
+    });
+
+    it('preserves paper width 58', () => {
+      const legacy: LegacyPrinterConfig = {
+        name: 'Test Printer',
+        address: 'AA:BB:CC:DD:EE:01',
+        type: 'classic',
+        paperWidth: 58,
+        printArt: false,
+        autoPrint: false,
+      };
+
+      const result = migratePrinterPreferences(legacy);
+
+      expect(result.paperWidth).toBe(58);
+      expect(result.preferredPrinterId).toBeNull();
+    });
+
+    it('handles invalid paper width with default of 58', () => {
+      const legacy = {
+        name: 'Test Printer',
+        address: 'AA:BB:CC:DD:EE:01',
+        type: 'ble',
+        paperWidth: 100,
+        printArt: true,
+        autoPrint: false,
+      };
+
+      const result = migratePrinterPreferences(legacy as LegacyPrinterConfig);
+
+      expect(result.paperWidth).toBe(58);
+    });
+
+    it('handles missing printArt with default true', () => {
+      const legacy = {
         name: 'Test Printer',
         address: 'AA:BB:CC:DD:EE:01',
         type: 'ble',
         paperWidth: 58,
-        printArt: false,
-      },
-    };
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated.printer.printArt).toBe(false);
-  });
+      };
 
-  it('preserves auto print preference', () => {
-    const legacy = {
-      printer: {
+      const result = migratePrinterPreferences(legacy as LegacyPrinterConfig);
+
+      expect(result.printArt).toBe(true);
+    });
+
+    it('handles missing autoPrint with default false', () => {
+      const legacy = {
         name: 'Test Printer',
         address: 'AA:BB:CC:DD:EE:01',
         type: 'ble',
         paperWidth: 58,
         printArt: true,
-        autoPrint: true,
-      },
-    };
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated.printer.autoPrint).toBe(true);
-  });
+      };
 
-  it('converts string printer type to valid type', () => {
-    const legacy = {
-      printer: {
+      const result = migratePrinterPreferences(legacy as LegacyPrinterConfig);
+
+      expect(result.autoPrint).toBe(false);
+    });
+
+    it('handles non-boolean printArt value', () => {
+      const legacy = {
         name: 'Test Printer',
         address: 'AA:BB:CC:DD:EE:01',
-        type: 'classic',
-        paperWidth: 80,
-      },
-    };
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated.printer.type).toBe('classic');
-  });
+        type: 'ble',
+        paperWidth: 58,
+        printArt: 'yes' as unknown as boolean,
+        autoPrint: false,
+      };
 
-  it('handles malformed printer object gracefully', () => {
-    const legacy = {
-      printer: {
+      const result = migratePrinterPreferences(legacy);
+
+      expect(result.printArt).toBe(true);
+    });
+
+    it('handles non-boolean autoPrint value', () => {
+      const legacy = {
+        name: 'Test Printer',
+        address: 'AA:BB:CC:DD:EE:01',
+        type: 'ble',
+        paperWidth: 58,
+        printArt: true,
+        autoPrint: 1 as unknown as boolean,
+      };
+
+      const result = migratePrinterPreferences(legacy);
+
+      expect(result.autoPrint).toBe(false);
+    });
+
+    it('handles completely malformed legacy config', () => {
+      const legacy = {
         name: 123,
         address: null,
         type: 'invalid',
-      },
-    };
-    const migrated = migrateLegacySettings(legacy as Record<string, unknown>);
-    
-    expect(migrated.printer.name).toBe('');
-    expect(migrated.printer.address).toBe('');
-    expect(migrated.printer.type).toBe('ble');
+        paperWidth: 'wide',
+        printArt: undefined,
+        autoPrint: 'true',
+      };
+
+      const result = migratePrinterPreferences(legacy as LegacyPrinterConfig);
+
+      expect(result.preferredPrinterId).toBeNull();
+      expect(result.paperWidth).toBe(58);
+      expect(result.printArt).toBe(true);
+      expect(result.autoPrint).toBe(false);
+    });
   });
 
-  it('handles missing printer field gracefully', () => {
-    const legacy = {
-      excludeDigitalOnly: false,
-      excludeFunnySets: false,
-    };
-    const migrated = migrateLegacySettings(legacy as Record<string, unknown>);
-    
-    expect(migrated.printer).toEqual(DEFAULT_PRINTER);
-    expect(migrated.excludeDigitalOnly).toBe(false);
-    expect(migrated.excludeFunnySets).toBe(false);
+  describe('DEFAULT_PRINTER_PREFERENCES', () => {
+    it('has correct default values', () => {
+      expect(DEFAULT_PRINTER_PREFERENCES.preferredPrinterId).toBeNull();
+      expect(DEFAULT_PRINTER_PREFERENCES.paperWidth).toBe(58);
+      expect(DEFAULT_PRINTER_PREFERENCES.printArt).toBe(true);
+      expect(DEFAULT_PRINTER_PREFERENCES.autoPrint).toBe(false);
+    });
   });
 
-  it('preserves other settings when migrating printer', () => {
-    const legacy = {
-      excludeDigitalOnly: false,
-      excludeFunnySets: true,
-      uniqueCardsOnly: true,
-      devMode: true,
-      printer: {
-        name: 'My Printer',
-        address: 'AA:BB:CC:DD:EE:01',
-        type: 'ble',
-      },
-    };
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated.excludeDigitalOnly).toBe(false);
-    expect(migrated.excludeFunnySets).toBe(true);
-    expect(migrated.uniqueCardsOnly).toBe(true);
-    expect(migrated.devMode).toBe(true);
-    expect(migrated.printer.name).toBe('My Printer');
-  });
-
-  it('converts legacy printerConnected to boolean', () => {
-    const legacy1 = { printerConnected: 'yes' };
-    const legacy2 = { printerConnected: null };
-    const legacy3 = { printerConnected: undefined };
-    
-    const migrated1 = migrateLegacySettings(legacy1 as Record<string, unknown>);
-    const migrated2 = migrateLegacySettings(legacy2 as Record<string, unknown>);
-    const migrated3 = migrateLegacySettings(legacy3 as Record<string, unknown>);
-    
-    expect(migrated1.printerConnected).toBe(false);
-    expect(migrated2.printerConnected).toBe(false);
-    expect(migrated3.printerConnected).toBe(false);
-  });
-
-  it('handles complete legacy settings object', () => {
-    const legacy = {
-      excludeDigitalOnly: false,
-      excludeFunnySets: false,
-      uniqueCardsOnly: true,
-      printerConnected: true,
-      devMode: true,
-      printer: {
-        name: 'Thermal-80mm BT',
-        address: 'AA:BB:CC:DD:EE:02',
-        type: 'classic',
+  describe('already-migrated settings pass-through', () => {
+    it('recognizes new format with preferredPrinterId', () => {
+      const newFormat: PrinterPreferences = {
+        preferredPrinterId: 'printer-123',
         paperWidth: 80,
-        printArt: true,
+        printArt: false,
         autoPrint: true,
-      },
-    };
-    const migrated = migrateLegacySettings(legacy);
-    
-    expect(migrated).toEqual({
-      printer: {
-        name: 'Thermal-80mm BT',
-        address: 'AA:BB:CC:DD:EE:02',
-        type: 'classic',
-        paperWidth: 80,
+      };
+
+      expect(newFormat.preferredPrinterId).toBe('printer-123');
+      expect(newFormat.paperWidth).toBe(80);
+    });
+
+    it('recognizes new format with null preferredPrinterId', () => {
+      const newFormat: PrinterPreferences = {
+        preferredPrinterId: null,
+        paperWidth: 58,
         printArt: true,
-        autoPrint: true,
-      },
-      excludeDigitalOnly: false,
-      excludeFunnySets: false,
-      uniqueCardsOnly: true,
-      printerConnected: true,
-      devMode: true,
+        autoPrint: false,
+      };
+
+      expect(newFormat.preferredPrinterId).toBeNull();
     });
   });
 });

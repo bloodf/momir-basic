@@ -2,21 +2,18 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import { AppSettings, PrinterConfig } from '@/types';
+import {
+  AppSettings,
+  PrinterPreferences,
+  LegacyPrinterConfig,
+  migratePrinterPreferences,
+  DEFAULT_PRINTER_PREFERENCES,
+} from '@/types';
 
 const SETTINGS_KEY = 'momir_settings';
 
-const DEFAULT_PRINTER: PrinterConfig = {
-  name: '',
-  address: '',
-  type: 'ble',
-  paperWidth: 58,
-  printArt: true,
-  autoPrint: false,
-};
-
 const DEFAULT_SETTINGS: AppSettings = {
-  printer: DEFAULT_PRINTER,
+  printer: DEFAULT_PRINTER_PREFERENCES,
   excludeDigitalOnly: true,
   excludeFunnySets: true,
   uniqueCardsOnly: false,
@@ -32,7 +29,25 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     queryKey: ['appSettings'],
     queryFn: async () => {
       const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } as AppSettings : DEFAULT_SETTINGS;
+      const parsed = stored ? JSON.parse(stored) : {};
+      const merged = { ...DEFAULT_SETTINGS, ...parsed };
+
+      if (parsed.printer && typeof parsed.printer === 'object') {
+        const printer = parsed.printer as Record<string, unknown>;
+        if ('address' in printer && !('preferredPrinterId' in printer)) {
+          const legacyConfig: LegacyPrinterConfig = {
+            name: typeof printer.name === 'string' ? printer.name : '',
+            address: typeof printer.address === 'string' ? printer.address : '',
+            type: printer.type === 'classic' || printer.type === 'ble' ? printer.type : 'ble',
+            paperWidth: printer.paperWidth === 58 || printer.paperWidth === 80 ? printer.paperWidth : 58,
+            printArt: typeof printer.printArt === 'boolean' ? printer.printArt : true,
+            autoPrint: typeof printer.autoPrint === 'boolean' ? printer.autoPrint : false,
+          };
+          merged.printer = migratePrinterPreferences(legacyConfig);
+        }
+      }
+
+      return merged as AppSettings;
     },
   });
 
@@ -60,7 +75,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     });
   }, [saveMutation]);
 
-  const updatePrinter = useCallback((partial: Partial<PrinterConfig>) => {
+  const updatePrinter = useCallback((partial: Partial<PrinterPreferences>) => {
     setSettings(prev => {
       const updated = { ...prev, printer: { ...prev.printer, ...partial } };
       saveMutation.mutate(updated);

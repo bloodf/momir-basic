@@ -46,15 +46,41 @@ export interface CardTypeConfig {
   count: number;
 }
 
-export interface PrinterDevice {
-  id: string;
-  name: string;
-  address: string;
-  rssi?: number;
-  type: 'classic' | 'ble';
+// Transport type
+export type PrinterTransport = 'ble' | 'classic' | 'tcp';
+
+// Printer record (stored in SQLite registry, keyed by stable ID)
+export interface PrinterRecord {
+  id: string;           // stable registry ID (UUID)
+  name: string;         // display name
+  address: string;      // device address/Bluetooth UUID
+  transport: PrinterTransport;
+  capabilities: PrinterCapabilities;
+  lastSeenAt: string;   // ISO timestamp
+  createdAt: string;    // ISO timestamp
 }
 
-export interface PrinterConfig {
+// Capabilities snapshot (captured at discovery time)
+export interface PrinterCapabilities {
+  supportImage: boolean;
+  supportQR: boolean;
+  supportCut: boolean;
+  supportText: boolean;
+  paperWidth: 58 | 80;
+  maxColumnWidth?: number;
+  encoding?: string;
+}
+
+// User preferences for printing (lives in SettingsProvider/AsyncStorage)
+export interface PrinterPreferences {
+  preferredPrinterId: string | null;  // null = no printer selected
+  paperWidth: 58 | 80;
+  printArt: boolean;
+  autoPrint: boolean;
+}
+
+// Legacy printer config (for migration only)
+export interface LegacyPrinterConfig {
   name: string;
   address: string;
   type: 'classic' | 'ble';
@@ -63,8 +89,85 @@ export interface PrinterConfig {
   autoPrint: boolean;
 }
 
+// Print job state machine
+export type PrintJobState =
+  | 'queued'       // waiting to be processed
+  | 'ready'        // claimed by worker, about to dispatch
+  | 'dispatching'  // actively sending to printer
+  | 'completed'    // finished successfully
+  | 'retry_wait'   // failed, waiting to retry (auto)
+  | 'failed_manual'; // failed, needs manual retry
+
+// A single print job (immutable payload, mutable state in DB)
+export interface PrintJob {
+  id: string;
+  printerId: string;
+  documentType: 'card_receipt' | 'diagnostics';
+  payload: string;        // JSON stringified PrintDocumentData
+  state: PrintJobState;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  nextRetryAt?: string;   // ISO timestamp for retry_wait jobs
+}
+
+// Document data for a card receipt
+export interface CardReceiptData {
+  cardId: string;
+  cardName: string;
+  manaCost: string;
+  typeLine: string;
+  oracleText: string;
+  flavorText?: string;
+  power?: string;
+  toughness?: string;
+  artCropUrl: string;
+  scryfallUrl: string;
+  artist?: string;
+  rarity: string;
+  setName: string;
+  paperWidth: 58 | 80;
+  printArt: boolean;
+}
+
+// Document data for diagnostics/test print
+export interface DiagnosticsData {
+  appName: string;
+  platform: string;
+  printerName?: string;
+  printerTransport?: PrinterTransport;
+  paperWidth: 58 | 80;
+  timestamp: string;
+}
+
+/**
+ * Migrates legacy PrinterConfig to new PrinterPreferences structure.
+ * The legacy config stored printer identity (name/address/type) directly,
+ * but the new structure stores only a preferredPrinterId reference.
+ * Since old configs don't have a registry ID, preferredPrinterId is set to null.
+ */
+export function migratePrinterPreferences(
+  legacy: LegacyPrinterConfig
+): PrinterPreferences {
+  return {
+    preferredPrinterId: null,
+    paperWidth: legacy.paperWidth === 58 || legacy.paperWidth === 80 ? legacy.paperWidth : 58,
+    printArt: typeof legacy.printArt === 'boolean' ? legacy.printArt : true,
+    autoPrint: typeof legacy.autoPrint === 'boolean' ? legacy.autoPrint : false,
+  };
+}
+
+// Default printer preferences
+export const DEFAULT_PRINTER_PREFERENCES: PrinterPreferences = {
+  preferredPrinterId: null,
+  paperWidth: 58,
+  printArt: true,
+  autoPrint: false,
+};
+
 export interface AppSettings {
-  printer: PrinterConfig;
+  printer: PrinterPreferences;
   excludeDigitalOnly: boolean;
   excludeFunnySets: boolean;
   uniqueCardsOnly: boolean;

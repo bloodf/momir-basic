@@ -40,3 +40,38 @@
 cd expo && bun run test -- --runInBand --listTests  # Exits 0
 cd expo && bun run test -- --runInBand             # All 30 tests pass
 ```
+
+## Task 2: Printer Domain Types Expansion
+
+### Key Decisions
+
+1. **Domain Model Separation**: Split printer concerns into distinct types:
+   - `PrinterTransport`: 'ble' | 'classic' | 'tcp' (physical transport)
+   - `PrinterRecord`: SQLite registry entry with stable ID
+   - `PrinterCapabilities`: Discovery-time snapshot of printer features
+   - `PrinterPreferences`: User preferences stored in AsyncStorage (references printer by ID)
+   - `PrintJob`/`PrintJobState`: Queue management types
+   - `CardReceiptData`/`DiagnosticsData`: Document payload types
+
+2. **Migration Strategy**: Old `PrinterConfig` had name/address/type directly. New `PrinterPreferences` uses `preferredPrinterId: string | null` to reference the SQLite registry. Migration sets `preferredPrinterId: null` since legacy configs don't have registry IDs.
+
+3. **Graceful Type Coercion**: Migration uses `typeof x === 'string' ? x : default` pattern (not `||`) to handle malformed data.
+
+### Gotchas
+
+- Migration runs in `queryFn` of settings query, before returning - this ensures old data is migrated on first load and stored in new format thereafter
+- Detection of old format: `('address' in printer && !('preferredPrinterId' in printer))`
+- `PrinterPreferences` doesn't store name/address/type - only a reference ID to the registry
+
+### Files Modified
+
+- `expo/types/index.ts` - Added new domain types, migratePrinterPreferences function
+- `expo/providers/SettingsProvider.tsx` - Updated to use PrinterPreferences with migration
+- `expo/__tests__/printer/printer-settings-migration.test.ts` - Updated with new migration tests (11 tests)
+
+### Verification
+
+```bash
+cd expo && bun run test -- --runInBand printer-settings-migration  # 11 tests pass
+cd expo && bun run test -- --runInBand printer                       # 39 tests pass
+```
