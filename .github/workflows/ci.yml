@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Lint
+        run: cd expo && bun run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Typecheck
+        run: cd expo && bunx tsc --noEmit
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Run tests
+        run: cd expo && bun run test -- --runInBand
+
+  e2e-printer:
+    name: E2E Printer QA
+    runs-on: ubuntu-latest
+    # Only run if e2e test file exists
+    if: hashFiles('expo/e2e/printer-qa.spec.ts') != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Install Playwright browsers
+        run: cd expo && bunx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: cd expo && bunx playwright test e2e/printer-qa.spec.ts
+        continue-on-error: true

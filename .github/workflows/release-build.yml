@@ -1,0 +1,84 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - ios
+          - android
+          - all
+      dry_run:
+        description: 'Dry run (validate only, no actual build)'
+        required: true
+        default: 'true'
+        type: boolean
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+jobs:
+  validate:
+    name: Validate Config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Validate eas.json
+        run: cd expo && cat eas.json | jq .
+
+      - name: Validate app.json
+        run: cd expo && cat app.json | jq .
+
+  build-ios:
+    name: Build iOS
+    runs-on: ubuntu-latest
+    needs: validate
+    if: (inputs.platform == 'ios' || inputs.platform == 'all') && inputs.dry_run == 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Install EAS CLI
+        run: bun add -g eas-cli
+
+      - name: Build iOS
+        run: cd expo && eas build --platform ios --profile production --non-interactive
+
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: validate
+    if: (inputs.platform == 'android' || inputs.platform == 'all') && inputs.dry_run == 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: cd expo && bun install
+
+      - name: Install EAS CLI
+        run: bun add -g eas-cli
+
+      - name: Build Android
+        run: cd expo && eas build --platform android --profile production --non-interactive
