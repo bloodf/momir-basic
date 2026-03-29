@@ -465,3 +465,78 @@ If universal compatibility or non-MFi iOS Classic is required:
 
 **Evidence File Created:**
 - `.sisyphus/evidence/task-10-observability.txt`
+
+### Task 12 Findings (2026-03-29)
+
+**Task: Produce the printer release sign-off packet**
+
+**Problem: No consolidated printer release documentation for store submission**
+- Support contract scattered across PRINTER.md and HARDWARE_VALIDATION.md
+- No explicit publish/no-publish recommendation with blockers listed
+- No consolidated view of architecture decisions, transport constraints, observability
+
+**Solution: Printer Release Packet section in LAUNCH_PACKET.md**
+
+1. **Support Contract (Section 1)**:
+   - Platform × Transport matrix: Android BLE+Classic+TCP ✅; iOS BLE+TCP ✅, Classic ❌/MFi only
+   - iOS Classic scope: Non-MFi = NOT supported, filtered by `filterTransport()`
+   - Certification matrix: All entries PENDING until Task 11 complete
+
+2. **Non-Goals (Section 2)**:
+   - Off-matrix printers = best-effort/non-goal
+   - Universal ESC/POS compatibility = BLOCKED
+   - Non-MFi iOS Classic = BLOCKED
+   - Printers without BLE/TCP on iOS = unsupported
+
+3. **Blocked Requirements (Section 3)**:
+   - Universal ESC/POS compatibility — no hardware proof
+   - Non-MFi iOS Classic — no MFi hardware
+   - iOS/Android hardware certification — Task 11 blocked
+
+4. **Runtime Architecture (Section 4)**:
+   - Factory: explicit error on unsupported/native-missing, never fake
+   - Canonical identity: `{address, transport}` not registry ID
+   - Queue: 6 explicit states with bounded retries
+   - Error codes: NATIVE_UNAVAILABLE (P0), TCP_TIMEOUT/CONNECTION_REJECTED/SEND_FAILED (P1)
+
+5. **Transport Constraints (Section 5)**:
+   - Android: BLE + Classic + TCP on certified printers
+   - iOS: BLE + TCP only; Classic = MFi-only
+
+6. **Observability (Section 6)**:
+   - 16-event taxonomy documented
+   - Android/iOS log capture commands documented
+
+7. **Known Limitations (Section 7)**:
+   - No physical hardware for certification
+   - iOS Classic requires MFi hardware
+   - Expo Go incompatible with printing
+
+8. **Hardware Evidence Status (Section 8)**:
+   - Tasks 1-10: Complete
+   - Task 11: BLOCKED — no physical hardware
+
+9. **Publish/No-Publish Decision (Section 9)**:
+   - **Decision: NO-PUBLISH** — 5 hard blockers identified
+   - Blocker 1: No physical printers
+   - Blocker 2: No iOS test device
+   - Blocker 3: No Android test device
+   - Blocker 4: Certification matrix empty
+   - Blocker 5: iOS Classic MFi hardware missing
+   - Path to publish: Procure hardware → Complete Task 11 → Populate matrix → Re-run tests
+
+10. **Open Issue Classification (Section 10)**:
+    - 5 blockers (all blocking)
+    - 2 non-goals (not blocking)
+    - 1 known limitation (not blocking)
+    - 1 decision needed (not blocking)
+    - 1 soft blocker (not blocking)
+
+**Key Insight:**
+- Code completeness (Tasks 1-10) does NOT imply hardware readiness
+- Printing is a core feature — releasing without certification risks 1-star reviews
+- Task 11 is an external hardware dependency, not a code problem
+
+**Files Created/Modified:**
+- `expo/docs/release/LAUNCH_PACKET.md` — added Printer Release Packet section
+- `.sisyphus/evidence/task-12-printer-release-packet.txt` — evidence file

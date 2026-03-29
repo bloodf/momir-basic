@@ -548,7 +548,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: NO | Message: `n/a` | Files: evidence + docs updates only as appropriate
 
-- [ ] 12. Produce the printer release sign-off packet
+- [x] 12. Produce the printer release sign-off packet
 
   **What to do**: Consolidate support contract, non-goals, certification matrix, runtime architecture decisions, transport constraints, observability, known limitations, hardware evidence, and publish/no-publish recommendation into a single printer release packet. Include explicit blockers for anything unresolved, especially iOS Classic MFi scope, any uncertified printers, and missing certification inventory.
   **Must NOT do**: Do not issue a printer-ready approval without complete certified-matrix evidence.
