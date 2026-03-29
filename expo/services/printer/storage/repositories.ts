@@ -21,7 +21,7 @@ export async function upsertPrinter(input: CreatePrinterInput): Promise<void> {
 
 export async function getPrinterByAddress(address: string): Promise<PrinterRecord | null> {
   const db = await getDatabase();
-  const row = await db.getFirstAsync<Record<string, unknown>>(
+  const row = await db.getFirstAsync(
     'SELECT * FROM printers WHERE address = ? LIMIT 1',
     [address]
   );
@@ -31,7 +31,7 @@ export async function getPrinterByAddress(address: string): Promise<PrinterRecor
 
 export async function getPrinterById(id: string): Promise<PrinterRecord | null> {
   const db = await getDatabase();
-  const row = await db.getFirstAsync<Record<string, unknown>>(
+  const row = await db.getFirstAsync(
     'SELECT * FROM printers WHERE id = ? LIMIT 1',
     [id]
   );
@@ -41,8 +41,8 @@ export async function getPrinterById(id: string): Promise<PrinterRecord | null> 
 
 export async function listPrinters(): Promise<PrinterRecord[]> {
   const db = await getDatabase();
-  const rows = await db.getFirstAsync<unknown[]>('SELECT * FROM printers ORDER BY last_seen_at DESC');
-  return (rows as Record<string, unknown>[] ?? []).map(rowToPrinterRecord);
+  const rows = await db.getAllAsync('SELECT * FROM printers ORDER BY last_seen_at DESC');
+  return (rows ?? []).map(rowToPrinterRecord);
 }
 
 export async function deletePrinter(id: string): Promise<void> {
@@ -81,7 +81,7 @@ export async function createJob(input: CreateJobInput): Promise<void> {
 
 export async function getJobById(id: string): Promise<PrintJob | null> {
   const db = await getDatabase();
-  const row = await db.getFirstAsync<Record<string, unknown>>(
+  const row = await db.getFirstAsync(
     'SELECT * FROM print_jobs WHERE id = ? LIMIT 1',
     [id]
   );
@@ -91,17 +91,26 @@ export async function getJobById(id: string): Promise<PrintJob | null> {
 
 export async function listJobsByState(state: PrintJobState): Promise<PrintJob[]> {
   const db = await getDatabase();
-  const rows = await db.getFirstAsync<unknown[]>(
+  const rows = await db.getAllAsync(
     'SELECT * FROM print_jobs WHERE state = ? ORDER BY created_at ASC',
     [state]
   );
-  return (rows as Record<string, unknown>[] ?? []).map(rowToPrintJob);
+  return (rows ?? []).map(rowToPrintJob);
 }
 
 export async function listAllJobs(): Promise<PrintJob[]> {
   const db = await getDatabase();
-  const rows = await db.getFirstAsync<unknown[]>('SELECT * FROM print_jobs ORDER BY created_at DESC');
-  return (rows as Record<string, unknown>[] ?? []).map(rowToPrintJob);
+  const rows = await db.getAllAsync('SELECT * FROM print_jobs ORDER BY created_at DESC');
+  return (rows ?? []).map(rowToPrintJob);
+}
+
+export async function getJobsForPrinter(printerId: string): Promise<PrintJob[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync(
+    'SELECT * FROM print_jobs WHERE printer_id = ? ORDER BY created_at DESC',
+    [printerId]
+  );
+  return (rows ?? []).map(rowToPrintJob);
 }
 
 export async function getNextJobForPrinter(printerId: string): Promise<PrintJob | null> {
@@ -109,7 +118,7 @@ export async function getNextJobForPrinter(printerId: string): Promise<PrintJob 
   const now = new Date().toISOString();
   
   // First try to get a job that's due for retry
-  const retryJob = await db.getFirstAsync<Record<string, unknown>>(
+  const retryJob = await db.getFirstAsync(
     `SELECT * FROM print_jobs 
      WHERE printer_id = ? AND state = 'retry_wait' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
      ORDER BY next_retry_at ASC LIMIT 1`,
@@ -118,7 +127,7 @@ export async function getNextJobForPrinter(printerId: string): Promise<PrintJob 
   if (retryJob) return rowToPrintJob(retryJob);
   
   // Then try to get a queued job
-  const queuedJob = await db.getFirstAsync<Record<string, unknown>>(
+  const queuedJob = await db.getFirstAsync(
     `SELECT * FROM print_jobs 
      WHERE printer_id = ? AND state = 'queued'
      ORDER BY created_at ASC LIMIT 1`,

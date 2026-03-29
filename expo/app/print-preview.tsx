@@ -311,7 +311,7 @@ export default function PrintPreviewScreen() {
             styles.enqueueBanner,
             enqueueBanner.type === 'success' ? styles.enqueueBannerSuccess : styles.enqueueBannerError,
           ]}
-          testID={enqueueBanner.type === 'success' ? 'enqueue-success' : 'enqueue-error'}
+          testID="queue-status-badge"
         >
           <Text style={styles.enqueueBannerText}>{enqueueBanner.message}</Text>
         </View>

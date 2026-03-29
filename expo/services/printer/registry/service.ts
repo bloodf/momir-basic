@@ -117,7 +117,9 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       const adapter = adapterFactory();
       try {
         await adapter.disconnectPrinter(printer.address);
-      } catch { }
+      } catch {
+        // Intentionally swallow — forget printer regardless of disconnect outcome
+      }
       await repoDeletePrinter(deviceId);
       const prefs = await getPreferences();
       if (prefs.preferredPrinterId === deviceId) {

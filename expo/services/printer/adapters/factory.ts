@@ -1,6 +1,5 @@
 import { Platform, NativeModules } from 'react-native';
 import type { PrinterPort } from './port';
-import { NativeThermalPrinterAdapter } from './native';
 import { FakePrinterAdapter } from './fake';
 
 export function createAdapter(): PrinterPort {
@@ -12,5 +11,8 @@ export function createAdapter(): PrinterPort {
     return new FakePrinterAdapter();
   }
 
+  // Dynamically import native adapter to avoid eager loading of native module on web
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { NativeThermalPrinterAdapter } = require('./native');
   return new NativeThermalPrinterAdapter();
 }

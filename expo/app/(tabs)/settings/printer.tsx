@@ -31,7 +31,8 @@ import type { PrinterRecord } from '@/types';
 import { useI18n } from '@/i18n';
 import { registryService } from '@/services/printer/registry/service';
 import { createAdapter } from '@/services/printer/adapters/factory';
-import { createJob } from '@/services/printer/storage/repositories';
+import { createJob, getJobById } from '@/services/printer/storage/repositories';
+import { getQueueSummary, processQueueForPrinter, retryJob } from '@/services/printer/queue/engine';
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -49,6 +50,7 @@ export default function PrinterSetupScreen() {
   const [testing, setTesting] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [queueSummary, setQueueSummary] = useState<{ pending: number; completed: number; failed: number; failedJobs: import('@/types').PrintJob[] } | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -71,6 +73,14 @@ export default function PrinterSetupScreen() {
       useNativeDriver: true,
     }).start();
   }, [fadeIn]);
+
+  useEffect(() => {
+    if (!settings.printer.preferredPrinterId) {
+      setQueueSummary(null);
+      return;
+    }
+    void getQueueSummary(settings.printer.preferredPrinterId).then(setQueueSummary).catch(() => setQueueSummary(null));
+  }, [settings.printer.preferredPrinterId, settings.printerConnected]);
 
   useEffect(() => {
     if (!scanning) return;
@@ -180,8 +190,33 @@ export default function PrinterSetupScreen() {
           timestamp: new Date().toISOString(),
         }),
       });
-      setStatusMessage(`Queued diagnostics print for ${printer.name}.`);
-      Alert.alert(t.printer.testPrint, `Queued diagnostics print for ${printer.name}.`);
+
+      await processQueueForPrinter(printer.id);
+
+      const [job, summary] = await Promise.all([
+        getJobById(jobId),
+        getQueueSummary(printer.id),
+      ]);
+      setQueueSummary(summary);
+
+      if (job?.state === 'completed') {
+        const message = `Completed diagnostics print for ${printer.name}.`;
+        setStatusMessage(message);
+        Alert.alert(t.printer.testPrint, message);
+        return;
+      }
+
+      if (job?.state === 'failed_manual' || job?.state === 'retry_wait') {
+        const message = job.lastError ?? `Unable to complete diagnostics print for ${printer.name}.`;
+        setErrorMessage(message);
+        setStatusMessage(null);
+        Alert.alert(t.printer.testPrint, message);
+        return;
+      }
+
+      const message = `Queued diagnostics print for ${printer.name}.`;
+      setStatusMessage(message);
+      Alert.alert(t.printer.testPrint, message);
     } catch (error) {
       setErrorMessage(getErrorMessage(error, 'Unable to queue diagnostics print.'));
       setStatusMessage(null);
@@ -189,6 +224,18 @@ export default function PrinterSetupScreen() {
       setTesting(null);
     }
   }, [settings.printer.paperWidth, t]);
+
+  const handleRetryJob = useCallback(async (jobId: string) => {
+    try {
+      await retryJob(jobId);
+      if (settings.printer.preferredPrinterId) {
+        const summary = await getQueueSummary(settings.printer.preferredPrinterId);
+        setQueueSummary(summary);
+      }
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to retry job.'));
+    }
+  }, [settings.printer.preferredPrinterId]);
 
   const hasPrinters = printers.length > 0;
 
@@ -370,6 +417,47 @@ export default function PrinterSetupScreen() {
                 <Text style={styles.disconnectText}>{t.printer.disconnect}</Text>
               </Pressable>
             </View>
+          </View>
+        )}
+
+        {preferredPrinter && queueSummary && (
+          <View style={styles.queueStatusCard}>
+            <View style={styles.queueStatusHeader}>
+              <Text style={styles.queueStatusTitle}>Print Queue</Text>
+              <View style={styles.queueStatusCounts}>
+                <View style={[styles.queueBadge, styles.queueBadgePending]}>
+                  <Text style={styles.queueBadgeText} testID="queue-pending-count">{queueSummary.pending}</Text>
+                </View>
+                <Text style={styles.queueStatusLabel}>pending</Text>
+                <View style={[styles.queueBadge, styles.queueBadgeCompleted]}>
+                  <Text style={styles.queueBadgeText} testID="queue-completed-count">{queueSummary.completed}</Text>
+                </View>
+                <Text style={styles.queueStatusLabel}>done</Text>
+                <View style={[styles.queueBadge, styles.queueBadgeFailed]}>
+                  <Text style={styles.queueBadgeText} testID="queue-failed-count">{queueSummary.failed}</Text>
+                </View>
+                <Text style={styles.queueStatusLabel}>failed</Text>
+              </View>
+            </View>
+            {queueSummary.failedJobs.length > 0 && (
+              <View style={styles.queueFailedList}>
+                {queueSummary.failedJobs.map((job) => (
+                  <View key={job.id} style={styles.queueFailedItem}>
+                    <View style={styles.queueFailedInfo}>
+                      <Text style={styles.queueFailedType}>{job.documentType === 'card_receipt' ? 'Card Receipt' : 'Diagnostics'}</Text>
+                      <Text style={styles.queueFailedError} numberOfLines={1}>{job.lastError ?? 'Unknown error'}</Text>
+                    </View>
+                    <Pressable
+                      onPress={() => { void handleRetryJob(job.id); }}
+                      style={styles.retryButton}
+                      testID={`retry-print-job-${job.id}`}
+                    >
+                      <Text style={styles.retryButtonText}>Retry</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -1060,5 +1148,93 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 11,
     fontWeight: '500' as const,
+  },
+  queueStatusCard: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  queueStatusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  queueStatusTitle: {
+    color: Colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  queueStatusCounts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  queueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  queueBadgePending: {
+    backgroundColor: '#FFF3E0',
+  },
+  queueBadgeCompleted: {
+    backgroundColor: '#E8F5E9',
+  },
+  queueBadgeFailed: {
+    backgroundColor: '#FFEBEE',
+  },
+  queueBadgeText: {
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: Colors.textPrimary,
+  },
+  queueStatusLabel: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginRight: 4,
+  },
+  queueFailedList: {
+    marginTop: 12,
+    gap: 8,
+  },
+  queueFailedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    padding: 10,
+    gap: 10,
+  },
+  queueFailedInfo: {
+    flex: 1,
+  },
+  queueFailedType: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.textPrimary,
+  },
+  queueFailedError: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  retryButton: {
+    backgroundColor: Colors.gold,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700' as const,
   },
 });

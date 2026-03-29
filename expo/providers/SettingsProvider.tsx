@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, AppStateStatus } from 'react-native';
 import createContextHook from '@nkzw/create-context-hook';
 import {
   AppSettings,
@@ -67,6 +68,23 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
       setSettings(settingsQuery.data);
     }
   }, [settingsQuery.data]);
+
+  useEffect(() => {
+    let lastState = AppState.currentState;
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (lastState.match(/inactive|background/) && nextAppState === 'active') {
+        if (settings.printer.preferredPrinterId && settings.printerConnected) {
+          const { processQueue } = await import('../services/printer/queue/engine');
+          void processQueue();
+        }
+      }
+      lastState = nextAppState;
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [settings.printer.preferredPrinterId, settings.printerConnected]);
 
   const saveMutation = useMutation({
     mutationFn: async (updated: AppSettings) => {

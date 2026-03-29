@@ -44,6 +44,7 @@ import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/sc
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
+import { createJob } from '../services/printer/storage/repositories';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_HEIGHT * 0.48;
@@ -60,10 +61,11 @@ export default function CardDetailScreen() {
     try {
       if (params.multiCards) return JSON.parse(params.multiCards);
       if (params.cardJson) return [JSON.parse(params.cardJson)];
-    } catch (e) {
-      console.log('[CardDetail] Parse error:', e);
+
+      return [];
+    } catch {
+      return [];
     }
-    return [];
   }, [params.cardJson, params.multiCards]);
 
   const [cards, setCards] = useState<Card[]>(initialCards);
@@ -98,6 +100,32 @@ export default function CardDetailScreen() {
     ]).start();
   }, [cardEntryAnim, heroScale]);
 
+  const autoPrintCardReceipt = useCallback(async (cardToPrint: Card) => {
+    if (!settings.printer.autoPrint) return;
+    if (!settings.printer.preferredPrinterId) return;
+
+    const cardReceiptData = {
+      name: cardToPrint.name,
+      manaCost: cardToPrint.manaCost,
+      type: cardToPrint.typeLine,
+      oracleText: cardToPrint.oracleText,
+      flavorText: cardToPrint.flavorText,
+      power: cardToPrint.power,
+      toughness: cardToPrint.toughness,
+      imageUrl: cardToPrint.normalImageUrl || cardToPrint.artCropUrl,
+      setCode: cardToPrint.setCode,
+      scryfallId: cardToPrint.id,
+    };
+
+    const jobId = `card-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await createJob({
+      id: jobId,
+      printerId: settings.printer.preferredPrinterId,
+      documentType: 'card_receipt',
+      payload: JSON.stringify(cardReceiptData),
+    });
+  }, [settings.printer.autoPrint, settings.printer.preferredPrinterId]);
+
   const rerollMutation = useMutation({
     mutationFn: async () => {
       if (!card) throw new Error('No card');
@@ -121,6 +149,7 @@ export default function CardDetailScreen() {
         Animated.timing(cardEntryAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.timing(heroScale, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]).start();
+      void autoPrintCardReceipt(newCard);
     },
   });
 
@@ -201,8 +230,8 @@ export default function CardDetailScreen() {
         message: `${card.name} — Art by ${card.artist ?? 'Unknown'}\n${card.scryfallUri}`,
         url: card.artCropUrl,
       });
-    } catch (e) {
-      console.log('[CardDetail] Share error:', e);
+    } catch {
+      Alert.alert('Share Failed', 'Unable to share card art right now.');
     }
   }, [card]);
 
@@ -215,28 +244,16 @@ export default function CardDetailScreen() {
         link.target = '_blank';
         link.download = `${card.name.replace(/[^a-zA-Z0-9]/g, '_')}_art.jpg`;
         link.click();
-      } catch (e) {
-        console.log('[CardDetail] Download error:', e);
+      } catch {
+        Alert.alert('Download Failed', 'Unable to open the art download in this browser.');
       }
     } else {
       Alert.alert('Download', 'Art download requires a development build with file system access.\n\nYou can share the art using the share button instead.');
     }
   }, [card]);
 
-  if (!card) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.errorState}>
-          <Text style={styles.errorText}>{t.card.cardNotFound}</Text>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>{t.common.goBack}</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
   const togglePrintings = useCallback(async () => {
+    if (!card) return;
     if (Platform.OS !== 'web') void Haptics.selectionAsync();
 
     if (!printingsFetched && !printingsLoading) {
@@ -245,9 +262,8 @@ export default function CardDetailScreen() {
         const results = await fetchCardPrintings(card.name);
         setPrintings(results);
         setPrintingsFetched(true);
-        console.log('[CardDetail] Fetched printings:', results.length);
-      } catch (e) {
-        console.log('[CardDetail] Printings error:', e);
+      } catch {
+        setPrintings([]);
       } finally {
         setPrintingsLoading(false);
       }
@@ -263,19 +279,33 @@ export default function CardDetailScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [printingsExpanded, printingsFetched, printingsLoading, card.name, chevronRotation]);
+  }, [card, printingsExpanded, printingsFetched, printingsLoading, chevronRotation]);
 
   useEffect(() => {
+    if (!card) return;
     setPrintingsExpanded(false);
     setPrintings([]);
     setPrintingsFetched(false);
     chevronRotation.setValue(0);
-  }, [card.id, chevronRotation]);
+  }, [card, chevronRotation]);
 
   const chevronSpin = chevronRotation.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
+
+  if (!card) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.errorState}>
+          <Text style={styles.errorText}>{t.card.cardNotFound}</Text>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>{t.common.goBack}</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
   const hasStats = card.power !== undefined && card.toughness !== undefined;

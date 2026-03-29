@@ -1,10 +1,11 @@
 import { resetInMemoryDb, getInMemoryDb } from '../../__mocks__/expo-sqlite';
-import { QueueEngine, PrintRenderer, PrinterPort } from '../../services/printer/queue/engine';
-import { createJob } from '../../services/printer/storage/repositories';
-import type { PrintJob } from '@/types';
+import { QueueEngine, PrintRenderer, PrinterPort, processQueueForPrinter, getQueueSummary } from '../../services/printer/queue/engine';
+import { createJob, getJobById, upsertPrinter } from '../../services/printer/storage/repositories';
 
 const TEST_PRINTER_ID = 'test-printer-1';
 const TEST_JOB_ID = 'test-job-1';
+const FAKE_PRINTER_ID = 'fake-ble-001';
+const FAKE_PRINTER_ADDRESS = 'AA:BB:CC:DD:EE:FF';
 
 class FakeRenderer implements PrintRenderer {
   async render(payload: string): Promise<Uint8Array[]> {
@@ -147,8 +148,16 @@ describe('QueueEngine - Happy Path', () => {
 
     await engine.recordTerminalState(job!, result);
 
+    await createJob({
+      id: 'test-job-2',
+      printerId: TEST_PRINTER_ID,
+      documentType: 'card_receipt',
+      payload: JSON.stringify({ cardId: 'card-456' }),
+    });
+
     const newJob = await engine.claimJob(TEST_PRINTER_ID);
     expect(newJob).not.toBeNull();
+    expect(newJob?.id).toBe('test-job-2');
   });
 
   it('handles render failure gracefully', async () => {
@@ -170,5 +179,44 @@ describe('QueueEngine - Happy Path', () => {
 
     expect(result.success).toBe(false);
     expect(result.failureType).toBe('pre_write');
+  });
+
+  it('processes diagnostics jobs immediately for a concrete printer', async () => {
+    await upsertPrinter({
+      id: FAKE_PRINTER_ID,
+      name: 'FakeThermal-BLE-001',
+      address: FAKE_PRINTER_ADDRESS,
+      transport: 'ble',
+      capabilities: {
+        supportImage: true,
+        supportQR: true,
+        supportCut: true,
+        supportText: true,
+        paperWidth: 58,
+      },
+    });
+
+    await createJob({
+      id: 'diag-now',
+      printerId: FAKE_PRINTER_ID,
+      documentType: 'diagnostics',
+      payload: JSON.stringify({
+        appName: 'Rork',
+        platform: 'test',
+        transport: 'ble',
+        paperWidth: 58,
+        timestamp: '2026-03-29T00:00:00.000Z',
+      }),
+    });
+
+    await processQueueForPrinter(FAKE_PRINTER_ID);
+
+    const job = await getJobById('diag-now');
+    const summary = await getQueueSummary(FAKE_PRINTER_ID);
+
+    expect(job?.state).toBe('completed');
+    expect(summary.pending).toBe(0);
+    expect(summary.completed).toBe(1);
+    expect(summary.failed).toBe(0);
   });
 });

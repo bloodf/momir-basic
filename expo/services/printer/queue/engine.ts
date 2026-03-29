@@ -1,12 +1,17 @@
-import type { PrintJob } from '@/types';
-import { getNextJobForPrinter, updateJobState, getJobById } from '../storage/repositories';
+import type { PrintJob, PrinterCapabilities } from '@/types';
+import { getNextJobForPrinter, updateJobState, getJobById, getJobsForPrinter, getPrinterById } from '../storage/repositories';
+import { EscPosRenderer } from '../render/escpos';
+import { CardReceiptDocument, DiagnosticsDocument } from '../render/document';
+import { createAdapter } from '../adapters/factory';
+import { getPrinterPreferencesFromSettings } from '../../../providers/SettingsProvider';
+import type { PrinterPort as AppPrinterPort } from '../adapters/port';
 
 export type PrintFailureType =
   | 'pre_write'
   | 'uncertain_write';
 
 export interface PrintRenderer {
-  render(payload: string): Promise<Uint8Array[]>;
+  render(payload: string, documentType: 'card_receipt' | 'diagnostics', capabilities: PrinterCapabilities): Promise<Uint8Array[]>;
 }
 
 export interface PrinterPort {
@@ -15,8 +20,69 @@ export interface PrinterPort {
   send(bytes: Uint8Array[]): Promise<'success' | 'uncertain'>;
 }
 
+class AdapterWrapper implements PrinterPort {
+  constructor(private adapter: AppPrinterPort) {}
+
+  async connect(printerId: string): Promise<void> {
+    await this.adapter.connectPrinter(printerId);
+  }
+
+  async disconnect(): Promise<void> {
+    await this.adapter.disconnectPrinter('');
+  }
+
+  async send(bytes: Uint8Array[]): Promise<'success' | 'uncertain'> {
+    try {
+      const text = bytes.map(b => new TextDecoder().decode(b)).join('');
+      await this.adapter.sendText(text);
+      return 'success';
+    } catch {
+      return 'uncertain';
+    }
+  }
+}
+
 const RETRY_BACKOFF_MS = [15_000, 60_000, 300_000] as const;
 const MAX_AUTO_RETRIES = 3;
+
+export class QueueRenderer implements PrintRenderer {
+  async render(
+    payload: string,
+    documentType: 'card_receipt' | 'diagnostics',
+    capabilities: PrinterCapabilities
+  ): Promise<Uint8Array[]> {
+    const escpos = new EscPosRenderer();
+
+    if (documentType === 'card_receipt') {
+      const data = JSON.parse(payload);
+      const doc = new CardReceiptDocument({
+        name: data.name,
+        manaCost: data.manaCost,
+        type: data.type,
+        oracleText: data.oracleText,
+        flavorText: data.flavorText,
+        power: data.power,
+        toughness: data.toughness,
+        imageUrl: data.imageUrl,
+        setCode: data.setCode,
+        scryfallId: data.scryfallId,
+      });
+      await doc.render(escpos, capabilities);
+    } else {
+      const data = JSON.parse(payload);
+      const doc = new DiagnosticsDocument(
+        data.appName,
+        data.platform,
+        data.transport,
+        data.paperWidth,
+        data.timestamp
+      );
+      await doc.render(escpos, capabilities);
+    }
+
+    return escpos.getChunks();
+  }
+}
 
 export class QueueEngine {
   private activePrinters: Set<string> = new Set();
@@ -46,11 +112,12 @@ export class QueueEngine {
   async dispatch(
     job: PrintJob,
     renderer: PrintRenderer,
-    adapter: PrinterPort
+    adapter: PrinterPort,
+    capabilities: PrinterCapabilities
   ): Promise<{ success: boolean; error?: string; failureType?: PrintFailureType }> {
     let bytes: Uint8Array[];
     try {
-      bytes = await renderer.render(job.payload);
+      bytes = await renderer.render(job.payload, job.documentType, capabilities);
     } catch (renderError) {
       return {
         success: false,
@@ -85,7 +152,7 @@ export class QueueEngine {
     try {
       await adapter.disconnect();
     } catch {
-      // Disconnect error after successful send is non-fatal
+      // Intentionally swallow — disconnect after send is non-fatal
     }
 
     return { success: true };
@@ -128,4 +195,61 @@ export class QueueEngine {
   releasePrinter(printerId: string): void {
     this.activePrinters.delete(printerId);
   }
+}
+
+const queueEngine = new QueueEngine();
+const queueRenderer = new QueueRenderer();
+
+export async function processQueue(): Promise<void> {
+  const prefs = await getPrinterPreferencesFromSettings();
+  const printerId = prefs.preferredPrinterId;
+  if (!printerId) return;
+
+  await processQueueForPrinter(printerId);
+}
+
+export async function processQueueForPrinter(printerId: string): Promise<void> {
+  if (!printerId) return;
+
+  const printer = await getPrinterById(printerId);
+  if (!printer) return;
+
+  const appAdapter = createAdapter();
+  const adapter = new AdapterWrapper(appAdapter);
+  const capabilities = printer.capabilities;
+
+  let job = await queueEngine.claimJob(printerId);
+  while (job) {
+    const result = await queueEngine.dispatch(job, queueRenderer, adapter, capabilities);
+    await queueEngine.recordTerminalState(job, result);
+
+    const nextJob = await queueEngine.claimJob(printerId);
+    if (!nextJob) break;
+    job = nextJob;
+  }
+}
+
+export async function retryJob(jobId: string): Promise<void> {
+  const job = await getJobById(jobId);
+  if (!job) return;
+  if (job.state !== 'failed_manual') return;
+  await updateJobState(jobId, 'queued');
+}
+
+export async function getQueueSummary(printerId: string): Promise<{
+  pending: number;
+  completed: number;
+  failed: number;
+  failedJobs: PrintJob[];
+}> {
+  const jobs = await getJobsForPrinter(printerId);
+  const pending = jobs.filter(j => j.state === 'queued' || j.state === 'retry_wait' || j.state === 'dispatching' || j.state === 'ready').length;
+  const completed = jobs.filter(j => j.state === 'completed').length;
+  const failedJobs = jobs.filter(j => j.state === 'failed_manual');
+  return {
+    pending,
+    completed,
+    failed: failedJobs.length,
+    failedJobs,
+  };
 }

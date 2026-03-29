@@ -174,27 +174,67 @@ class FakeSQLite {
       const printer = inMemoryDb.printers.find(p => p.id === args[0]);
       return printer ?? null;
     }
+    if (sql.includes("state = 'retry_wait'") && args) {
+      const printerId = args[0];
+      const now = args[1];
+      const job = inMemoryDb.print_jobs
+        .filter(j => j.printer_id === printerId && j.state === 'retry_wait' && j.next_retry_at && j.next_retry_at <= now)
+        .sort((a, b) => a.next_retry_at.localeCompare(b.next_retry_at))[0];
+      return job ?? null;
+    }
+    if (sql.includes("state = 'queued'") && args) {
+      const printerId = args[0];
+      const job = inMemoryDb.print_jobs
+        .filter(j => j.printer_id === printerId && j.state === 'queued')
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
+      return job ?? null;
+    }
     if (sql.includes('SELECT * FROM printers ORDER BY last_seen_at DESC')) {
-      return inMemoryDb.printers;
+      return inMemoryDb.printers[0] ?? null;
     }
     if (sql.includes('SELECT * FROM printers')) {
       return inMemoryDb.printers[0] ?? null;
     }
     if (sql.includes('SELECT * FROM print_jobs WHERE state = ?') && args) {
-      const jobs = inMemoryDb.print_jobs.filter(j => j.state === args[0]);
-      return jobs;
+      return inMemoryDb.print_jobs.find(j => j.state === args[0]) ?? null;
     }
     if (sql.includes('SELECT * FROM print_jobs WHERE id = ?') && args) {
       const job = inMemoryDb.print_jobs.find(j => j.id === args[0]);
       return job ?? null;
     }
     if (sql.includes('SELECT * FROM print_jobs ORDER BY created_at DESC')) {
-      return inMemoryDb.print_jobs;
+      return inMemoryDb.print_jobs[0] ?? null;
     }
     if (sql.includes('SELECT * FROM print_jobs')) {
       return inMemoryDb.print_jobs[0] ?? null;
     }
     return null;
+  }
+
+  async getAllAsync(sql, args) {
+    if (!this._isOpen) throw new Error('Database not open');
+
+    if (sql.includes('SELECT * FROM printers ORDER BY last_seen_at DESC')) {
+      return [...inMemoryDb.printers].sort((a, b) => String(b.last_seen_at).localeCompare(String(a.last_seen_at)));
+    }
+
+    if (sql.includes('SELECT * FROM print_jobs WHERE printer_id = ?') && args) {
+      return inMemoryDb.print_jobs
+        .filter(j => j.printer_id === args[0])
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    }
+
+    if (sql.includes('SELECT * FROM print_jobs WHERE state = ?') && args) {
+      return inMemoryDb.print_jobs
+        .filter(j => j.state === args[0])
+        .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    }
+
+    if (sql.includes('SELECT * FROM print_jobs ORDER BY created_at DESC')) {
+      return [...inMemoryDb.print_jobs].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    }
+
+    return [];
   }
 
   static async openDatabaseAsync(name) {
