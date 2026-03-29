@@ -3,31 +3,24 @@
     "version": ">= 13.0.0"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "simulator": true
-      },
-      "android": {
-        "buildType": "debug"
-      }
-    },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": {
-        "simulator": false
+        "resourceClass": "m-medium"
       },
       "android": {
-        "buildType": "debug"
+        "buildType": "apk"
       }
     },
     "production": {
+      "distribution": "store",
+      "channel": "production",
       "ios": {
-        "simulator": false
+        "resourceClass": "m-medium"
       },
       "android": {
-        "buildType": "release"
+        "buildType": "app-bundle"
       }
     }
   },

@@ -6,6 +6,14 @@
     "name": "Momir Basic",
     "slug": "khur2ml36fu56vvhu6tre",
     "version": "1.0.0",
+    "cli": {
+      "appVersionSource": "remote"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "TODO: Run `eas project:associate` to link your EAS project"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "rork-app",
