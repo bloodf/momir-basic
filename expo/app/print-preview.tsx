@@ -17,22 +17,27 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
-import { X, Printer, Download, Check } from 'lucide-react-native';
+import { X, Printer, Download, Check, AlertTriangle, WifiOff, Loader } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
-import { createJob } from '../services/printer/storage/repositories';
+import { createJob, getJobById } from '../services/printer/storage/repositories';
+import { processQueueForPrinter } from '../services/printer/queue/engine';
+import { createAdapter } from '../services/printer/adapters/factory';
+import type { PrintJob, PrintJobState } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
 const ART_WIDTH = RECEIPT_WIDTH - 32;
 const ART_HEIGHT = ART_WIDTH * 0.85;
 
-type EnqueueBanner = {
-  type: 'success' | 'error';
+type PrinterConnectionState = 'checking' | 'connected' | 'disconnected' | 'no_printer';
+
+type PrintOutcomeBanner = {
+  type: 'queued' | 'success' | 'uncertain' | 'failed';
   message: string;
 };
 
@@ -47,18 +52,20 @@ export default function PrintPreviewScreen() {
   const receiptSlide = useRef(new Animated.Value(40)).current;
   const receiptOpacity = useRef(new Animated.Value(0)).current;
   const printBtnScale = useRef(new Animated.Value(1)).current;
-  const successOpacity = useRef(new Animated.Value(0)).current;
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isQueueing, setIsQueueing] = useState<boolean>(false);
   const [saved, setSaved] = useState<boolean>(false);
-  const [enqueueBanner, setEnqueueBanner] = useState<EnqueueBanner | null>(null);
+  const [printOutcome, setPrintOutcome] = useState<PrintOutcomeBanner | null>(null);
+
+  // Printer connection state
+  const [printerConnection, setPrinterConnection] = useState<PrinterConnectionState>('checking');
 
   const card = useMemo<Card | null>(() => {
     try {
       if (params.cardJson) return JSON.parse(params.cardJson);
-    } catch (e) {
-      console.log('[PrintPreview] Parse error:', e);
+    } catch {
+      // Card parse error — handled by null return
     }
     return null;
   }, [params.cardJson]);
@@ -70,14 +77,39 @@ export default function PrintPreviewScreen() {
     ]).start();
   }, [receiptSlide, receiptOpacity]);
 
+  /**
+   * verifyPrinterConnection — checks if the preferred printer is physically connected.
+   * This uses the adapter.isConnected() call to determine real state.
+   */
+  const verifyPrinterConnection = useCallback(async () => {
+    const prefId = settings.printer?.preferredPrinterId;
+    if (!prefId) {
+      setPrinterConnection('no_printer');
+      return;
+    }
+
+    try {
+      const adapter = createAdapter();
+      const isConnected = await adapter.isConnected(prefId);
+      setPrinterConnection(isConnected ? 'connected' : 'disconnected');
+    } catch {
+      setPrinterConnection('disconnected');
+    }
+  }, [settings.printer?.preferredPrinterId]);
+
+  useEffect(() => {
+    if (!settings.devMode) {
+      void verifyPrinterConnection();
+    }
+  }, [settings.devMode, verifyPrinterConnection]);
+
   const showSuccessFlash = useCallback(() => {
     setSaved(true);
     Animated.sequence([
-      Animated.timing(successOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.delay(1500),
-      Animated.timing(successOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-    ]).start(() => setSaved(false));
-  }, [successOpacity]);
+      Animated.timing(printBtnScale, { toValue: 1.05, duration: 100, useNativeDriver: true }),
+      Animated.timing(printBtnScale, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start();
+  }, [printBtnScale]);
 
   const handleDevPrint = useCallback(async () => {
     if (!card || !receiptRef.current) return;
@@ -87,7 +119,6 @@ export default function PrintPreviewScreen() {
     }
 
     setIsSaving(true);
-    console.log('[PrintPreview] Dev mode: capturing receipt...');
 
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -103,24 +134,30 @@ export default function PrintPreviewScreen() {
         result: 'tmpfile',
       });
 
-      console.log('[PrintPreview] Captured to:', uri);
-
       const asset = await MediaLibrary.createAssetAsync(uri);
-      console.log('[PrintPreview] Saved to gallery:', asset.uri);
 
       if (Platform.OS !== 'web') {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
       showSuccessFlash();
-    } catch (err) {
-      console.log('[PrintPreview] Dev print error:', err);
+    } catch {
       Alert.alert(t.printPreview.saveFailed, t.printPreview.saveFailedMsg);
     } finally {
       setIsSaving(false);
     }
   }, [card, showSuccessFlash, t]);
 
+  /**
+   * handlePrint — enqueues a card receipt print job and processes the queue.
+   *
+   * After processing, inspects the job state to determine the actual outcome:
+   * - printed_confirmed: printer confirmed receipt
+   * - sent_unknown: uncertain delivery (mid-write disconnect) — operator must reconcile
+   * - failed_terminal | failed_retryable: printer/hardware error
+   *
+   * The UI is updated to reflect the real outcome, not an assumed success.
+   */
   const handlePrint = useCallback(async () => {
     if (!card) return;
 
@@ -129,7 +166,7 @@ export default function PrintPreviewScreen() {
       Animated.timing(printBtnScale, { toValue: 1, duration: 150, useNativeDriver: true }),
     ]).start();
 
-    setEnqueueBanner(null);
+    setPrintOutcome(null);
 
     if (settings.devMode) {
       void handleDevPrint();
@@ -139,9 +176,22 @@ export default function PrintPreviewScreen() {
     const preferredPrinterId = settings.printer?.preferredPrinterId;
 
     if (!preferredPrinterId) {
-      const message = 'Please select a printer in Settings first.';
-      setEnqueueBanner({ type: 'error', message });
-      Alert.alert('No Printer', message);
+      setPrintOutcome({ type: 'failed', message: 'No printer selected. Go to Settings to select a printer.' });
+      Alert.alert('No Printer', 'Please select a printer in Settings first.');
+      return;
+    }
+
+    // Verify physical connection before attempting print
+    try {
+      const adapter = createAdapter();
+      const isConnected = await adapter.isConnected(preferredPrinterId);
+      if (!isConnected) {
+        setPrintOutcome({ type: 'failed', message: 'Printer is not connected. Go to Settings to reconnect.' });
+        Alert.alert('Printer Disconnected', 'The printer is not connected. Please reconnect from Settings.');
+        return;
+      }
+    } catch {
+      setPrintOutcome({ type: 'failed', message: 'Unable to verify printer connection.' });
       return;
     }
 
@@ -169,16 +219,46 @@ export default function PrintPreviewScreen() {
         payload: JSON.stringify(cardReceiptData),
       });
 
-      if (Platform.OS !== 'web') {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Process the queue to attempt printing
+      await processQueueForPrinter(preferredPrinterId);
+
+      // Fetch the final job state after processing
+      const job = await getJobById(jobId);
+
+      if (job?.state === 'printed_confirmed') {
+        if (Platform.OS !== 'web') {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        setPrintOutcome({ type: 'success', message: 'Card receipt printed successfully.' });
+        Alert.alert('Print Complete', 'Your card receipt was printed successfully.');
+        return;
       }
 
-      const message = 'Your card receipt has been sent to the printer.';
-      setEnqueueBanner({ type: 'success', message });
-      Alert.alert('Print Queued', message);
-    } catch {
-      const message = 'Unable to queue the print job. Please try again.';
-      setEnqueueBanner({ type: 'error', message });
+      if (job?.state === 'sent_unknown') {
+        if (Platform.OS !== 'web') {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
+        const msg = 'Print delivery is uncertain. The printer may have received partial data. Check the printer output.';
+        setPrintOutcome({ type: 'uncertain', message: msg });
+        Alert.alert('Uncertain Delivery', msg);
+        return;
+      }
+
+      if (job?.state === 'failed_terminal' || job?.state === 'failed_retryable') {
+        if (Platform.OS !== 'web') {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+        const msg = job.lastError ?? 'Print failed. Please try again or check the printer.';
+        setPrintOutcome({ type: 'failed', message: msg });
+        Alert.alert('Print Failed', msg);
+        return;
+      }
+
+      // Job is still queued or printing — this shouldn't happen since we just processed
+      setPrintOutcome({ type: 'queued', message: 'Print job queued for processing.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to queue the print job.';
+      setPrintOutcome({ type: 'failed', message });
       Alert.alert('Print Failed', message);
     } finally {
       setIsQueueing(false);
@@ -203,6 +283,8 @@ export default function PrintPreviewScreen() {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(scryfallUrl)}&bgcolor=FFFFFF&color=000000&margin=0`;
 
   const isDevMode = settings.devMode;
+
+  const canPrint = printerConnection === 'connected' || isDevMode;
 
   return (
     <View style={styles.container}>
@@ -297,7 +379,7 @@ export default function PrintPreviewScreen() {
       </ScrollView>
 
       {saved && (
-        <Animated.View style={[styles.successOverlay, { opacity: successOpacity }]} pointerEvents="none">
+        <Animated.View style={[styles.successOverlay, { opacity: printBtnScale }]} pointerEvents="none">
           <View style={styles.successBubble}>
             <Check size={28} color="#fff" />
             <Text style={styles.successText}>{t.printPreview.savedToGallery}</Text>
@@ -305,54 +387,138 @@ export default function PrintPreviewScreen() {
         </Animated.View>
       )}
 
-      {enqueueBanner && (
+      {printOutcome && (
         <View
           style={[
-            styles.enqueueBanner,
-            enqueueBanner.type === 'success' ? styles.enqueueBannerSuccess : styles.enqueueBannerError,
+            styles.printOutcomeBanner,
+            printOutcome.type === 'success' ? styles.printOutcomeSuccess :
+            printOutcome.type === 'uncertain' ? styles.printOutcomeUncertain :
+            printOutcome.type === 'queued' ? styles.printOutcomeQueued :
+            styles.printOutcomeFailed,
           ]}
-          testID="queue-status-badge"
+          testID="print-outcome-badge"
         >
-          <Text style={styles.enqueueBannerText}>{enqueueBanner.message}</Text>
+          {printOutcome.type === 'success' && <Check size={16} color={Colors.success} />}
+          {printOutcome.type === 'uncertain' && <AlertTriangle size={16} color={Colors.gold} />}
+          {printOutcome.type === 'failed' && <AlertTriangle size={16} color={Colors.error} />}
+          {printOutcome.type === 'queued' && <Loader size={16} color={Colors.textSecondary} />}
+          <Text style={[
+            styles.printOutcomeText,
+            printOutcome.type === 'success' ? styles.printOutcomeTextSuccess :
+            printOutcome.type === 'uncertain' ? styles.printOutcomeTextUncertain :
+            printOutcome.type === 'queued' ? styles.printOutcomeTextQueued :
+            styles.printOutcomeTextFailed,
+          ]}>{printOutcome.message}</Text>
         </View>
       )}
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}> 
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
-        >
-          <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
-        </Pressable>
-        <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
+      {!isDevMode && printerConnection === 'checking' && (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.checkingPrinterBanner}>
+            <Loader size={14} color={Colors.textMuted} />
+            <Text style={styles.checkingPrinterText}>Checking printer connection...</Text>
+          </View>
+        </View>
+      )}
+
+      {!isDevMode && printerConnection === 'disconnected' && (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.disconnectedBanner}>
+            <WifiOff size={14} color={Colors.error} />
+            <Text style={styles.disconnectedBannerText}>Printer disconnected — reconnect in Settings</Text>
+          </View>
           <Pressable
-            onPress={handlePrint}
-            disabled={isSaving || isQueueing}
-            style={({ pressed }) => [
-              styles.footerBtn,
-              isDevMode ? styles.footerBtnDev : styles.footerBtnPrimary,
-              pressed && styles.footerPressed,
-              (isSaving || isQueueing) && styles.footerBtnDisabled,
-            ]}
-            testID="confirm-print"
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
           >
-            {isSaving || isQueueing ? (
-              <ActivityIndicator size="small" color={Colors.background} />
-            ) : (
-              <>
-                {isDevMode ? (
-                  <Download size={17} color={Colors.background} />
-                ) : (
-                  <Printer size={17} color={Colors.background} />
-                )}
-                <Text style={styles.footerBtnPrimaryText}>
-                  {isDevMode ? t.printPreview.saveToGallery : t.printPreview.printCard}
-                </Text>
-              </>
-            )}
+            <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
           </Pressable>
-        </Animated.View>
-      </View>
+          <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
+            <Pressable
+              onPress={handlePrint}
+              disabled={true}
+              style={({ pressed }) => [
+                styles.footerBtn,
+                styles.footerBtnDisabled,
+                pressed && styles.footerPressed,
+              ]}
+              testID="confirm-print"
+            >
+              <Printer size={17} color={Colors.textMuted} />
+              <Text style={styles.footerBtnDisabledText}>Print Card</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      )}
+
+      {!isDevMode && printerConnection === 'no_printer' && (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.noPrinterBanner}>
+            <Printer size={14} color={Colors.gold} />
+            <Text style={styles.noPrinterBannerText}>No printer selected — tap to choose in Settings</Text>
+          </View>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
+          >
+            <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
+          </Pressable>
+          <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
+            <Pressable
+              onPress={handlePrint}
+              disabled={true}
+              style={({ pressed }) => [
+                styles.footerBtn,
+                styles.footerBtnDisabled,
+                pressed && styles.footerPressed,
+              ]}
+              testID="confirm-print"
+            >
+              <Printer size={17} color={Colors.textMuted} />
+              <Text style={styles.footerBtnDisabledText}>Print Card</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      )}
+
+      {(isDevMode || printerConnection === 'connected') && (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
+          >
+            <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
+          </Pressable>
+          <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
+            <Pressable
+              onPress={handlePrint}
+              disabled={isSaving || isQueueing}
+              style={({ pressed }) => [
+                styles.footerBtn,
+                isDevMode ? styles.footerBtnDev : styles.footerBtnPrimary,
+                pressed && styles.footerPressed,
+                (isSaving || isQueueing) && styles.footerBtnDisabled,
+              ]}
+              testID="confirm-print"
+            >
+              {isSaving || isQueueing ? (
+                <ActivityIndicator size="small" color={Colors.background} />
+              ) : (
+                <>
+                  {isDevMode ? (
+                    <Download size={17} color={Colors.background} />
+                  ) : (
+                    <Printer size={17} color={Colors.background} />
+                  )}
+                  <Text style={styles.footerBtnPrimaryText}>
+                    {isDevMode ? t.printPreview.saveToGallery : t.printPreview.printCard}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }
@@ -524,27 +690,49 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     fontStyle: 'italic' as const,
   },
-  enqueueBanner: {
+  printOutcomeBanner: {
     marginHorizontal: 16,
     marginBottom: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  enqueueBannerSuccess: {
-    backgroundColor: Colors.cardBackground,
+  printOutcomeSuccess: {
+    backgroundColor: 'rgba(34,204,102,0.08)',
     borderColor: Colors.success,
   },
-  enqueueBannerError: {
-    backgroundColor: Colors.cardBackground,
+  printOutcomeUncertain: {
+    backgroundColor: 'rgba(232,105,45,0.08)',
+    borderColor: Colors.gold,
+  },
+  printOutcomeQueued: {
+    backgroundColor: 'rgba(91,155,213,0.08)',
+    borderColor: '#5B9BD5',
+  },
+  printOutcomeFailed: {
+    backgroundColor: 'rgba(239,83,80,0.08)',
     borderColor: Colors.error,
   },
-  enqueueBannerText: {
-    color: Colors.textPrimary,
+  printOutcomeText: {
     fontSize: 13,
     fontWeight: '600' as const,
-    textAlign: 'center' as const,
+    flex: 1,
+  },
+  printOutcomeTextSuccess: {
+    color: Colors.success,
+  },
+  printOutcomeTextUncertain: {
+    color: Colors.gold,
+  },
+  printOutcomeTextQueued: {
+    color: Colors.textSecondary,
+  },
+  printOutcomeTextFailed: {
+    color: Colors.error,
   },
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -570,6 +758,54 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700' as const,
+  },
+  checkingPrinterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(91,155,213,0.08)',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  checkingPrinterText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '500' as const,
+  },
+  disconnectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(239,83,80,0.08)',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  disconnectedBannerText: {
+    color: Colors.error,
+    fontSize: 12,
+    fontWeight: '500' as const,
+  },
+  noPrinterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(232,105,45,0.08)',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  noPrinterBannerText: {
+    color: Colors.gold,
+    fontSize: 12,
+    fontWeight: '500' as const,
   },
   footer: {
     flexDirection: 'row' as const,
@@ -612,7 +848,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
   },
   footerBtnDisabled: {
-    opacity: 0.6,
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  footerBtnDisabledText: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
   footerBtnPrimaryText: {
     color: Colors.background,

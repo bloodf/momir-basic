@@ -429,7 +429,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: YES | Message: `fix(printer): make queue delivery semantics deterministic` | Files: queue engine, storage, settings, tests
 
-- [ ] 9. Rebuild the printer UI around real hardware states only
+- [x] 9. Rebuild the printer UI around real hardware states only
 
   **What to do**: Rewrite the printer settings and print-preview flows so they expose only real capability/permission/transport states. Add explicit scan state, pairing guidance, connection lifecycle, diagnostics print, queue reconciliation, unsupported transport messaging, and TCP printer entry/config where supported. Remove all fake-device cues and success states. Ensure the UI is actionable when the printer is unavailable, denied, disconnected, unsupported, or uncertain.
   **Must NOT do**: Do not preserve legacy mock scan/connect flows. Do not show “connected” based on stale flags alone.

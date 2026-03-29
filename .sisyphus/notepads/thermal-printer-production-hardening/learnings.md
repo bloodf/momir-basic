@@ -362,6 +362,55 @@ If universal compatibility or non-MFi iOS Classic is required:
 **Evidence File Created:**
 - `.sisyphus/evidence/task-8-queue-semantics.txt`
 
+### Task 9 Findings (2026-03-29)
+
+**Problem: Legacy UI Cues and Fake Success States**
+- `print-preview.tsx`: showed "success" banner when job was enqueued, not when actually confirmed
+- `printer.tsx`: `handleConnect()` declared connected without verifying `adapter.isConnected()`
+- Stale `settings.printerConnected` flag used instead of real hardware checks
+- No explicit `connecting` state shown during connection attempt
+- No `module_unavailable` state when native module missing
+
+**Solution: Real Hardware State UI**
+
+1. **printer.tsx — Connection Verification**:
+   - `handleConnect()` now calls `adapter.isConnected()` AFTER `registryService.connectPrinter()`
+   - If `isConnected()` returns false, transitions to `disconnected` (not `connected`)
+   - Added `renderConnectingState()` with spinner + "Connecting to {printer}..." text
+   - Added `module_unavailable` state with "Go Back" button
+   - `checkRealConnectionState()` is sole source of truth for connection state
+
+2. **print-preview.tsx — Real Job State Inspection**:
+   - Added `verifyPrinterConnection()` that checks `adapter.isConnected()` before print
+   - `handlePrint()` now calls `processQueueForPrinter()` then `getJobById()` for final state
+   - Removed misleading "success" banner on enqueue
+   - Distinct banners for `printed_confirmed` (success), `sent_unknown` (uncertain), `failed_*` (error)
+   - Print button disabled when `printerConnection !== 'connected'`
+
+3. **PrinterConnectionState type**:
+   - `'checking'` — verifying connection
+   - `'connected'` — adapter confirms physical connection
+   - `'disconnected'` — adapter confirms not connected
+   - `'no_printer'` — no preferred printer set
+
+4. **PrintOutcomeBanner type**:
+   - `'queued'` — job created, awaiting processing
+   - `'success'` — `printed_confirmed` state confirmed
+   - `'uncertain'` — `sent_unknown` state (mid-write disconnect)
+   - `'failed'` — `failed_terminal` | `failed_retryable` state
+
+5. **Key Pattern**:
+   - UI "connected" = `adapter.isConnected()` returns true
+   - UI "success" = job state is `printed_confirmed`
+   - No assumptions based on enqueue alone
+
+**Files Modified:**
+- `expo/app/(tabs)/settings/printer.tsx` — real hardware states
+- `expo/app/print-preview.tsx` — real job states
+
+**Evidence File Created:**
+- `.sisyphus/evidence/task-9-printer-ui.txt`
+
 ### Task 10 Findings (2026-03-29)
 
 **Problem: No Structured Observability for Printer Sessions**

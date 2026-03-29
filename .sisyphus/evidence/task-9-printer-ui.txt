@@ -1,0 +1,93 @@
+# Task 9: Printer UI Production Hardening — Evidence
+
+## Files Modified
+
+1. `expo/app/(tabs)/settings/printer.tsx`
+2. `expo/app/print-preview.tsx`
+
+## Changes Summary
+
+### printer.tsx — Real Hardware States Only
+
+**Added `module_unavailable` state:**
+- When native module is not available, shows actionable error with "Go Back" button
+- Prevents attempting operations on unavailable hardware
+
+**Fixed `handleConnect` connection verification:**
+- Previously: called `registryService.connectPrinter()` then immediately set `uiState = 'connected'`
+- Now: after connect, calls `adapter.isConnected()` to verify physical connection BEFORE declaring connected
+- If `isConnected()` returns false, transitions to `disconnected` with appropriate error message
+
+**Added explicit `connecting` state:**
+- New `renderConnectingState()` component shows spinner + "Connecting to {printer}..." text
+- UI clearly shows connection attempt in progress
+
+**Removed stale `settings.printerConnected` flag usage:**
+- `checkRealConnectionState()` now uses only `adapter.isConnected()` for truth
+- All connection state derived from real adapter verification
+
+**Printer canonical details displayed:**
+- `renderConnectedCard()` shows `{address} via {transport}` to verify correct device
+
+**Queue reconciliation always accessible:**
+- `renderQueueCard()` shows sent_unknown + failed_terminal jobs with retry/abandon actions
+- `renderUncertainDelivery()` shows uncertain jobs requiring operator action
+
+**Diagnostics print flow:**
+- `handleTestPrint()` inspects final job state after processing
+- Shows success/uncertain/failed based on actual `printed_confirmed`, `sent_unknown`, or `failed_*` states
+
+### print-preview.tsx — Real Job States Only
+
+**Added printer connection verification before print:**
+- `verifyPrinterConnection()` checks `adapter.isConnected()` before allowing print
+- Shows `checking`, `disconnected`, `no_printer` banners when printer unavailable
+
+**Removed misleading "success" banner:**
+- Previously: showed "Your card receipt has been sent to the printer" as success on enqueue
+- Now: processes queue and inspects actual job state
+
+**Added real job state inspection after processing:**
+- `handlePrint()` now calls `processQueueForPrinter()` then `getJobById()` to get final state
+- Shows distinct banners for:
+  - `printed_confirmed`: green success banner
+  - `sent_unknown`: gold uncertain banner with warning
+  - `failed_terminal`/`failed_retryable`: red failed banner
+  - `queued`/`printing`: neutral queued banner
+
+**Print button disabled when printer unavailable:**
+- When `printerConnection === 'disconnected'` or `'no_printer'`, print button is disabled
+- Shows reconnect guidance banner
+
+**Haptic feedback matches outcome:**
+- Success: `NotificationFeedbackType.Success`
+- Uncertain: `NotificationFeedbackType.Warning`
+- Failed: `NotificationFeedbackType.Error`
+
+## State Machines
+
+### PrinterUiState (printer.tsx)
+```
+initializing
+  |-> module_unavailable
+  |-> permission_denied
+  |-> permission_never_ask
+  |-> scanning -> scan_empty | discovered
+  |-> tcp_setup
+  |-> connecting -> connected | disconnected
+  |-> connected -> disconnected | uncertain_delivery
+  |-> disconnected
+  |-> uncertain_delivery
+```
+
+### PrintOutcomeBanner (print-preview.tsx)
+```
+queued    -> Job created, awaiting processing
+success   -> printed_confirmed
+uncertain -> sent_unknown (mid-write disconnect)
+failed    -> failed_terminal | failed_retryable
+```
+
+## Verification
+- TypeScript: No diagnostics on both files
+- LSP: Clean on both modified files
