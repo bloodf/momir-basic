@@ -102,7 +102,7 @@ describe('QueueEngine - Queue Semantics', () => {
 
       expect(job).not.toBeNull();
       expect(job!.id).toBe(TEST_JOB_ID);
-      expect(job!.state).toBe('dispatching');
+      expect(job!.state).toBe('printing');
     });
 
     it('returns null when no jobs available', async () => {
@@ -237,7 +237,7 @@ describe('QueueEngine - Queue Semantics', () => {
   });
 
   describe('recordTerminalState', () => {
-    it('records completed state after successful dispatch', async () => {
+    it('records printed_confirmed state after successful dispatch', async () => {
       await createJob({
         id: TEST_JOB_ID,
         printerId: TEST_PRINTER_ID,
@@ -254,7 +254,7 @@ describe('QueueEngine - Queue Semantics', () => {
 
       const db = getInMemoryDb();
       const updatedJob = db.print_jobs.find(j => j.id === TEST_JOB_ID);
-      expect(updatedJob?.state).toBe('completed');
+      expect(updatedJob?.state).toBe('printed_confirmed');
     });
 
     it('releases printer after terminal state is recorded', async () => {
@@ -282,7 +282,7 @@ describe('QueueEngine - Queue Semantics', () => {
       expect(newJob?.id).toBe('test-job-2');
     });
 
-    it('marks uncertain_write as failed_manual (no auto-retry)', async () => {
+    it('marks uncertain_write as sent_unknown (no auto-retry)', async () => {
       adapter.sendResult = 'uncertain';
 
       await createJob({
@@ -299,10 +299,10 @@ describe('QueueEngine - Queue Semantics', () => {
 
       const db = getInMemoryDb();
       const updatedJob = db.print_jobs.find(j => j.id === TEST_JOB_ID);
-      expect(updatedJob?.state).toBe('failed_manual');
+      expect(updatedJob?.state).toBe('sent_unknown');
     });
 
-    it('sets retry_wait with backoff on retryable failure', async () => {
+    it('sets failed_retryable with backoff on retryable failure', async () => {
       adapter.shouldFailOn = 'send';
 
       await createJob({
@@ -319,7 +319,7 @@ describe('QueueEngine - Queue Semantics', () => {
 
       const db = getInMemoryDb();
       const updatedJob = db.print_jobs.find(j => j.id === TEST_JOB_ID);
-      expect(updatedJob?.state).toBe('retry_wait');
+      expect(updatedJob?.state).toBe('failed_retryable');
     });
   });
 
@@ -366,7 +366,7 @@ describe('QueueEngine - Queue Semantics', () => {
   });
 
   describe('Queue Semantics - Terminal States', () => {
-    it('job in failed_manual is not re-claimed automatically', async () => {
+    it('job in sent_unknown is not re-claimed automatically', async () => {
       await createJob({
         id: TEST_JOB_ID,
         printerId: TEST_PRINTER_ID,
@@ -452,16 +452,16 @@ describe('getQueueSummary', () => {
 
     const db = getInMemoryDb();
     const completedJob = db.print_jobs.find(j => j.id === 'job-completed');
-    completedJob!.state = 'completed';
+    completedJob!.state = 'printed_confirmed';
 
     const failedJob = db.print_jobs.find(j => j.id === 'job-failed');
-    failedJob!.state = 'failed_manual';
+    failedJob!.state = 'failed_terminal';
 
     const summary = await getQueueSummary(TEST_PRINTER_ID);
 
     expect(summary.pending).toBe(1);
     expect(summary.completed).toBe(1);
-    expect(summary.failed).toBe(1);
-    expect(summary.failedJobs).toHaveLength(1);
+    expect(summary.failedTerminal).toBe(1);
+    expect(summary.failedTerminalJobs).toHaveLength(1);
   });
 });

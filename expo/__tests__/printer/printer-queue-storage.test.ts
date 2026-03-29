@@ -156,13 +156,13 @@ describe('Printer Queue Storage Repository', () => {
         payload: mockPayload,
       });
 
-      await Repositories.updateJobState('job-5', 'dispatching');
+      await Repositories.updateJobState('job-5', 'printing');
 
       const job = await Repositories.getJobById('job-5');
-      expect(job?.state).toBe('dispatching');
+      expect(job?.state).toBe('printing');
     });
 
-    it('updates job state to retry_wait with error', async () => {
+    it('updates job state to failed_retryable with error', async () => {
       await Repositories.createJob({
         id: 'job-6',
         printerId: 'test-printer-id',
@@ -170,15 +170,15 @@ describe('Printer Queue Storage Repository', () => {
         payload: mockPayload,
       });
 
-      await Repositories.updateJobState('job-6', 'retry_wait', 'Connection timeout', '2025-01-01T00:00:00Z');
+      await Repositories.updateJobState('job-6', 'failed_retryable', 'Connection timeout', '2025-01-01T00:00:00Z');
 
       const job = await Repositories.getJobById('job-6');
-      expect(job?.state).toBe('retry_wait');
+      expect(job?.state).toBe('failed_retryable');
       expect(job?.lastError).toBe('Connection timeout');
       expect(job?.nextRetryAt).toBe('2025-01-01T00:00:00Z');
     });
 
-    it('increments attempts on retry_wait state', async () => {
+    it('increments attempts on failed_retryable state', async () => {
       await Repositories.createJob({
         id: 'job-7',
         printerId: 'test-printer-id',
@@ -186,7 +186,7 @@ describe('Printer Queue Storage Repository', () => {
         payload: mockPayload,
       });
 
-      await Repositories.updateJobState('job-7', 'retry_wait', 'Error');
+      await Repositories.updateJobState('job-7', 'failed_retryable', 'Error');
 
       const job = await Repositories.getJobById('job-7');
       expect(job?.attempts).toBe(1);
@@ -226,13 +226,13 @@ describe('Printer Queue Storage Repository', () => {
     });
 
     it('handles all job states', async () => {
-      const states: Array<'queued' | 'ready' | 'dispatching' | 'completed' | 'retry_wait' | 'failed_manual'> = [
+      const states: Array<'queued' | 'printing' | 'printed_confirmed' | 'failed_retryable' | 'failed_terminal' | 'sent_unknown'> = [
         'queued',
-        'ready',
-        'dispatching',
-        'completed',
-        'retry_wait',
-        'failed_manual',
+        'printing',
+        'printed_confirmed',
+        'failed_retryable',
+        'failed_terminal',
+        'sent_unknown',
       ];
 
       for (const state of states) {
@@ -244,7 +244,7 @@ describe('Printer Queue Storage Repository', () => {
           payload: mockPayload,
         });
 
-        await Repositories.updateJobState(`job-state-${state}`, state, state === 'retry_wait' ? 'error' : null);
+        await Repositories.updateJobState(`job-state-${state}`, state, state === 'failed_retryable' ? 'error' : null);
 
         const job = await Repositories.getJobById(`job-state-${state}`);
         expect(job?.state).toBe(state);

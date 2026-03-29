@@ -73,9 +73,9 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     let lastState = AppState.currentState;
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (lastState.match(/inactive|background/) && nextAppState === 'active') {
-        if (settings.printer.preferredPrinterId && settings.printerConnected) {
-          const { processQueue } = await import('../services/printer/queue/engine');
-          void processQueue();
+        if (settings.printer.preferredPrinterId) {
+          const { resumeQueueAfterRestart } = await import('../services/printer/queue/engine');
+          void resumeQueueAfterRestart();
         }
       }
       lastState = nextAppState;
@@ -84,7 +84,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     return () => {
       subscription.remove();
     };
-  }, [settings.printer.preferredPrinterId, settings.printerConnected]);
+  }, [settings.printer.preferredPrinterId]);
 
   const saveMutation = useMutation({
     mutationFn: async (updated: AppSettings) => {

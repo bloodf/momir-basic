@@ -59,7 +59,7 @@ describe('QueueEngine - Retry Backoff', () => {
     jest.useRealTimers();
   });
 
-  it('first failure triggers retry_wait with 15s backoff', async () => {
+  it('first failure triggers failed_retryable with 15s backoff', async () => {
     adapter.failOn = 'connect';
 
     await createJob({
@@ -80,7 +80,7 @@ describe('QueueEngine - Retry Backoff', () => {
     const db = getInMemoryDb();
     const updatedJob = db.print_jobs.find(j => j.id === 'job-1');
 
-    expect(updatedJob?.state).toBe('retry_wait');
+    expect(updatedJob?.state).toBe('failed_retryable');
     expect(updatedJob?.attempts).toBe(1);
     expect(updatedJob?.next_retry_at).not.toBeNull();
 
@@ -89,7 +89,7 @@ describe('QueueEngine - Retry Backoff', () => {
     expect(nextRetryAt.getTime()).toBeCloseTo(expectedRetryAt.getTime(), -2);
   });
 
-  it('second failure triggers retry_wait with 60s backoff', async () => {
+  it('second failure triggers failed_retryable with 60s backoff', async () => {
     adapter.failOn = 'connect';
 
     await createJob({
@@ -99,7 +99,7 @@ describe('QueueEngine - Retry Backoff', () => {
       payload: JSON.stringify({ cardId: 'card-123' }),
     });
 
-    await updateJobState('job-2', 'retry_wait', 'Connection timeout', new Date(Date.now() + 15_000).toISOString());
+    await updateJobState('job-2', 'failed_retryable', 'Connection timeout', new Date(Date.now() + 15_000).toISOString());
 
     jest.advanceTimersByTime(16_000);
 
@@ -115,7 +115,7 @@ describe('QueueEngine - Retry Backoff', () => {
     const db = getInMemoryDb();
     const updatedJob = db.print_jobs.find(j => j.id === 'job-2');
 
-    expect(updatedJob?.state).toBe('retry_wait');
+    expect(updatedJob?.state).toBe('failed_retryable');
     expect(updatedJob?.attempts).toBe(2);
 
     const nextRetryAt = new Date(updatedJob!.next_retry_at!);
@@ -123,7 +123,7 @@ describe('QueueEngine - Retry Backoff', () => {
     expect(nextRetryAt.getTime()).toBeCloseTo(expectedRetryAt.getTime(), -2);
   });
 
-  it('third failure triggers retry_wait with 300s backoff', async () => {
+  it('third failure triggers failed_retryable with 300s backoff', async () => {
     adapter.failOn = 'connect';
 
     await createJob({
@@ -133,7 +133,7 @@ describe('QueueEngine - Retry Backoff', () => {
       payload: JSON.stringify({ cardId: 'card-123' }),
     });
 
-    await updateJobState('job-3', 'retry_wait', 'Connection timeout', new Date(Date.now() + 15_000).toISOString());
+    await updateJobState('job-3', 'failed_retryable', 'Connection timeout', new Date(Date.now() + 15_000).toISOString());
 
     jest.advanceTimersByTime(16_000);
     const job2 = await engine.claimJob(TEST_PRINTER_ID);
@@ -150,7 +150,7 @@ describe('QueueEngine - Retry Backoff', () => {
     const db = getInMemoryDb();
     const updatedJob = db.print_jobs.find(j => j.id === 'job-3');
 
-    expect(updatedJob?.state).toBe('retry_wait');
+    expect(updatedJob?.state).toBe('failed_retryable');
     expect(updatedJob?.attempts).toBe(3);
 
     const nextRetryAt = new Date(updatedJob!.next_retry_at!);
@@ -158,7 +158,7 @@ describe('QueueEngine - Retry Backoff', () => {
     expect(nextRetryAt.getTime()).toBeCloseTo(expectedRetryAt.getTime(), -2);
   });
 
-  it('fourth failure moves to failed_manual', async () => {
+  it('fourth failure moves to failed_terminal', async () => {
     adapter.failOn = 'connect';
 
     await createJob({
@@ -168,7 +168,7 @@ describe('QueueEngine - Retry Backoff', () => {
       payload: JSON.stringify({ cardId: 'card-123' }),
     });
 
-    await updateJobState('job-4', 'retry_wait', 'Connection timeout', new Date(Date.now() + 15_000).toISOString());
+    await updateJobState('job-4', 'failed_retryable', 'Connection timeout', new Date(Date.now() + 15_000).toISOString());
 
     jest.advanceTimersByTime(16_000);
     let job = await engine.claimJob(TEST_PRINTER_ID);
@@ -190,7 +190,7 @@ describe('QueueEngine - Retry Backoff', () => {
     const db = getInMemoryDb();
     const updatedJob = db.print_jobs.find(j => j.id === 'job-4');
 
-    expect(updatedJob?.state).toBe('failed_manual');
+    expect(updatedJob?.state).toBe('failed_terminal');
     expect(updatedJob?.attempts).toBe(3);
     expect(updatedJob?.last_error).toBe('Connection timeout');
   });
@@ -208,7 +208,7 @@ describe('QueueEngine - Uncertain Write', () => {
     adapter = new FakeAdapter();
   });
 
-  it('uncertain write result moves to failed_manual immediately', async () => {
+  it('uncertain write result moves to sent_unknown immediately', async () => {
     await createJob({
       id: 'job-uncertain',
       printerId: TEST_PRINTER_ID,
@@ -232,7 +232,7 @@ describe('QueueEngine - Uncertain Write', () => {
     const db = getInMemoryDb();
     const updatedJob = db.print_jobs.find(j => j.id === 'job-uncertain');
 
-    expect(updatedJob?.state).toBe('failed_manual');
+    expect(updatedJob?.state).toBe('sent_unknown');
     expect(updatedJob?.last_error).toContain('uncertain');
   });
 
@@ -259,7 +259,7 @@ describe('QueueEngine - Uncertain Write', () => {
     const db = getInMemoryDb();
     const updatedJob = db.print_jobs.find(j => j.id === 'job-uncertain-2');
 
-    expect(updatedJob?.state).toBe('failed_manual');
+    expect(updatedJob?.state).toBe('sent_unknown');
     expect(updatedJob?.attempts).toBe(0);
   });
 });

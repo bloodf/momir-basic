@@ -1,5 +1,12 @@
 import { Platform, NativeModules, PermissionsAndroid } from 'react-native';
 import type { PrinterTransport } from '../../../types';
+import {
+  emitPermissionRequested,
+  emitPermissionGranted,
+  emitPermissionDenied,
+  emitNativeError,
+} from '../diagnostics';
+import { PrinterErrorCode } from '../adapters/port';
 
 export type AndroidBluetoothPermissionStatus =
   | 'granted'
@@ -81,6 +88,8 @@ export class PrinterCapabilityService {
       };
     }
 
+    emitPermissionRequested('ble');
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const required: any[] = [
       PERM_BLUETOOTH_CONNECT,
@@ -121,6 +130,12 @@ export class PrinterCapabilityService {
       location === 'undetermined'
     ) {
       overall = 'undetermined';
+    }
+
+    if (overall === 'granted') {
+      emitPermissionGranted('ble');
+    } else {
+      emitPermissionDenied(`Bluetooth permissions ${overall}`, 'ble');
     }
 
     return {
@@ -229,7 +244,10 @@ export class PrinterCapabilityService {
 
     const state = await this.getAndroidPermissionState();
 
-    if (state.overall === 'granted') return;
+    if (state.overall === 'granted') {
+      emitPermissionGranted('ble');
+      return;
+    }
 
     if (state.overall === 'denied' || state.overall === 'undetermined') {
       const newState = await this.requestAndroidBluetoothPermissions();
@@ -242,6 +260,8 @@ export class PrinterCapabilityService {
           newState.overall === 'never_ask_again'
             ? 'Bluetooth permissions were permanently denied. Please enable them in Android Settings.'
             : 'Bluetooth permissions were denied. Please grant them to use Bluetooth printers.';
+        emitPermissionDenied(reason, 'ble');
+        emitNativeError('ble', PrinterErrorCode.CONNECTION_REJECTED, `Permission denied: ${reason}`);
         throw new Error(`[PrinterCapability] Permission denied: ${reason}`);
       }
     }

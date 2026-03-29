@@ -5,10 +5,18 @@ import { CardReceiptDocument, DiagnosticsDocument } from '../render/document';
 import { createAdapter } from '../adapters/factory';
 import { getPrinterPreferencesFromSettings } from '../../../providers/SettingsProvider';
 import type { PrinterPort as AppPrinterPort } from '../adapters/port';
+import {
+  emitJobQueued,
+  emitJobDispatched,
+  emitJobCompleted,
+  emitJobFailed,
+  emitJobSentUnknown,
+} from '../diagnostics';
 
 export type PrintFailureType =
-  | 'pre_write'
-  | 'uncertain_write';
+  | 'pre_write'        // render or connect error — retryable
+  | 'uncertain_write'  // disconnect mid-write — sent_unknown, operator action required
+  | 'terminal';        // non-retryable hardware error
 
 export interface PrintRenderer {
   render(payload: string, documentType: 'card_receipt' | 'diagnostics', capabilities: PrinterCapabilities): Promise<Uint8Array[]>;
@@ -24,7 +32,7 @@ class AdapterWrapper implements PrinterPort {
   constructor(private adapter: AppPrinterPort) {}
 
   async connect(identity: CanonicalPrinterIdentity): Promise<void> {
-    await this.adapter.connectPrinter(identity.address);
+    await this.adapter.connectPrinter(identity.address, identity.transport);
   }
 
   async disconnect(): Promise<void> {
@@ -97,10 +105,8 @@ export class QueueEngine {
       return null;
     }
 
-    if (job.state === 'queued') {
-      await updateJobState(job.id, 'dispatching');
-    } else if (job.state === 'retry_wait') {
-      await updateJobState(job.id, 'dispatching');
+    if (job.state === 'queued' || job.state === 'failed_retryable') {
+      await updateJobState(job.id, 'printing');
     }
 
     this.activePrinters.add(printerId);
@@ -115,7 +121,8 @@ export class QueueEngine {
     adapter: PrinterPort,
     capabilities: PrinterCapabilities,
     identity: CanonicalPrinterIdentity
-  ): Promise<{ success: boolean; error?: string; failureType?: PrintFailureType }> {
+  ): Promise<{ success: boolean; error?: string; failureType?: PrintFailureType; durationMs?: number }> {
+    const dispatchStart = Date.now();
     let bytes: Uint8Array[];
     try {
       bytes = await renderer.render(job.payload, job.documentType, capabilities);
@@ -140,7 +147,7 @@ export class QueueEngine {
         await adapter.disconnect();
         return {
           success: false,
-          error: 'Print result uncertain - printer state unknown',
+          error: 'Print result uncertain — printer may have received partial data',
           failureType: 'uncertain_write',
         };
       }
@@ -153,44 +160,55 @@ export class QueueEngine {
     try {
       await adapter.disconnect();
     } catch {
-      // Intentionally swallow — disconnect after send is non-fatal
+      // Intentionally swallow — disconnect after confirmed send is non-fatal
     }
 
-    return { success: true };
+    return { success: true, durationMs: Date.now() - dispatchStart };
   }
 
   async recordTerminalState(
     job: PrintJob,
-    result: { success: boolean; error?: string; failureType?: PrintFailureType }
-  ): Promise<void> {
-    const printerId = job.printerId;
-    this.activePrinters.delete(printerId);
+    result: { success: boolean; error?: string; failureType?: PrintFailureType; durationMs?: number }
+  ): Promise<{ durationMs?: number }> {
+    this.activePrinters.delete(job.printerId);
+    const address = job.canonicalIdentity?.address ?? 'unknown';
 
     if (result.success) {
-      await updateJobState(job.id, 'completed', null);
-      return;
+      await updateJobState(job.id, 'printed_confirmed', null);
+      emitJobCompleted(job.id, job.printerId, address, job.documentType, result.durationMs ?? 0);
+      return { durationMs: result.durationMs };
     }
 
     if (result.failureType === 'uncertain_write') {
-      await updateJobState(job.id, 'failed_manual', result.error ?? 'Print result uncertain');
-      return;
+      await updateJobState(job.id, 'sent_unknown', result.error ?? 'Uncertain delivery — operator reconciliation required');
+      emitJobSentUnknown(job.id, job.printerId, address, job.documentType, result.durationMs ?? 0);
+      return { durationMs: result.durationMs };
+    }
+
+    if (result.failureType === 'terminal') {
+      await updateJobState(job.id, 'failed_terminal', result.error ?? 'Terminal printer error');
+      emitJobFailed(job.id, job.printerId, address, job.documentType, 'terminal', result.error ?? 'Terminal error', job.attempts, result.durationMs ?? 0);
+      return { durationMs: result.durationMs };
     }
 
     const currentJob = await getJobById(job.id);
-    if (!currentJob) return;
+    if (!currentJob) return {};
 
     const attempts = currentJob.attempts + 1;
 
     if (attempts > MAX_AUTO_RETRIES) {
-      await updateJobState(job.id, 'failed_manual', result.error ?? 'Max retries exceeded');
-      return;
+      await updateJobState(job.id, 'failed_terminal', result.error ?? 'Max retries exceeded — operator investigation required');
+      emitJobFailed(job.id, job.printerId, address, job.documentType, 'max_retries', result.error ?? 'Max retries exceeded', attempts, result.durationMs ?? 0);
+      return { durationMs: result.durationMs };
     }
 
     const backoffIndex = Math.min(attempts - 1, RETRY_BACKOFF_MS.length - 1);
     const backoffMs = RETRY_BACKOFF_MS[backoffIndex];
     const nextRetryAt = new Date(Date.now() + backoffMs).toISOString();
 
-    await updateJobState(job.id, 'retry_wait', result.error ?? 'Print failed', nextRetryAt);
+    await updateJobState(job.id, 'failed_retryable', result.error ?? 'Print failed', nextRetryAt);
+    emitJobFailed(job.id, job.printerId, address, job.documentType, 'retryable', result.error ?? 'Print failed', attempts, result.durationMs ?? 0);
+    return { durationMs: result.durationMs };
   }
 
   releasePrinter(printerId: string): void {
@@ -222,6 +240,8 @@ export async function processQueueForPrinter(printerId: string): Promise<void> {
 
   let job = await queueEngine.claimJob(printerId);
   while (job) {
+    const address = job.canonicalIdentity?.address ?? 'unknown';
+    emitJobDispatched(job.id, job.printerId, address, job.documentType, job.attempts);
     const result = await queueEngine.dispatch(job, queueRenderer, adapter, capabilities, identity);
     await queueEngine.recordTerminalState(job, result);
 
@@ -234,24 +254,60 @@ export async function processQueueForPrinter(printerId: string): Promise<void> {
 export async function retryJob(jobId: string): Promise<void> {
   const job = await getJobById(jobId);
   if (!job) return;
-  if (job.state !== 'failed_manual') return;
+  if (job.state !== 'failed_terminal' && job.state !== 'sent_unknown') return;
   await updateJobState(jobId, 'queued');
+}
+
+export async function abandonJob(jobId: string): Promise<void> {
+  const job = await getJobById(jobId);
+  if (!job) return;
+  await updateJobState(jobId, 'failed_terminal', 'Abandoned by operator');
 }
 
 export async function getQueueSummary(printerId: string): Promise<{
   pending: number;
   completed: number;
-  failed: number;
-  failedJobs: PrintJob[];
+  uncertain: number;
+  failedRetryable: number;
+  failedTerminal: number;
+  sentUnknownJobs: PrintJob[];
+  failedTerminalJobs: PrintJob[];
 }> {
   const jobs = await getJobsForPrinter(printerId);
-  const pending = jobs.filter(j => j.state === 'queued' || j.state === 'retry_wait' || j.state === 'dispatching' || j.state === 'ready').length;
-  const completed = jobs.filter(j => j.state === 'completed').length;
-  const failedJobs = jobs.filter(j => j.state === 'failed_manual');
+  const pending = jobs.filter(j => j.state === 'queued' || j.state === 'printing').length;
+  const completed = jobs.filter(j => j.state === 'printed_confirmed').length;
+  const failedRetryable = jobs.filter(j => j.state === 'failed_retryable').length;
+  const sentUnknownJobs = jobs.filter(j => j.state === 'sent_unknown');
+  const failedTerminalJobs = jobs.filter(j => j.state === 'failed_terminal');
   return {
     pending,
     completed,
-    failed: failedJobs.length,
-    failedJobs,
+    uncertain: sentUnknownJobs.length,
+    failedRetryable,
+    failedTerminal: failedTerminalJobs.length,
+    sentUnknownJobs,
+    failedTerminalJobs,
   };
+}
+
+export async function resumeQueueAfterRestart(): Promise<void> {
+  const prefs = await getPrinterPreferencesFromSettings();
+  const printerId = prefs.preferredPrinterId;
+  if (!printerId) return;
+
+  const printer = await getPrinterById(printerId);
+  if (!printer) return;
+
+  const appAdapter = createAdapter();
+  const isCurrentlyConnected = await appAdapter.isConnected(printer.address);
+  if (!isCurrentlyConnected) return;
+
+  const summary = await getQueueSummary(printerId);
+  if (summary.uncertain > 0 || summary.failedTerminal > 0) {
+    return;
+  }
+
+  if (summary.pending > 0 || summary.failedRetryable > 0) {
+    await processQueueForPrinter(printerId);
+  }
 }

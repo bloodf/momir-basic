@@ -14,6 +14,17 @@ import {
   getPrinterPreferencesFromSettings,
   savePrinterPreferencesToSettings,
 } from '../../../providers/SettingsProvider';
+import {
+  emitDiscoveryStarted,
+  emitDiscoveryResult,
+  emitDiscoveryCompleted,
+  emitConnectStarted,
+  emitConnectSuccess,
+  emitConnectFailed,
+  emitDisconnected,
+  emitNativeError,
+} from '../diagnostics';
+import { PrinterAdapterError, PrinterErrorCode } from '../adapters/port';
 
 function isIOS(): boolean {
   return Platform.OS === 'ios';
@@ -76,10 +87,23 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
 
   return {
     async discoverPrinters(): Promise<PrinterRecord[]> {
+      const start = Date.now();
       const adapter = adapterFactory();
-      const discovered = await adapter.discoverPrinters();
+      emitDiscoveryStarted();
+      let discovered = await adapter.discoverPrinters();
       const filtered = filterTransport(discovered);
+      discovered.forEach((d) => {
+        const accepted = filtered.some((f) => f.address === d.address);
+        emitDiscoveryResult({
+          printerName: d.name,
+          printerAddress: d.address,
+          transport: d.transport,
+          accepted,
+          rejectedReason: accepted ? undefined : `Transport ${d.transport} filtered for platform`,
+        });
+      });
       await Promise.all(filtered.map((d) => upsertDiscovered(d)));
+      emitDiscoveryCompleted(Date.now() - start, filtered.length);
       return repoListPrinters();
     },
 
@@ -89,7 +113,18 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
         throw new Error(`Printer with id ${deviceId} not found in registry`);
       }
       const adapter = adapterFactory();
-      await adapter.connectPrinter(printer.address);
+      const start = Date.now();
+      emitConnectStarted(printer.address, printer.transport);
+      try {
+        await adapter.connectPrinter(printer.address);
+        emitConnectSuccess(printer.address, printer.name, printer.transport, Date.now() - start);
+      } catch (err) {
+        const code = err instanceof PrinterAdapterError ? err.code : PrinterErrorCode.CONNECTION_FAILED;
+        const msg = err instanceof Error ? err.message : String(err);
+        emitConnectFailed(printer.address, printer.transport, code, msg, Date.now() - start);
+        emitNativeError(printer.transport, code, msg);
+        throw err;
+      }
     },
 
     async disconnectPrinter(deviceId: string): Promise<void> {
@@ -99,6 +134,7 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       }
       const adapter = adapterFactory();
       await adapter.disconnectPrinter(printer.address);
+      emitDisconnected(printer.address, printer.transport);
     },
 
     async savePreferredPrinter(deviceId: string): Promise<void> {

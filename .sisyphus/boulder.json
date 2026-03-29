@@ -51,7 +51,9 @@
     "ses_2c7da5b7dffeylXL4MJlTUoE3e",
     "ses_2c7c89419ffeT1bu8e5dbDyAPD",
     "ses_2c7c8599dffeKmQujIVnQ5Bdwd",
-    "ses_2c7c8cbd6ffeLzDgL4zPEw3twq"
+    "ses_2c7c8cbd6ffeLzDgL4zPEw3twq",
+    "ses_2c7bb936effe8N10Y1FPT7odtR",
+    "ses_2c7bbf25cffek2pVJxpo8s1v5U"
   ],
   "plan_name": "thermal-printer-implementation",
   "agent": "atlas",
@@ -105,10 +107,10 @@
       "task_key": "todo:9",
       "task_label": "9",
       "task_title": "Replace the printer settings screen’s mock behavior with real registry + adapter actions",
-      "session_id": "ses_2c7c8cbd6ffeLzDgL4zPEw3twq",
+      "session_id": "ses_2c7bbf25cffek2pVJxpo8s1v5U",
       "agent": "Sisyphus-Junior",
       "category": "deep",
-      "updated_at": "2026-03-29T06:22:30.353Z"
+      "updated_at": "2026-03-29T06:38:51.648Z"
     }
   }
 }

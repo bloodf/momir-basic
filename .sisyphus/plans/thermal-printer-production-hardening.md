@@ -390,7 +390,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: YES | Message: `fix(printer): harden escpos rendering for real devices` | Files: renderer, documents, tests
 
-- [ ] 8. Make queue semantics deterministic for uncertain delivery
+- [x] 8. Make queue semantics deterministic for uncertain delivery
 
   **What to do**: Redesign queue semantics around explicit outcomes: `queued`, `printing`, `printed_confirmed`, `failed_retryable`, `failed_terminal`, and `sent_unknown` for disconnects during write. Add operator-visible reconciliation so duplicate-print risk is surfaced. Ensure retries are transport-aware and tied to canonical printer identity. Persist enough metadata to resume safely after app restarts.
   **Must NOT do**: Do not mark jobs complete on uncertain transport failure. Do not auto-retry blindly on ambiguous delivery.
@@ -469,7 +469,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: YES | Message: `feat(printer): rebuild ui around real hardware states` | Files: printer settings, print preview, related hooks/tests
 
-- [ ] 10. Add native diagnostics, log capture, and printer-session observability
+- [x] 10. Add native diagnostics, log capture, and printer-session observability
 
   **What to do**: Add structured printer-session logging around permissions, scan results, transport selection, connect/disconnect events, print job lifecycle, and native module errors. Define adb/logcat capture commands, iOS device log capture, and evidence collection scripts so every certification run produces reproducible diagnostics. Integrate release-critical error reporting for printer failures only after event taxonomy is defined.
   **Must NOT do**: Do not add generic analytics expansion. Do not leave native printer failures unclassified.

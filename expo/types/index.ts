@@ -116,19 +116,20 @@ export interface LegacyPrinterConfig {
   autoPrint: boolean;
 }
 
-// Print job state machine
+// Print job state machine — explicit outcomes for deterministic handling
 export type PrintJobState =
-  | 'queued'       // waiting to be processed
-  | 'ready'        // claimed by worker, about to dispatch
-  | 'dispatching'  // actively sending to printer
-  | 'completed'    // finished successfully
-  | 'retry_wait'   // failed, waiting to retry (auto)
-  | 'failed_manual'; // failed, needs manual retry
+  | 'queued'              // waiting to be processed
+  | 'printing'            // actively sending to printer
+  | 'printed_confirmed'    // successfully printed and confirmed
+  | 'failed_retryable'    // failed, auto-retryable after backoff
+  | 'failed_terminal'     // failed, non-retryable (operator must investigate)
+  | 'sent_unknown';       // uncertain delivery — disconnect mid-write, operator reconciliation required
 
 // A single print job (immutable payload, mutable state in DB)
 export interface PrintJob {
   id: string;
   printerId: string;
+  canonicalIdentity?: CanonicalPrinterIdentity; // address+transport snapshot at job creation for safe resume
   documentType: 'card_receipt' | 'diagnostics';
   payload: string;        // JSON stringified PrintDocumentData
   state: PrintJobState;
@@ -136,7 +137,7 @@ export interface PrintJob {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
-  nextRetryAt?: string;   // ISO timestamp for retry_wait jobs
+  nextRetryAt?: string;   // ISO timestamp for failed_retryable jobs
 }
 
 // Document data for a card receipt

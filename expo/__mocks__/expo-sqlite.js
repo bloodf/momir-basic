@@ -120,8 +120,9 @@ class FakeSQLite {
       inMemoryDb.print_jobs.push({
         id: args[0],
         printer_id: args[1],
-        document_type: args[2],
-        payload: args[3],
+        canonical_identity: args[2],  // canonicalIdentity JSON or null
+        document_type: args[3],         // documentType shifted by canonical_identity
+        payload: args[4],              // payload shifted
         state: 'queued',
         attempts: 0,
         last_error: null,
@@ -182,10 +183,26 @@ class FakeSQLite {
         .sort((a, b) => a.next_retry_at.localeCompare(b.next_retry_at))[0];
       return job ?? null;
     }
+    if (sql.includes("state = 'failed_retryable'") && args) {
+      const printerId = args[0];
+      const now = args[1];
+      const job = inMemoryDb.print_jobs
+        .filter(j => j.printer_id === printerId && j.state === 'failed_retryable' && j.next_retry_at && j.next_retry_at <= now)
+        .sort((a, b) => a.next_retry_at.localeCompare(b.next_retry_at))[0];
+      return job ?? null;
+    }
     if (sql.includes("state = 'queued'") && args) {
       const printerId = args[0];
       const job = inMemoryDb.print_jobs
         .filter(j => j.printer_id === printerId && j.state === 'queued')
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
+      return job ?? null;
+    }
+    if (sql.includes("state = ?") && args && args.length >= 2) {
+      const printerId = args[0];
+      const state = args[1];
+      const job = inMemoryDb.print_jobs
+        .filter(j => j.printer_id === printerId && j.state === state)
         .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
       return job ?? null;
     }

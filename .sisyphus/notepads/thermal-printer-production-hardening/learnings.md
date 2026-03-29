@@ -297,3 +297,122 @@ If universal compatibility or non-MFi iOS Classic is required:
 
 **Evidence File Created:**
 - `.sisyphus/evidence/task-5-permissions.txt`
+
+### Task 8 Findings (2026-03-29)
+
+**Problem: Non-Deterministic Queue Semantics + Stale State Assumptions**
+- Queue had ambiguous failure states (`failed_manual` used for both uncertain delivery and terminal errors)
+- `uncertain_write` mapped to `failed_manual` — auto-retry possible on ambiguous delivery
+- `printerConnected` in SettingsProvider was stale — app restart could trigger duplicate prints
+- Retry logic tied to registry `printerId` not canonical `{address, transport}`
+- No operator-visible reconciliation path for uncertain deliveries
+
+**Solution: Explicit State Machine + Transport-Aware Retry + Safe Resume**
+
+1. **New Explicit Job States** (`types/index.ts`):
+   - `queued` — waiting to be processed
+   - `printing` — actively sending to printer
+   - `printed_confirmed` — successfully printed (replaces completed)
+   - `failed_retryable` — auto-retryable after backoff (replaces retry_wait)
+   - `failed_terminal` — non-retryable, operator must investigate (replaces failed_manual)
+   - `sent_unknown` — uncertain delivery, operator reconciliation required (NEW)
+
+2. **Canonical Identity for Safe Resume** (`types/index.ts` + `repositories.ts`):
+   - Added `canonicalIdentity?: CanonicalPrinterIdentity` to `PrintJob`
+   - Stores `{address, transport}` snapshot at job creation
+   - `getPrinterByCanonicalIdentity()` for safe printer lookup
+   - `getJobsRequiringReconciliation()` queries all `sent_unknown` jobs
+
+3. **Queue Engine State Machine** (`queue/engine.ts`):
+   - `uncertain_write` → `sent_unknown` (NOT auto-retryable)
+   - `pre_write` failure → `failed_retryable` with backoff
+   - `terminal` failure → `failed_terminal`
+   - `printing` state during active dispatch
+   - New `abandonJob()` for explicit operator abandonment
+   - `getQueueSummary()` returns counts for all states including `sent_unknownJobs`
+
+4. **Safe Resume After Restart** (`queue/engine.ts`):
+   - `resumeQueueAfterRestart()` verifies:
+     1. Printer still connected (via `isConnected` with canonical address)
+     2. No `sent_unknown` or `failed_terminal` jobs exist
+     3. Only then resumes `queued`/`failed_retryable` jobs
+
+5. **SettingsProvider Fix** (`SettingsProvider.tsx`):
+   - Removed stale `printerConnected` check from app restart handler
+   - Now uses `resumeQueueAfterRestart()` which does proper verification
+   - Stale `printerConnected` field remains in type for backward compat
+
+6. **Transport-Aware Retry**:
+   - Retries tied to `{address, transport}` not registry ID
+   - `AdapterWrapper.connect()` passes full `CanonicalPrinterIdentity` to adapter
+   - Adapter uses identity for transport validation and address matching
+
+**Key Design Decisions:**
+- `sent_unknown` requires explicit operator action — no silent auto-retry
+- `failed_terminal` after max retries exceeded OR explicit terminal failure
+- Safe resume blocks on any uncertain/terminal state jobs
+- Canonical identity stored in job for cross-restart reliability
+
+**Files Modified:**
+- `types/index.ts` — PrintJobState enum, PrintJob interface
+- `queue/engine.ts` — new state machine, safe resume, reconciliation functions
+- `storage/repositories.ts` — canonicalIdentity support, reconciliation queries
+- `providers/SettingsProvider.tsx` — removed stale printerConnected assumption
+
+**Evidence File Created:**
+- `.sisyphus/evidence/task-8-queue-semantics.txt`
+
+### Task 10 Findings (2026-03-29)
+
+**Problem: No Structured Observability for Printer Sessions**
+- No event taxonomy for printer lifecycle (permissions, discovery, connect, job states)
+- No documented logcat/Console.app capture commands for certification evidence
+- Native module errors not classified with explicit error codes
+- Hardware certification runs lacked reproducible diagnostics
+
+**Solution: Structured Event Taxonomy + Native Log Capture**
+
+1. **PrinterSessionDiagnostics Module** (`services/printer/diagnostics/logger.ts`):
+   - 16 event types covering full lifecycle
+   - Structured JSON output with metadata: ts, platform, appVersion, buildId, domain
+   - Configurable logger: `consolePrinterLogger` (dev), `noOpPrinterLogger` (prod default)
+   - `initPrinterDiagnostics()` enables console logging in `__DEV__` builds
+   - All events emitted via `emit*` convenience helpers
+
+2. **Event Taxonomy**:
+   - Permission: PRINTER_PERMISSION_REQUESTED, PRINTER_PERMISSION_GRANTED, PRINTER_PERMISSION_DENIED
+   - Discovery: PRINTER_DISCOVERY_STARTED, PRINTER_DISCOVERY_RESULT, PRINTER_DISCOVERY_COMPLETED
+   - Connect: PRINTER_CONNECT_STARTED, PRINTER_CONNECT_SUCCESS, PRINTER_CONNECT_FAILED, PRINTER_DISCONNECTED
+   - Job: PRINT_JOB_QUEUED, PRINT_JOB_DISPATCHED, PRINT_JOB_COMPLETED, PRINT_JOB_FAILED, PRINT_JOB_SENT_UNKNOWN
+   - Native: PRINTER_NATIVE_ERROR (with PrinterErrorCode from Task 6)
+
+3. **Instrumented Services**:
+   - `capability/service.ts`: permission flow emits granted/denied events
+   - `registry/service.ts`: discovery emits start/results/complete; connect emits start/success/failed
+   - `queue/engine.ts`: dispatch emits dispatched/completed/failed/sent_unknown
+
+4. **Log Capture Commands** (documented in OBSERVABILITY.md):
+   - Android: `adb logcat --pid=$(adb shell pidof host.exp.exponent) -s PrinterSession:*`
+   - iOS: `log stream --predicate 'subsystem == "com.rork.momir-basic.PrinterSession"' --level debug`
+
+5. **Release-Critical Error Codes** (for blocking releases):
+   - NATIVE_UNAVAILABLE (P0), TCP_TIMEOUT (P1), CONNECTION_REJECTED (P1), SEND_FAILED (P1)
+
+**Key Design Decisions:**
+- Diagnostics wired as event observer only — NOT added to factory or adapter interfaces
+- Console output uses `[PrinterSession]` tag for easy logcat filtering
+- JSON structured format enables grep/parse for certification evidence
+- No Sentry integration yet — could be added via `setPrinterSessionLogger()` swap
+
+**Files Created:**
+- `services/printer/diagnostics/logger.ts` — event taxonomy, logger interface, emit helpers
+- `services/printer/diagnostics/index.ts` — barrel export
+
+**Files Modified:**
+- `services/printer/capability/service.ts` — permission event emission
+- `services/printer/registry/service.ts` — discovery/connect event emission
+- `services/printer/queue/engine.ts` — job lifecycle event emission
+- `docs/release/OBSERVABILITY.md` — added printer session diagnostics section
+
+**Evidence File Created:**
+- `.sisyphus/evidence/task-10-observability.txt`

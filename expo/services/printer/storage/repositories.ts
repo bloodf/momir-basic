@@ -1,5 +1,5 @@
 import { getDatabase } from './database';
-import type { PrinterRecord, PrinterCapabilities, PrintJob, PrintJobState, PrinterTransport } from '@/types';
+import type { PrinterRecord, PrinterCapabilities, PrintJob, PrintJobState, PrinterTransport, CanonicalPrinterIdentity } from '@/types';
 
 export interface CreatePrinterInput {
   id: string;
@@ -39,6 +39,16 @@ export async function getPrinterById(id: string): Promise<PrinterRecord | null> 
   return rowToPrinterRecord(row);
 }
 
+export async function getPrinterByCanonicalIdentity(identity: CanonicalPrinterIdentity): Promise<PrinterRecord | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync(
+    'SELECT * FROM printers WHERE address = ? AND transport = ? LIMIT 1',
+    [identity.address, identity.transport]
+  );
+  if (!row) return null;
+  return rowToPrinterRecord(row);
+}
+
 export async function listPrinters(): Promise<PrinterRecord[]> {
   const db = await getDatabase();
   const rows = await db.getAllAsync('SELECT * FROM printers ORDER BY last_seen_at DESC');
@@ -65,6 +75,7 @@ function rowToPrinterRecord(row: Record<string, unknown>): PrinterRecord {
 export interface CreateJobInput {
   id: string;
   printerId: string;
+  canonicalIdentity?: CanonicalPrinterIdentity;
   documentType: 'card_receipt' | 'diagnostics';
   payload: string;
 }
@@ -72,10 +83,13 @@ export interface CreateJobInput {
 export async function createJob(input: CreateJobInput): Promise<void> {
   const db = await getDatabase();
   const now = new Date().toISOString();
+  const canonicalJson = input.canonicalIdentity
+    ? JSON.stringify(input.canonicalIdentity)
+    : null;
   await db.runAsync(
-    `INSERT INTO print_jobs (id, printer_id, document_type, payload, state, attempts, last_error, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'queued', 0, NULL, ?, ?)`,
-    [input.id, input.printerId, input.documentType, input.payload, now, now]
+    `INSERT INTO print_jobs (id, printer_id, canonical_identity, document_type, payload, state, attempts, last_error, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'queued', 0, NULL, ?, ?)`,
+    [input.id, input.printerId, canonicalJson, input.documentType, input.payload, now, now]
   );
 }
 
@@ -113,28 +127,34 @@ export async function getJobsForPrinter(printerId: string): Promise<PrintJob[]> 
   return (rows ?? []).map(rowToPrintJob);
 }
 
+export async function getJobsRequiringReconciliation(): Promise<PrintJob[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync(
+    `SELECT * FROM print_jobs WHERE state = 'sent_unknown' ORDER BY created_at ASC`
+  );
+  return (rows ?? []).map(rowToPrintJob);
+}
+
 export async function getNextJobForPrinter(printerId: string): Promise<PrintJob | null> {
   const db = await getDatabase();
   const now = new Date().toISOString();
-  
-  // First try to get a job that's due for retry
+
   const retryJob = await db.getFirstAsync(
-    `SELECT * FROM print_jobs 
-     WHERE printer_id = ? AND state = 'retry_wait' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
+    `SELECT * FROM print_jobs
+     WHERE printer_id = ? AND state = 'failed_retryable' AND next_retry_at IS NOT NULL AND next_retry_at <= ?
      ORDER BY next_retry_at ASC LIMIT 1`,
     [printerId, now]
   );
   if (retryJob) return rowToPrintJob(retryJob);
-  
-  // Then try to get a queued job
+
   const queuedJob = await db.getFirstAsync(
-    `SELECT * FROM print_jobs 
+    `SELECT * FROM print_jobs
      WHERE printer_id = ? AND state = 'queued'
      ORDER BY created_at ASC LIMIT 1`,
     [printerId]
   );
   if (queuedJob) return rowToPrintJob(queuedJob);
-  
+
   return null;
 }
 
@@ -147,10 +167,10 @@ export async function updateJobState(
   const db = await getDatabase();
   const now = new Date().toISOString();
   const existingJob = await getJobById(id);
-  const attempts = state === 'retry_wait' 
-    ? (existingJob?.attempts ?? 0) + 1 
+  const attempts = state === 'failed_retryable'
+    ? (existingJob?.attempts ?? 0) + 1
     : (existingJob?.attempts ?? 0);
-  
+
   await db.runAsync(
     `UPDATE print_jobs SET state = ?, attempts = ?, last_error = ?, next_retry_at = ?, updated_at = ? WHERE id = ?`,
     [state, attempts, error, nextRetryAt ?? null, now, id]
@@ -173,9 +193,19 @@ export async function resetPrinters(): Promise<void> {
 }
 
 function rowToPrintJob(row: Record<string, unknown>): PrintJob {
+  const canonicalJson = row.canonical_identity as string | null;
+  let canonicalIdentity: CanonicalPrinterIdentity | undefined;
+  if (canonicalJson) {
+    try {
+      canonicalIdentity = JSON.parse(canonicalJson) as CanonicalPrinterIdentity;
+    } catch {
+      canonicalIdentity = undefined;
+    }
+  }
   return {
     id: row.id as string,
     printerId: row.printer_id as string,
+    canonicalIdentity,
     documentType: row.document_type as 'card_receipt' | 'diagnostics',
     payload: row.payload as string,
     state: row.state as PrintJobState,
