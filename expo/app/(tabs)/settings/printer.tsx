@@ -757,7 +757,7 @@ export default function PrinterSetupScreen() {
         <Text style={styles.permissionDeniedTitle}>Bluetooth Permission Denied</Text>
       </View>
       <Text style={styles.permissionDeniedText}>
-        Tap "Scan" to grant Bluetooth permissions. You may be prompted again.
+        Tap &quot;Scan&quot; to grant Bluetooth permissions. You may be prompted again.
       </Text>
     </View>
   );
@@ -792,7 +792,7 @@ export default function PrinterSetupScreen() {
         <Text style={styles.disconnectedTitle}>Printer Disconnected</Text>
       </View>
       <Text style={styles.disconnectedText}>
-        The previously connected printer is no longer reachable. Check that the printer is powered on and in range, then tap "Reconnect" to restore the connection.
+        The previously connected printer is no longer reachable. Check that the printer is powered on and in range, then tap &quot;Reconnect&quot; to restore the connection.
       </Text>
       <View style={styles.disconnectedActions}>
         <Pressable

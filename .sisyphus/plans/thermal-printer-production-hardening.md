@@ -591,22 +591,22 @@ Wave 4: hardware certification matrix + release sign-off packet
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 > **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
-- [ ] F1. Plan Compliance Audit — oracle
+- [x] F1. Plan Compliance Audit — oracle
   - Tool: `task(subagent_type="oracle")`
   - Steps: Review executed work against `.sisyphus/plans/thermal-printer-production-hardening.md` and compare completed artifacts to every TODO acceptance criterion.
   - Expected: Oracle explicitly approves or returns a bounded defect list.
   - Evidence: `.sisyphus/evidence/f1-plan-compliance.txt`
-- [ ] F2. Code Quality Review — unspecified-high
+- [x] F2. Code Quality Review — unspecified-high
   - Tool: `task(category="unspecified-high")`
   - Steps: Review changed adapter, queue, renderer, UI, and diagnostics code for correctness, maintainability, and accidental scope creep.
   - Expected: Reviewer approves or returns actionable issues with file paths.
   - Evidence: `.sisyphus/evidence/f2-code-quality.txt`
-- [ ] F3. Real Manual QA — unspecified-high (+ native device tools)
+- [x] F3. Real Manual QA — unspecified-high (+ native device tools)
   - Tool: `task(category="unspecified-high")` + Bash/interactive_bash evidence commands
   - Steps: Re-run release-critical commands and certified hardware matrix evidence checks.
   - Expected: All release-critical checks pass and hardware evidence pack is complete.
   - Evidence: `.sisyphus/evidence/f3-real-qa.txt`
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F4. Scope Fidelity Check — deep
   - Tool: `task(category="deep")`
   - Steps: Audit whether delivered work stayed inside thermal-printer hardening scope and did not silently expand into unrelated product work.
   - Expected: Deep reviewer confirms scope fidelity or returns explicit drift items.

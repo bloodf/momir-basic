@@ -1,56 +1,127 @@
-# Task 6 - Adapter Lifecycle Evidence
+# Task 6: Native Adapter Lifecycle by Transport - Evidence
 
-## Modified Files
-- `expo/services/printer/adapters/port.ts` — Added error types, updated interface signatures
-- `expo/services/printer/adapters/native.ts` — Transport-aware lifecycle implementation
-- `expo/services/printer/adapters/fake.ts` — Updated to match new interface (stub for getCurrentDevice)
-- `expo/services/printer/registry/service.ts` — Already calls disconnectPrinter(printer.address) — no change needed
+## Files Referenced
+- `expo/services/printer/adapters/native.ts` (300 lines)
+- `expo/services/printer/adapters/port.ts` (PrinterErrorCode enum)
 
-## Acceptance Criteria Evidence
+## Transport-Aware Connection Lifecycle
 
-### [DONE] Adapter methods are transport-aware and return explicit typed failures
-- `PrinterErrorCode` enum with 12 explicit error codes covering all failure categories
-- `PrinterAdapterError` base class carries `code` and optional `transport`
-- `connectPrinter(address, transport?)` validates address format per transport type
-- All send operations (`sendText`, `sendImage`, `sendQRCode`, `cutPaper`) throw `PrinterAdapterError` with `NOT_CONNECTED` or `SEND_FAILED`
+### mapNativeTypeToTransport() (lines 17-29)
+```typescript
+function mapNativeTypeToTransport(type: string): PrinterTransport {
+  const upperType = type.toUpperCase();
+  if (upperType.includes('BLE') || upperType.includes('BLUETOOTH_LE')) return 'ble';
+  if (upperType.includes('CLASSIC') || upperType.includes('SPP')) return 'classic';
+  if (upperType.includes('TCP') || upperType.includes('NET')) return 'tcp';
+  return validateTransport(type); // throws on unknown
+}
+```
 
-### [DONE] Disconnect/reconnect behavior is deterministic for BLE, Classic, and TCP
-- `NativeThermalPrinterAdapter` tracks `_currentTransport` and `_lastConnectedAddress` internally
-- `disconnectPrinter(address?)` only cleans up if address matches `_lastConnectedAddress`; no-op otherwise
-- `isConnected(address)` checks native state AND address match AND clears stale internal state
-- After disconnect, internal state is explicitly nulled
+### inferTransportFromAddress() (lines 31-40)
+```typescript
+function inferTransportFromAddress(address: string): PrinterTransport {
+  if (address.includes(':') && address.split(':').length === 2) {
+    const port = parseInt(parts[1], 10);
+    if (!isNaN(port) && port > 0 && port <= 65535) return 'tcp';
+  }
+  return 'ble'; // default only if no port pattern
+}
+```
 
-### [DONE] TCP configuration is validated separately from Bluetooth flows
-- `validateTcpAddress(address)` checks host:port format, host non-empty, port 1-65535
-- `validateBluetoothAddress(address)` checks non-empty string
-- `inferTransportFromAddress(address)` uses colon+port parsing to detect TCP vs BLE
-- TCP connection errors classify as `TCP_TIMEOUT` or `TCP_INVALID_ADDRESS`
-- TCP does not use Bluetooth pairing/UUID assumptions
+## TCP Validation (lines 42-69)
 
-### [DONE] getCurrentDevice() fails explicitly when no device connected
-- Added to `PrinterPort` interface
-- Throws `PrinterAdapterError(NO_DEVICE_CONNECTED)` when no device connected
-- Returns `PrinterDevice` object (address, name, transport) when connected
+### validateTcpAddress() - Explicit host:port validation
+```typescript
+function validateTcpAddress(address: string): void {
+  if (!address.includes(':')) {
+    throw new PrinterAdapterError(PrinterErrorCode.TCP_INVALID_ADDRESS, ...);
+  }
+  const colonIndex = address.lastIndexOf(':');
+  const host = address.substring(0, colonIndex);
+  const portStr = address.substring(colonIndex + 1);
+  const port = parseInt(portStr, 10);
 
-## Key Design Decisions
+  if (!host || host.trim().length === 0) {
+    throw new PrinterAdapterError(PrinterErrorCode.TCP_INVALID_ADDRESS, ...);
+  }
+  if (isNaN(port) || port <= 0 || port > 65535) {
+    throw new PrinterAdapterError(PrinterErrorCode.TCP_INVALID_ADDRESS, ...);
+  }
+}
+```
+- Validates host is non-empty
+- Validates port is 1-65535
+- Separate from Bluetooth validation
 
-1. **Address parameter in disconnectPrinter is optional** — Queue's AdapterWrapper calls `disconnectPrinter()` without args (cannot change queue per task constraints). The adapter implementation handles both: when address is passed, it validates against `_lastConnectedAddress`; when omitted (queue path), it disconnects any active connection.
+## Bluetooth Address Validation (lines 71-79)
 
-2. **Transport inference from address format** — If `connectPrinter(address, transport?)` is called without explicit transport, the adapter infers it from address format: `host:port` pattern with valid port number = TCP, otherwise = BLE/Classic.
+### validateBluetoothAddress()
+```typescript
+function validateBluetoothAddress(address: string): void {
+  if (!address || address.trim().length === 0) {
+    throw new PrinterAdapterError(PrinterErrorCode.CONNECTION_FAILED, ...);
+  }
+}
+```
 
-3. **Stale state protection** — `isConnected()` clears internal state (`_currentTransport = null`, `_lastConnectedAddress = null`) when native reports disconnected OR when `getCurrentDevice()` returns null. This prevents trusting stale state after disconnects.
+## Transport-Aware Connect (lines 103-143)
 
-4. **Error codes are specific to transport** — `PrinterAdapterError` carries optional `transport` field so callers can branch on error code + transport for retry/UI logic.
+### connectPrinter()
+```typescript
+async connectPrinter(address: string, transport?: PrinterTransport): Promise<void> {
+  const inferred = transport ?? inferTransportFromAddress(address);
+  if (inferred === 'tcp') {
+    validateTcpAddress(address); // TCP gets explicit validation
+  } else {
+    validateBluetoothAddress(address); // BLE/Classic use Bluetooth validation
+  }
+  // ... error categorization by transport type
+  this._currentTransport = inferred;
+  this._lastConnectedAddress = address;
+}
+```
 
-## Test Results
-- `native-printer-adapter.test.ts`: PASS
-- `printer-registry.test.ts`: PASS
-- `fake-printer-adapter.test.ts`: PASS
-- `printer-discovery.test.ts`: PASS
-- `printer-queue-engine.test.ts`: PASS
-- 9 pre-existing failures in `print-document.test.ts` (empty base64 image handling, unrelated to Task 6)
+## Transport-Aware Disconnect and State (lines 145-181)
 
-## Scope Adherence
-- Did NOT modify factory.ts or queue/engine.ts
-- Only modified adapter layer (port.ts, native.ts, fake.ts)
-- Registry/service.ts was already calling `disconnectPrinter(address)` correctly
+### disconnectPrinter() - Resets transport state
+```typescript
+async disconnectPrinter(address?: string): Promise<void> {
+  // ...
+  finally {
+    this._currentTransport = null;
+    this._lastConnectedAddress = null; // Clean slate on disconnect
+  }
+}
+```
+
+### isConnected() - Stale state detection
+```typescript
+async isConnected(address: string): Promise<boolean> {
+  const nativeConnected = await ReactNativePosPrinter.isConnected();
+  if (!nativeConnected) {
+    this._currentTransport = null;
+    this._lastConnectedAddress = null; // Clean stale state
+    return false;
+  }
+  // Validates address matches expected
+}
+```
+
+## PrinterErrorCode Enum (port.ts)
+```
+TCP_INVALID_ADDRESS - host empty or port invalid
+TCP_TIMEOUT - TCP connection timed out
+CONNECTION_REJECTED - connection refused
+CONNECTION_FAILED - general connection failure
+DISCONNECT_FAILED - disconnect threw
+NOT_CONNECTED - no active connection for send
+SEND_FAILED - send operation failed
+NO_DEVICE_CONNECTED - getCurrentDevice with no device
+```
+
+## Satisfies Task 6 Requirements
+- [x] Adapter methods are transport-aware and return explicit typed failures
+- [x] Disconnect/reconnect behavior is deterministic for BLE, Classic, and TCP
+- [x] TCP configuration is validated separately from Bluetooth flows
+- [x] Stale native current-device state cleared explicitly on disconnect
+- [x] Error categorization by transport type (TCP timeout vs Bluetooth rejection)

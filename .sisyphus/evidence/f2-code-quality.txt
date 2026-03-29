@@ -1,0 +1,198 @@
+APPROVE
+
+================================================================================
+F2 — CODE QUALITY REVIEW — THERMAL PRINTER HARDENING
+================================================================================
+
+Reviewer: Sisyphus-Junior (automated)
+Scope: thermal-printer hardening work (adapters, queue, storage, capability,
+       diagnostics, renderer, UI, types)
+
+================================================================================
+1. SUMMARY
+================================================================================
+
+TypeScript:    PASS — 0 errors (bunx tsc --noEmit)
+TODO/FIXME:   PASS — None found in changed files
+console.log:   PASS — None in production code (diagnostics logger uses
+               structured JSON with [PrinterSession] prefix — appropriate)
+as any/ts-ignore: PASS — None found in changed files
+Empty catch:   PASS — None found in changed files
+
+================================================================================
+2. FILE-BY-FILE ASSESSMENT
+================================================================================
+
+--- Adapters ---
+
+expo/services/printer/adapters/factory.ts
+  ✓ Explicit error states (UnsupportedPlatformError, MissingNativeModuleError,
+    UnavailableTransportError)
+  ✓ No fake fallback — throws on web/unavailable module
+  ✓ Dynamic require for native adapter avoids eager loading on web
+  ✓ No anti-patterns detected
+
+expo/services/printer/adapters/native.ts
+  ✓ Transport-aware lifecycle via _currentTransport and _lastConnectedAddress
+  ✓ Error codes via PrinterAdapterError (CONNECTION_FAILED, TCP_TIMEOUT, etc.)
+  ✓ TCP address validation (host:port format, port range 1-65535)
+  ✓ Bluetooth address validation (non-empty)
+  ✓ All public methods check _lastConnectedAddress before operations
+  ✓ getCurrentDevice throws NO_DEVICE_CONNECTED when idle
+  ✓ Graceful disconnect with _currentTransport preserved for error reporting
+  ✓ No anti-patterns detected
+
+expo/services/printer/adapters/port.ts
+  ✓ PrinterErrorCode enum with 11 explicit codes
+  ✓ PrinterAdapterError carries code + transport + message
+  ✓ PrinterDevice and PrinterDiscoveryResult interfaces complete
+  ✓ PrinterPort interface fully typed (8 methods)
+  ✓ No anti-patterns detected
+
+expo/services/printer/adapters/fake.ts
+  ✓ Matches PrinterPort interface
+  ✓ Failure mode injection for testing
+  ✓ Throws PrinterAdapterError on NOT_CONNECTED/NO_DEVICE_CONNECTED
+  ✓ No anti-patterns detected
+
+--- Queue + Storage ---
+
+expo/services/printer/queue/engine.ts
+  ✓ Deterministic state machine: queued → printing → printed_confirmed |
+    failed_retryable | failed_terminal | sent_unknown
+  ✓ sent_unknown state for mid-write disconnects (uncertain delivery)
+  ✓ emitJobSentUnknown event for diagnostics
+  ✓ Retry backoff: [15s, 60s, 300s], max 3 auto-retries
+  ✓ AdapterWrapper converts adapter.send() 'uncertain' return to failure
+  ✓ Disconnect swallow after confirmed send is intentional (non-fatal)
+  ✓ No anti-patterns detected
+
+expo/services/printer/storage/repositories.ts
+  ✓ Canonical identity support via getPrinterByCanonicalIdentity
+  ✓ rowToPrinterRecord and rowToPrintJob handle JSON parsing safely
+  ✓ getJobsRequiringReconciliation queries state='sent_unknown'
+  ✓ getNextJobForPrinter respects retry scheduling
+  ✓ No anti-patterns detected
+
+--- Capability + Diagnostics ---
+
+expo/services/printer/capability/service.ts
+  ✓ Platform × transport state machine (ble, classic, tcp)
+  ✓ Android runtime permission handling (BLUETOOTH_CONNECT,
+    BLUETOOTH_SCAN, ACCESS_FINE_LOCATION)
+  ✓ isAndroid / isIOS guards
+  ✓ emitPermissionGranted / emitPermissionDenied events
+  ✓ getPermissionDeniedMessage provides user-facing strings
+  ✓ No anti-patterns detected
+
+expo/services/printer/diagnostics/logger.ts
+  ✓ 16-event taxonomy (PrinterEventType enum)
+  ✓ PrinterPermissionEvent, PrinterDiscoveryEvent, PrinterConnectEvent,
+    PrintJobEvent, PrinterNativeErrorEvent
+  ✓ Structured JSON logging with [PrinterSession] prefix
+  ✓ __DEV__ guard enables console logging only in debug builds
+  ✓ No console.log in production code path
+  ✓ No anti-patterns detected
+
+--- Renderer ---
+
+expo/services/printer/render/escpos.ts
+  ✓ No placeholder data — all rendering is capability-gated
+  ✓ requireCapability() throws on unsupported features
+  ✓ printImage validates base64 non-empty before decode
+  ✓ TextEncoder for proper UTF-8 encoding
+  ✓ No anti-patterns detected
+
+expo/services/printer/render/document.ts
+  ✓ CardReceiptDocument: capability guards before printImage/printQR/cutPaper
+  ✓ DiagnosticsDocument: capability guards, no placeholder image data
+  ✓ Max column width based on paperWidth (58mm vs 80mm)
+  ✓ No anti-patterns detected
+
+--- UI ---
+
+expo/app/(tabs)/settings/printer.tsx
+  ✓ Exhaustive PrinterUiState (14 hardware-grounded states, no stale flags)
+  ✓ checkRealConnectionState uses adapter.isConnected() as single source
+    of truth
+  ✓ uncertain_delivery state triggered when sent_unknown jobs exist while
+    connected
+  ✓ Queue reconciliation UI (sent_unknown + failed_terminal jobs)
+  ✓ iOS transport validation (classic BT unsupported on iOS)
+  ✓ TCP printer modal with host + port validation (1-65535)
+  ✓ No stale connected flags — all driven by adapter verification
+  ✓ No anti-patterns detected
+
+expo/app/print-preview.tsx
+  ✓ verifyPrinterConnection uses adapter.isConnected()
+  ✓ handlePrint inspects actual job state after processing (not assumed)
+  ✓ sent_unknown → warning with haptic feedback
+  ✓ printed_confirmed → success
+  ✓ failed_* → error with message
+  ✓ Disconnected/no_printer states block print button
+  ✓ No anti-patterns detected
+
+--- Types ---
+
+expo/types/index.ts
+  ✓ PrinterTransportType enum (BLE, CLASSIC, TCP)
+  ✓ PrinterTransport = 'ble' | 'classic' | 'tcp' (narrow union)
+  ✓ validateTransport() throws on unknown transport
+  ✓ CanonicalPrinterIdentity interface (address + transport)
+  ✓ PrintJobState: 6 explicit states including 'sent_unknown'
+  ✓ PrintJob with immutable payload + mutable state
+  ✓ PrinterRecord, PrinterCapabilities, PrinterPreferences
+  ✓ migratePrinterPreferences for legacy config migration
+  ✓ No anti-patterns detected
+
+================================================================================
+3. SCOPE CREEP CHECK
+================================================================================
+
+All changed files are within the thermal-printer hardening scope:
+  - Adapters: factory, native, port, fake ✓
+  - Queue: engine ✓
+  - Storage: repositories ✓
+  - Capability: service ✓
+  - Diagnostics: logger ✓
+  - Renderer: escpos, document ✓
+  - UI: printer.tsx, print-preview.tsx ✓
+  - Types: index.ts ✓
+
+No changes to unrelated files detected.
+
+================================================================================
+4. INTERFACE MATCHING
+================================================================================
+
+PrinterPort (port.ts) implemented by:
+  - NativeThermalPrinterAdapter (native.ts) ✓
+  - FakePrinterAdapter (fake.ts) ✓
+
+Queue Engine uses CanonicalPrinterIdentity consistently across:
+  - engine.ts (AdapterWrapper.connect, recordTerminalState)
+  - repositories.ts (getPrinterByCanonicalIdentity, createJob)
+  - printer.tsx (identity construction in handleConnect)
+
+Type consistency verified:
+  - PrintJobState used in repositories + engine + UI
+  - PrinterTransport used in port + capability + factory + native
+  - PrinterCapabilities used in renderer + capability + repositories
+
+================================================================================
+5. CONCLUSION
+================================================================================
+
+APPROVE — All files pass code quality review:
+- TypeScript: 0 errors
+- No TODO/FIXME/HACK/xxx/console.log in production code
+- No as any / @ts-ignore
+- No empty catch blocks
+- Explicit error states throughout
+- Deterministic state machines
+- No scope creep
+- Interfaces properly implemented
+- No hardcoded secrets
+
+Evidence file: .sisyphus/evidence/f2-code-quality.txt
+Generated: 2026-03-29
