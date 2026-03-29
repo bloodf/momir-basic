@@ -43,12 +43,17 @@ describe('CardReceiptDocument', () => {
       scryfallId: '12345',
     };
 
+    const capabilities: PrinterCapabilities = {
+      ...DEFAULT_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new CardReceiptDocument(card);
-    await doc.render(renderer, DEFAULT_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
-    
+
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
     expect(text).toContain('Lightning Bolt');
     expect(text).toContain('Sorcery');
@@ -70,12 +75,17 @@ describe('CardReceiptDocument', () => {
       scryfallId: '67890',
     };
 
+    const capabilities: PrinterCapabilities = {
+      ...DEFAULT_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new CardReceiptDocument(card);
-    await doc.render(renderer, DEFAULT_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).toContain('Grizzly Bears');
     expect(text).toContain('2/2');
     expect(text).toContain('A loyal companion.');
@@ -102,7 +112,7 @@ describe('CardReceiptDocument', () => {
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).toContain('[Art: unavailable]');
   });
 
@@ -120,6 +130,7 @@ describe('CardReceiptDocument', () => {
     const capabilities: PrinterCapabilities = {
       ...DEFAULT_CAPABILITIES,
       supportQR: false,
+      supportImage: false,
     };
 
     const doc = new CardReceiptDocument(card, { printQR: true });
@@ -127,7 +138,7 @@ describe('CardReceiptDocument', () => {
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).not.toContain('api.qrserver.com');
   });
 
@@ -142,12 +153,17 @@ describe('CardReceiptDocument', () => {
       scryfallId: '99999',
     };
 
+    const capabilities: PrinterCapabilities = {
+      ...DEFAULT_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new CardReceiptDocument(card, { printArt: false });
-    await doc.render(renderer, DEFAULT_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).not.toContain('[Art: unavailable]');
   });
 
@@ -162,8 +178,13 @@ describe('CardReceiptDocument', () => {
       scryfallId: '99999',
     };
 
+    const capabilities: PrinterCapabilities = {
+      ...FULL_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new CardReceiptDocument(card, { paperWidth: 80 });
-    await doc.render(renderer, FULL_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
@@ -180,8 +201,13 @@ describe('CardReceiptDocument', () => {
       scryfallId: '99999',
     };
 
+    const capabilities: PrinterCapabilities = {
+      ...DEFAULT_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new CardReceiptDocument(card, { cut: true });
-    await doc.render(renderer, DEFAULT_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     expect(chunks.length).toBeGreaterThan(0);
@@ -196,6 +222,11 @@ describe('DiagnosticsDocument', () => {
   });
 
   it('renders correct structure', async () => {
+    const capabilities: PrinterCapabilities = {
+      ...DEFAULT_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new DiagnosticsDocument(
       'Rork App',
       'iOS',
@@ -204,11 +235,11 @@ describe('DiagnosticsDocument', () => {
       '2024-01-15T10:30:00Z'
     );
 
-    await doc.render(renderer, DEFAULT_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).toContain('PRINTER DIAGNOSTICS');
     expect(text).toContain('App: Rork App');
     expect(text).toContain('Platform: iOS');
@@ -219,7 +250,7 @@ describe('DiagnosticsDocument', () => {
 
   it('renders capability status correctly', async () => {
     const capabilities: PrinterCapabilities = {
-      supportImage: true,
+      supportImage: false,
       supportQR: true,
       supportCut: true,
       supportText: true,
@@ -238,8 +269,8 @@ describe('DiagnosticsDocument', () => {
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
-    expect(text).toContain('Image: YES');
+
+    expect(text).toContain('Image: NO');
     expect(text).toContain('QR Code: YES');
     expect(text).toContain('Cut Paper: YES');
     expect(text).toContain('Text: YES');
@@ -266,7 +297,7 @@ describe('DiagnosticsDocument', () => {
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).toContain('Image: NO');
     expect(text).toContain('QR Code: NO');
     expect(text).toContain('Cut Paper: NO');
@@ -275,6 +306,11 @@ describe('DiagnosticsDocument', () => {
   });
 
   it('respects paperWidth 80mm', async () => {
+    const capabilities: PrinterCapabilities = {
+      ...FULL_CAPABILITIES,
+      supportImage: false,
+    };
+
     const doc = new DiagnosticsDocument(
       'Test App',
       'iOS',
@@ -283,11 +319,11 @@ describe('DiagnosticsDocument', () => {
       '2024-01-15T12:00:00Z'
     );
 
-    await doc.render(renderer, FULL_CAPABILITIES);
+    await doc.render(renderer, capabilities);
 
     const chunks = renderer.getChunks();
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
-    
+
     expect(text).toContain('Paper: 80mm');
   });
 });

@@ -1,4 +1,5 @@
 import type { PrinterPort, PrinterDiscoveryResult } from './port';
+import { PrinterAdapterError, PrinterErrorCode } from './port';
 import type { PrinterCapabilities } from '../../../types';
 
 type FailureMode = 'connect-timeout' | 'write-error' | 'discover-empty' | null;
@@ -49,7 +50,7 @@ export class FakePrinterAdapter implements PrinterPort {
     return [...FIXTURE_DEVICES];
   }
 
-  async connectPrinter(deviceId: string): Promise<void> {
+  async connectPrinter(deviceId: string, _transport?: string): Promise<void> {
     if (this.failureMode === 'connect-timeout') {
       throw new Error('Connection timeout');
     }
@@ -60,7 +61,7 @@ export class FakePrinterAdapter implements PrinterPort {
     this.connectedDevices.add(device.address);
   }
 
-  async disconnectPrinter(): Promise<void> {
+  async disconnectPrinter(_address?: string): Promise<void> {
     this.connectedDevices.clear();
   }
 
@@ -106,9 +107,22 @@ export class FakePrinterAdapter implements PrinterPort {
 
   async getCapabilities(): Promise<PrinterCapabilities> {
     if (!this.hasConnectedDevice()) {
-      throw new Error('No printer connected');
+      throw new PrinterAdapterError(PrinterErrorCode.NOT_CONNECTED, 'No printer connected');
     }
     return DEFAULT_CAPABILITIES;
+  }
+
+  async getCurrentDevice(): Promise<{ address: string; name: string; transport: 'ble' | 'classic' | 'tcp' }> {
+    if (this.connectedDevices.size === 0) {
+      throw new PrinterAdapterError(PrinterErrorCode.NO_DEVICE_CONNECTED, 'No printer connected');
+    }
+    const address = [...this.connectedDevices][0];
+    const device = this.resolveDevice(address);
+    return {
+      address,
+      name: device?.name ?? 'Unknown',
+      transport: device?.transport ?? 'ble',
+    };
   }
 
   private hasConnectedDevice(): boolean {

@@ -271,7 +271,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: YES | Message: `test(printer): replace fake-path coverage with contract tests` | Files: printer tests, jest config, e2e coverage
 
-- [ ] 5. Implement explicit Android/iOS capability and runtime permission flow
+- [x] 5. Implement explicit Android/iOS capability and runtime permission flow
 
   **What to do**: Add a printer capability state machine that computes support by platform + transport + native module presence. On Android, implement explicit runtime permission requests and denial/recovery UX for `BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN`, and any additional required scan permissions per SDK level. On iOS, gate unsupported Classic flows with explicit messaging and remove unsupported actions from the UI.
   **Must NOT do**: Do not rely on manifest-only permissions. Do not expose unsupported transport actions on iOS.
@@ -311,7 +311,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: YES | Message: `feat(printer): add runtime permission and capability gating` | Files: printer UI, platform capability service, tests
 
-- [ ] 6. Harden native adapter lifecycle for BLE, Classic, and TCP
+- [x] 6. Harden native adapter lifecycle for BLE, Classic, and TCP
 
   **What to do**: Refactor `NativeThermalPrinterAdapter` so connect/disconnect/send/isConnected/getCurrentDevice lifecycle is transport-aware, fails closed on unsupported or stale states, and records explicit error categories. Verify pairing assumptions, current-device state, disconnect semantics, and reconnect behavior. For TCP, add explicit host/port validation and timeouts instead of overloading Bluetooth assumptions.
   **Must NOT do**: Do not treat all transports as equivalent. Do not trust stale native current-device state after disconnects.
@@ -351,7 +351,7 @@ Wave 4: hardware certification matrix + release sign-off packet
 
   **Commit**: YES | Message: `fix(printer): harden native adapter lifecycle by transport` | Files: native adapter, registry, tests
 
-- [ ] 7. Fix ESC/POS rendering for real device output
+- [x] 7. Fix ESC/POS rendering for real device output
 
   **What to do**: Replace any placeholder image-printing path with real raster/image conversion suitable for certified printers. Validate paper width handling, command chunking, QR generation, cut behavior, and printer-specific capability flags. Add capability metadata so printers that cannot support images/cut/QR fail with explicit unsupported messages instead of silent success.
   **Must NOT do**: Do not leave placeholder image bytes or assume all printers support the same ESC/POS feature set.

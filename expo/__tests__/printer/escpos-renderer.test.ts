@@ -105,16 +105,15 @@ describe('EscPosRenderer', () => {
   });
 
   describe('image', () => {
-    it('renders image placeholder', () => {
-      renderer.printImage('', 100, 100);
-      
-      const chunks = renderer.getChunks();
-      expect(chunks.length).toBeGreaterThan(0);
+    it('throws error on empty base64', () => {
+      expect(() => {
+        renderer.printImage('', 100, 100);
+      }).toThrow('Image printing requires valid raster bitmap data; received empty base64');
     });
 
     it('renders with base64 data', () => {
       renderer.printImage('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 1, 1);
-      
+
       const chunks = renderer.getChunks();
       expect(chunks.length).toBeGreaterThan(0);
     });

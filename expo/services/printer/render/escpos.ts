@@ -28,9 +28,6 @@ export const PAPER_WIDTH_80MM = 80;
 export const MAX_COLUMN_58MM = 32;
 export const MAX_COLUMN_80MM = 48;
 
-// Base64 placeholder for dithered image (1x1 transparent pixel)
-const IMAGE_PLACEHOLDER_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
 /**
  * Printer capabilities for rendering decisions
  */
@@ -56,6 +53,45 @@ export interface PrintDocument {
  */
 export class EscPosRenderer {
   private chunks: Uint8Array[] = [];
+  private capabilities: PrinterCapabilities | null = null;
+
+  /**
+   * Set printer capabilities for validation.
+   * When capabilities are set, operations like printImage, printQRCode, and cutPaper
+   * will throw if the printer does not support them.
+   */
+  setCapabilities(caps: PrinterCapabilities | null): void {
+    this.capabilities = caps;
+  }
+
+  /**
+   * Get the current capabilities
+   */
+  getCapabilities(): PrinterCapabilities | null {
+    return this.capabilities;
+  }
+
+  private requireCapability(feature: 'image' | 'qr' | 'cut'): void {
+    if (!this.capabilities) return;
+
+    switch (feature) {
+      case 'image':
+        if (!this.capabilities.supportImage) {
+          throw new Error('Printer does not support image printing (capability: supportImage=false)');
+        }
+        break;
+      case 'qr':
+        if (!this.capabilities.supportQR) {
+          throw new Error('Printer does not support QR code printing (capability: supportQR=false)');
+        }
+        break;
+      case 'cut':
+        if (!this.capabilities.supportCut) {
+          throw new Error('Printer does not support paper cut (capability: supportCut=false)');
+        }
+        break;
+    }
+  }
 
   /**
    * Get the rendered byte chunks
@@ -152,12 +188,14 @@ export class EscPosRenderer {
   }
 
   /**
-   * Print QR code if supported
+   * Print QR code using ESC/POS QR commands.
+   * Requires QR capability to be supported by the printer.
    */
   printQRCode(data: string, size: number = 8): void {
-    // QR size must be 1-16
+    this.requireCapability('qr');
+
     const qrSize = Math.min(Math.max(size, 1), 16);
-    
+
     const bytes: number[] = [];
     
     // Model 2
@@ -182,41 +220,70 @@ export class EscPosRenderer {
   }
 
   /**
-   * Print a dithered bitmap placeholder image
-   * Uses a base64 encoded 1x1 transparent pixel as placeholder
+   * Print a raster bit image from base64-encoded bitmap data.
+   * Requires the base64 to be a valid bitmap (1-bit dithered format expected).
+   * Throws if no valid image data is provided.
    */
   printImage(base64: string, width: number, height: number): void {
-    // Use placeholder if no real image data
+    this.requireCapability('image');
+
     if (!base64 || base64.length === 0) {
-      base64 = IMAGE_PLACEHOLDER_BASE64;
+      throw new Error('Image printing requires valid raster bitmap data; received empty base64');
     }
-    
+
+    let imageData: Uint8Array;
+    try {
+      const binaryString = atob(base64);
+      imageData = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        imageData[i] = binaryString.charCodeAt(i);
+      }
+    } catch {
+      throw new Error('Image printing requires valid base64-encoded raster bitmap; decode failed');
+    }
+
     // Image print command: ESC * m n1 n2
     // m = 0: 8-dot single-density
     // n1 n2 = width in bytes (LSB, MSB)
     const bytesPerLine = Math.ceil(width / 8);
     const n1 = bytesPerLine % 256;
     const n2 = Math.floor(bytesPerLine / 256);
-    
-    // Initialize image
-    this.addBytes(IMAGE_INIT);
-    
-    // Print raster image
+
+    // Initialize image with default line spacing
+    this.addBytes([ESC, 0x33, 0x18]);
+
+    // Print raster image mode 0 (8-dot single-density)
     this.addBytes([ESC, 0x2a, 0x00, n1, n2]);
-    
-    // Add placeholder image data (all zeros for transparent)
-    const rowData = new Uint8Array(bytesPerLine);
-    for (let y = 0; y < height && y < 8; y++) {
-      this.chunks.push(new Uint8Array(rowData));
+
+    // Output image data rows, respecting printer's line spacing
+    // Chunk per row to stay within transport MTU limits
+    const rowsPerChunk = 4;
+    for (let y = 0; y < height; y++) {
+      const rowStart = y * bytesPerLine;
+      const rowEnd = Math.min(rowStart + bytesPerLine, imageData.length);
+      if (rowStart < imageData.length) {
+        const rowData = imageData.slice(rowStart, rowEnd);
+        this.chunks.push(new Uint8Array(rowData));
+      } else {
+        // Pad short rows with zeros
+        this.chunks.push(new Uint8Array(bytesPerLine));
+      }
+
+      // Feed after each row group to prevent buffer overflow on limited printers
+      if ((y + 1) % rowsPerChunk === 0) {
+        this.addBytes([LF]);
+      }
     }
-    
+
     this.feedLine();
   }
 
   /**
-   * Cut the paper
+   * Cut the paper using ESC/POS cut command.
+   * Requires cut capability to be supported by the printer.
    */
   cutPaper(partial: boolean = false): void {
+    this.requireCapability('cut');
     this.addBytes(partial ? CUT_PAPER_PARTIAL : CUT_PAPER);
   }
 

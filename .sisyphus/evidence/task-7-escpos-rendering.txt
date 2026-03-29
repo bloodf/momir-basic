@@ -1,0 +1,67 @@
+# Task 7 - ESC/POS Rendering Evidence
+# Date: 2026-03-29
+# Status: COMPLETE
+
+## Changes Made
+
+### 1. Removed Placeholder Image Path
+- **File**: `expo/services/printer/render/escpos.ts`
+- **Removed**: `IMAGE_PLACEHOLDER_BASE64` constant (1x1 transparent pixel base64)
+- **Removed**: Fallback logic that used placeholder when base64 was empty
+- **Changed**: `printImage()` now throws explicit error when base64 is empty/invalid
+- **Changed**: `printImage()` now properly decodes base64 to raw bitmap bytes
+
+### 2. Added Capability Validation
+- **File**: `expo/services/printer/render/escpos.ts`
+- **Added**: `setCapabilities(caps)` method on `EscPosRenderer`
+- **Added**: `getCapabilities()` method on `EscPosRenderer`
+- **Added**: `requireCapability(feature)` private method
+- **Changed**: `printImage()` calls `requireCapability('image')` - throws if unsupported
+- **Changed**: `printQRCode()` calls `requireCapability('qr')` - throws if unsupported
+- **Changed**: `cutPaper()` calls `requireCapability('cut')` - throws if unsupported
+
+### 3. Added Paper-Width-Aware Command Chunking
+- **File**: `expo/services/printer/render/escpos.ts`
+- **Changed**: Image raster data output in 4-row chunks with LF feeds
+- **Purpose**: Prevent buffer overflow on limited printers (MTU safety)
+
+### 4. Fixed DiagnosticsDocument Cut Handling
+- **File**: `expo/services/printer/render/document.ts`
+- **Changed**: `DiagnosticsDocument.render()` now guards `cutPaper()` with `capabilities.supportCut`
+- **Previously**: Unconditional `cutPaper()` call - would throw when cut unsupported
+
+### 5. Updated Documents to Pass Capabilities
+- **File**: `expo/services/printer/render/document.ts`
+- **Changed**: Both `CardReceiptDocument.render()` and `DiagnosticsDocument.render()`
+  now call `renderer.setCapabilities(capabilities)` before rendering
+
+### 6. Updated Tests
+- **File**: `expo/__tests__/printer/escpos-renderer.test.ts`
+- **Changed**: "renders image placeholder" → "throws error on empty base64"
+- **File**: `expo/__tests__/printer/print-document.test.ts`
+- **Changed**: Tests now set `supportImage: false` when they don't have valid raster bitmap data
+
+## Test Results
+```
+Test Suites: 12 passed, 12 total
+Tests:       178 passed, 178 total
+```
+
+## Error Messages (Explicit Failures)
+- `'Image printing requires valid raster bitmap data; received empty base64'`
+- `'Image printing requires valid base64-encoded raster bitmap; decode failed'`
+- `'Printer does not support image printing (capability: supportImage=false)'`
+- `'Printer does not support QR code printing (capability: supportQR=false)'`
+- `'Printer does not support paper cut (capability: supportCut=false)'`
+
+## Capability Validation Flow
+1. Document calls `renderer.setCapabilities(capabilities)`
+2. Document calls renderer methods (printImage, printQRCode, cutPaper)
+3. Renderer checks `requireCapability(feature)` before each operation
+4. If capability is false, renderer throws explicit error with capability flag
+
+## Architectural Notes
+- `printImage()` expects actual base64-encoded raster bitmap (1-bit dithered format)
+- URL-to-raster conversion should happen at a higher layer (outside renderer scope per task)
+- Documents must check capabilities before calling renderer OR pass valid data
+- DiagnosticsDocument previously had unguarded cutPaper() - fixed

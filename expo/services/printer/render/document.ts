@@ -45,9 +45,10 @@ export class CardReceiptDocument implements PrintDocument {
 
   async render(renderer: EscPosRenderer, capabilities: PrinterCapabilities): Promise<void> {
     renderer.reset();
-    
-    const maxWidth = this.options.paperWidth === 80 
-      ? MAX_COLUMN_80MM 
+    renderer.setCapabilities(capabilities);
+
+    const maxWidth = this.options.paperWidth === 80
+      ? MAX_COLUMN_80MM
       : MAX_COLUMN_58MM;
 
     renderer.setAlignment('center');
@@ -162,9 +163,10 @@ export class DiagnosticsDocument implements PrintDocument {
 
   async render(renderer: EscPosRenderer, capabilities: PrinterCapabilities): Promise<void> {
     renderer.reset();
-    
-    const maxWidth = this.paperWidth === 80 
-      ? MAX_COLUMN_80MM 
+    renderer.setCapabilities(capabilities);
+
+    const maxWidth = this.paperWidth === 80
+      ? MAX_COLUMN_80MM
       : MAX_COLUMN_58MM;
 
     renderer.setAlignment('center');
@@ -232,7 +234,9 @@ export class DiagnosticsDocument implements PrintDocument {
     renderer.addText('END DIAGNOSTICS');
     renderer.feedLine();
 
-    renderer.cutPaper(true);
+    if (capabilities.supportCut) {
+      renderer.cutPaper(true);
+    }
   }
 
   getAppName(): string {

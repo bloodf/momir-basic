@@ -1,0 +1,56 @@
+# Task 6 - Adapter Lifecycle Evidence
+
+## Modified Files
+- `expo/services/printer/adapters/port.ts` — Added error types, updated interface signatures
+- `expo/services/printer/adapters/native.ts` — Transport-aware lifecycle implementation
+- `expo/services/printer/adapters/fake.ts` — Updated to match new interface (stub for getCurrentDevice)
+- `expo/services/printer/registry/service.ts` — Already calls disconnectPrinter(printer.address) — no change needed
+
+## Acceptance Criteria Evidence
+
+### [DONE] Adapter methods are transport-aware and return explicit typed failures
+- `PrinterErrorCode` enum with 12 explicit error codes covering all failure categories
+- `PrinterAdapterError` base class carries `code` and optional `transport`
+- `connectPrinter(address, transport?)` validates address format per transport type
+- All send operations (`sendText`, `sendImage`, `sendQRCode`, `cutPaper`) throw `PrinterAdapterError` with `NOT_CONNECTED` or `SEND_FAILED`
+
+### [DONE] Disconnect/reconnect behavior is deterministic for BLE, Classic, and TCP
+- `NativeThermalPrinterAdapter` tracks `_currentTransport` and `_lastConnectedAddress` internally
+- `disconnectPrinter(address?)` only cleans up if address matches `_lastConnectedAddress`; no-op otherwise
+- `isConnected(address)` checks native state AND address match AND clears stale internal state
+- After disconnect, internal state is explicitly nulled
+
+### [DONE] TCP configuration is validated separately from Bluetooth flows
+- `validateTcpAddress(address)` checks host:port format, host non-empty, port 1-65535
+- `validateBluetoothAddress(address)` checks non-empty string
+- `inferTransportFromAddress(address)` uses colon+port parsing to detect TCP vs BLE
+- TCP connection errors classify as `TCP_TIMEOUT` or `TCP_INVALID_ADDRESS`
+- TCP does not use Bluetooth pairing/UUID assumptions
+
+### [DONE] getCurrentDevice() fails explicitly when no device connected
+- Added to `PrinterPort` interface
+- Throws `PrinterAdapterError(NO_DEVICE_CONNECTED)` when no device connected
+- Returns `PrinterDevice` object (address, name, transport) when connected
+
+## Key Design Decisions
+
+1. **Address parameter in disconnectPrinter is optional** — Queue's AdapterWrapper calls `disconnectPrinter()` without args (cannot change queue per task constraints). The adapter implementation handles both: when address is passed, it validates against `_lastConnectedAddress`; when omitted (queue path), it disconnects any active connection.
+
+2. **Transport inference from address format** — If `connectPrinter(address, transport?)` is called without explicit transport, the adapter infers it from address format: `host:port` pattern with valid port number = TCP, otherwise = BLE/Classic.
+
+3. **Stale state protection** — `isConnected()` clears internal state (`_currentTransport = null`, `_lastConnectedAddress = null`) when native reports disconnected OR when `getCurrentDevice()` returns null. This prevents trusting stale state after disconnects.
+
+4. **Error codes are specific to transport** — `PrinterAdapterError` carries optional `transport` field so callers can branch on error code + transport for retry/UI logic.
+
+## Test Results
+- `native-printer-adapter.test.ts`: PASS
+- `printer-registry.test.ts`: PASS
+- `fake-printer-adapter.test.ts`: PASS
+- `printer-discovery.test.ts`: PASS
+- `printer-queue-engine.test.ts`: PASS
+- 9 pre-existing failures in `print-document.test.ts` (empty base64 image handling, unrelated to Task 6)
+
+## Scope Adherence
+- Did NOT modify factory.ts or queue/engine.ts
+- Only modified adapter layer (port.ts, native.ts, fake.ts)
+- Registry/service.ts was already calling `disconnectPrinter(address)` correctly

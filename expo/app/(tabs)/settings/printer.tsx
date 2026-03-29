@@ -24,6 +24,8 @@ import {
   Wifi,
   ExternalLink,
   Info,
+  ShieldOff,
+  Settings,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
@@ -33,6 +35,10 @@ import { registryService } from '@/services/printer/registry/service';
 import { createAdapter } from '@/services/printer/adapters/factory';
 import { createJob, getJobById } from '@/services/printer/storage/repositories';
 import { getQueueSummary, processQueueForPrinter, retryJob } from '@/services/printer/queue/engine';
+import {
+  printerCapabilityService,
+  type AndroidBluetoothPermissionStatus,
+} from '@/services/printer/capability';
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -51,6 +57,7 @@ export default function PrinterSetupScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [queueSummary, setQueueSummary] = useState<{ pending: number; completed: number; failed: number; failedJobs: import('@/types').PrintJob[] } | null>(null);
+  const [permissionState, setPermissionState] = useState<AndroidBluetoothPermissionStatus | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -104,8 +111,13 @@ export default function PrinterSetupScreen() {
   const handleScan = useCallback(async () => {
     setScanning(true);
     setErrorMessage(null);
+    setPermissionState(null);
 
     try {
+      if (!isIOS) {
+        await printerCapabilityService.ensureBluetoothPermissions();
+      }
+
       const discovered = await registryService.discoverPrinters();
       const merged = await registryService.mergeDiscoveredWithRegistry(
         discovered.map((printer) => ({
@@ -120,12 +132,18 @@ export default function PrinterSetupScreen() {
           : null
       );
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Unable to scan for printers.'));
+      if (error instanceof Error && error.message.includes('[PrinterCapability]')) {
+        const state = await printerCapabilityService.getAndroidPermissionState();
+        setPermissionState(state.overall);
+        setErrorMessage(error.message.replace('[PrinterCapability] ', ''));
+      } else {
+        setErrorMessage(getErrorMessage(error, 'Unable to scan for printers.'));
+      }
       setStatusMessage(null);
     } finally {
       setScanning(false);
     }
-  }, []);
+  }, [isIOS]);
 
   useEffect(() => {
     void handleScan();
@@ -134,20 +152,30 @@ export default function PrinterSetupScreen() {
   const handleConnect = useCallback(async (printer: PrinterRecord) => {
     setConnecting(printer.id);
     setErrorMessage(null);
+    setPermissionState(null);
 
     try {
+      if (!isIOS) {
+        await printerCapabilityService.ensureBluetoothPermissions();
+      }
       await registryService.connectPrinter(printer.id);
       await savePreferredPrinter(printer.id);
       updateSettings({ printerConnected: true });
       setStatusMessage(`Connected to ${printer.name}.`);
       Alert.alert(t.printer.connected, t.printer.connectedTo(printer.name));
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, `Unable to connect to ${printer.name}.`));
+      if (error instanceof Error && error.message.includes('[PrinterCapability]')) {
+        const state = await printerCapabilityService.getAndroidPermissionState();
+        setPermissionState(state.overall);
+        setErrorMessage(error.message.replace('[PrinterCapability] ', ''));
+      } else {
+        setErrorMessage(getErrorMessage(error, `Unable to connect to ${printer.name}.`));
+      }
       setStatusMessage(null);
     } finally {
       setConnecting(null);
     }
-  }, [savePreferredPrinter, t, updateSettings]);
+  }, [isIOS, savePreferredPrinter, t, updateSettings]);
 
   const handleDisconnect = useCallback(async () => {
     if (!settings.printer.preferredPrinterId) {
@@ -367,6 +395,41 @@ export default function PrinterSetupScreen() {
         {errorMessage && (
           <View style={styles.errorCard}>
             <Text style={styles.errorCardText}>{errorMessage}</Text>
+          </View>
+        )}
+
+        {permissionState === 'never_ask_again' && (
+          <View style={styles.permissionDeniedCard}>
+            <View style={styles.permissionDeniedHeader}>
+              <ShieldOff size={20} color={Colors.error} />
+              <Text style={styles.permissionDeniedTitle}>Bluetooth Permission Required</Text>
+            </View>
+            <Text style={styles.permissionDeniedText}>
+              Bluetooth scanning is disabled. Open Android Settings to enable Bluetooth permissions for this app, then return and tap Scan again.
+            </Text>
+            <Pressable
+              onPress={openBluetoothSettings}
+              style={({ pressed }) => [
+                styles.permissionDeniedButton,
+                pressed && styles.permissionDeniedButtonPressed,
+              ]}
+              testID="open-bt-settings-from-permission"
+            >
+              <Settings size={16} color="#fff" />
+              <Text style={styles.permissionDeniedButtonText}>Open Android Settings</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {permissionState === 'denied' && (
+          <View style={styles.permissionDeniedCard}>
+            <View style={styles.permissionDeniedHeader}>
+              <ShieldOff size={20} color={Colors.error} />
+              <Text style={styles.permissionDeniedTitle}>Bluetooth Permission Denied</Text>
+            </View>
+            <Text style={styles.permissionDeniedText}>
+              Tap &quot;Scan&quot; to grant Bluetooth permissions. You may be prompted again.
+            </Text>
           </View>
         )}
 
@@ -711,6 +774,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(76,175,80,0.2)',
     marginBottom: 12,
+  },
+  permissionDeniedCard: {
+    backgroundColor: 'rgba(239,83,80,0.08)',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239,83,80,0.3)',
+    marginBottom: 12,
+  },
+  permissionDeniedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  permissionDeniedTitle: {
+    color: Colors.error,
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
+  permissionDeniedText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  permissionDeniedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.error,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  permissionDeniedButtonPressed: {
+    opacity: 0.85,
+  },
+  permissionDeniedButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700' as const,
   },
   successCardText: {
     color: Colors.success,

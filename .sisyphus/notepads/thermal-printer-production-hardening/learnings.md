@@ -136,3 +136,164 @@ If universal compatibility or non-MFi iOS Classic is required:
 - 177/178 tests pass
 - 1 pre-existing implementation bug exposed (not in Task 4 scope)
 - No fake device assertions remain in printer-domain tests
+
+### Task 6 Findings (2026-03-29)
+
+**Problem: Native Adapter Lifecycle Not Transport-Aware**
+- `connectPrinter(deviceId)` had no transport awareness — all transports treated identically
+- `disconnectPrinter()` had no address parameter — couldn't clean up per-transport state
+- `isConnected()` trusted native state blindly — stale state possible after disconnects
+- `getCurrentDevice()` not in interface — native method returned null silently
+- No error categorization — all failures were generic Error objects
+- TCP used same connection logic as Bluetooth — no host/port validation or timeouts
+
+**Solution: Transport-Aware Adapter Lifecycle**
+
+1. **Error Taxonomy** (`port.ts`):
+   - `PrinterErrorCode` enum: 12 explicit error codes
+   - `PrinterAdapterError` class carries `code` + optional `transport`
+   - Codes: CONNECTION_FAILED, DISCONNECT_FAILED, NOT_CONNECTED, CONNECTION_REJECTED, TRANSPORT_MISMATCH, UNSUPPORTED_TRANSPORT, TCP_INVALID_ADDRESS, TCP_TIMEOUT, NATIVE_UNAVAILABLE, NATIVE_ERROR, SEND_FAILED, NO_DEVICE_CONNECTED
+
+2. **Transport Inference** (`native.ts`):
+   - `inferTransportFromAddress()` detects TCP via `host:port` pattern with valid port
+   - BLE/Classic assumed otherwise
+   - `connectPrinter(address, transport?)` accepts optional transport for explicit validation
+
+3. **TCP Validation** (`native.ts`):
+   - `validateTcpAddress()` checks: colon present, host non-empty, port 1-65535
+   - `validateBluetoothAddress()` checks: non-empty string
+   - TCP timeout classified as `TCP_TIMEOUT`, not generic `CONNECTION_FAILED`
+   - Refused connections classified as `CONNECTION_REJECTED`
+
+4. **Stale State Protection** (`native.ts`):
+   - `_currentTransport` and `_lastConnectedAddress` tracked internally
+   - `isConnected()` clears internal state when native reports disconnected
+   - After disconnect, internal state explicitly nulled to prevent stale reads
+
+5. **Disconnect Semantics** (`native.ts`):
+   - `disconnectPrinter(address?)` — optional address for queue backward compat
+   - When address passed: only disconnects if matches `_lastConnectedAddress`
+   - When address omitted (queue path): disconnects any active connection
+   - Internal state always cleared after native disconnect call
+
+6. **getCurrentDevice()** (`port.ts` + `native.ts`):
+   - Added to `PrinterPort` interface
+   - Throws `PrinterAdapterError(NO_DEVICE_CONNECTED)` when no device
+   - Returns `PrinterDevice {address, name, transport}` when connected
+
+**Backward Compatibility Note:**
+- `disconnectPrinter()` address parameter is optional — queue's `AdapterWrapper` calls without args
+- This was a constraint: "Do NOT change the factory or queue — only adapter layer"
+- Adapter handles both: address-based cleanup when available, unconditional disconnect when omitted
+
+**Evidence File Created:**
+- `.sisyphus/evidence/task-6-adapter-lifecycle.txt`
+
+### Task 7 Findings (2026-03-29)
+
+**Problem: Placeholder Image Data + Silent Capability Failures**
+- `IMAGE_PLACEHOLDER_BASE64` constant (1x1 transparent pixel) used when no image provided
+- `printImage()` silently output zeros instead of failing
+- QR/cut had no capability validation — silent success on unsupported printers
+- `DiagnosticsDocument.render()` had unguarded `cutPaper()` call
+
+**Solution: Real Raster + Explicit Capability Errors**
+
+1. **Removed Placeholder Path** (`escpos.ts`):
+   - Deleted `IMAGE_PLACEHOLDER_BASE64` constant
+   - `printImage()` now throws `'Image printing requires valid raster bitmap data; received empty base64'`
+   - Base64 is properly decoded via `atob()` and output as raster bitmap rows
+   - Image data output in 4-row chunks with LF feeds (MTU safety for limited printers)
+
+2. **Capability Validation** (`escpos.ts`):
+   - Added `setCapabilities(capabilities)` to `EscPosRenderer`
+   - Added `requireCapability(feature)` private method
+   - `printImage()`, `printQRCode()`, `cutPaper()` all call `requireCapability()` first
+   - Error messages include capability flag: `'Printer does not support image printing (capability: supportImage=false)'`
+
+3. **Fixed DiagnosticsDocument** (`document.ts`):
+   - Added `renderer.setCapabilities(capabilities)` at start of render
+   - Added guard: `if (capabilities.supportCut)` before `cutPaper()` call
+   - Previously threw when `supportCut=false` because `cutPaper()` was unconditional
+
+4. **Updated Tests** (`escpos-renderer.test.ts`, `print-document.test.ts`):
+   - "renders image placeholder" → "throws error on empty base64"
+   - Tests set `supportImage: false` when they don't have valid raster bitmap data
+   - 178/178 printer tests pass
+
+**Key Architectural Insight:**
+- `printImage()` expects actual base64-encoded raster bitmap (1-bit dithered format)
+- URL-to-raster conversion belongs at a higher layer (outside renderer scope per task constraint)
+- Documents must either provide valid raster data OR check capabilities before calling renderer
+- Capability validation happens in renderer, not document — explicit error if violated
+
+**Error Message Patterns:**
+- `'Image printing requires valid raster bitmap data; received empty base64'`
+- `'Image printing requires valid base64-encoded raster bitmap; decode failed'`
+- `'Printer does not support image printing (capability: supportImage=false)'`
+- `'Printer does not support QR code printing (capability: supportQR=false)'`
+- `'Printer does not support paper cut (capability: supportCut=false)'`
+
+**Evidence File Created:**
+- `.sisyphus/evidence/task-7-escpos-rendering.txt`
+
+### Task 5 Findings (2026-03-29)
+
+**Problem: No Runtime Permission Flow for Android Bluetooth**
+- Android 12+ requires BLUETOOTH_CONNECT + BLUETOOTH_SCAN runtime grants
+- Manifest-only permissions insufficient for API 31+
+- No explicit denial UX — scan/connect failed silently or with generic errors
+
+**Solution: PrinterCapabilityService + Permission-Aware UI**
+
+1. **PrinterCapabilityService** (`services/printer/capability/service.ts`):
+   - `getTransportCapability(transport)` — platform × transport × native module state machine
+   - `ensureBluetoothPermissions()` — checks and requests Android runtime permissions
+   - `getAndroidPermissionState()` — returns individual + overall permission status
+   - `requestAndroidBluetoothPermissions()` — requests BLUETOOTH_CONNECT, BLUETOOTH_SCAN, ACCESS_FINE_LOCATION
+   - `getPermissionDeniedMessage(state)` — user-facing remediation text
+   - `isNativeModuleAvailable()` — gates all operations on native module presence
+
+2. **Permission State Types**:
+   - `AndroidBluetoothPermissionStatus`: 'granted' | 'denied' | 'never_ask_again' | 'undetermined'
+   - `AndroidBluetoothPermissionState`: BLUETOOTH_CONNECT/SCAN/FINE_LOCATION + overall composite
+   - `TransportCapability`: isSupported, nativeModuleAvailable, reason, requiresRuntimePermission
+
+3. **Android Permission Flow** (`printer.tsx handleScan + handleConnect`):
+   - Calls `ensureBluetoothPermissions()` before registry discovery
+   - Catches `[PrinterCapability] Permission denied` errors
+   - Extracts permission state for UX rendering
+   - Throws on `never_ask_again` — user must open Android Settings
+
+4. **Permission Denied UX** (`printer.tsx`):
+   - `never_ask_again`: Red ShieldOff card with "Open Android Settings" button
+   - `denied`: Red ShieldOff card with "Tap Scan to grant" message
+   - Both render as distinct from regular error card
+   - Blocks scan/connect until permissions resolved
+
+5. **iOS Classic Gating**:
+   - Already enforced at registry level via `filterTransport()` (filters 'classic' on iOS)
+   - Info card in UI states "Classic Bluetooth devices are hidden from scan results"
+   - Capability service `getTransportCapability('classic').isSupported = false` on iOS
+
+6. **Android Permissions Required**:
+   - `android.permission.BLUETOOTH_CONNECT` — required for connect operations
+   - `android.permission.BLUETOOTH_SCAN` — required for scan operations
+   - `android.permission.ACCESS_FINE_LOCATION` — historical BLE scanning requirement
+   - `PermissionsAndroid.check()` returns `Promise<boolean>` — must await
+
+**TypeScript Issues Encountered**:
+- `PermissionsAndroid.PERMISSIONS.ANDROID` doesn't exist — permissions are flat
+- `PermissionsAndroid.RESULTS` doesn't exist as namespace — use string comparison
+- `PermissionsAndroid.check()` returns `Promise<boolean>` not `boolean` — must await
+- Solution: Use string literals, `any[]` for requestMultiple, `any` for result mapping
+
+**Files Created:**
+- `services/printer/capability/service.ts` — PrinterCapabilityService class
+- `services/printer/capability/index.ts` — barrel export
+
+**Files Modified:**
+- `app/(tabs)/settings/printer.tsx` — permission state, handleScan/handleConnect permission calls, denied UX
+
+**Evidence File Created:**
+- `.sisyphus/evidence/task-5-permissions.txt`
