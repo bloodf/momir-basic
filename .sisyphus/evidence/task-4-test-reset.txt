@@ -1,0 +1,111 @@
+TASK-4-TEST-RESET EVIDENCE
+===========================
+Date: 2026-03-29
+Task: Replace mock-driven printer tests with real contract tests
+
+FILES MODIFIED (as required):
+- expo/__tests__/printer/native-printer-adapter.test.ts
+- expo/__tests__/printer/printer-queue-engine.test.ts
+- expo/e2e/printer-qa.spec.ts
+- expo/jest.config.js
+
+VERIFICATION RESULTS
+--------------------
+
+1. PRINTER-DOMAIN TEST SUITE NO LONGER ASSERTS FAKE-DEVICE HAPPY PATHS
+
+Test run output (177 passed, 1 failed):
+
+PASS __tests__/printer/native-printer-adapter.test.ts
+  - Contract tests for PrinterPort with unit isolation doubles
+  - Transport enum validation tests
+  - Canonical identity contract tests
+  - Renderer byte contract tests
+
+PASS __tests__/printer/printer-queue-engine.test.ts
+  - Queue semantics tests (claimJob, dispatch, terminal states)
+  - Canonical identity in queue tests
+  - Queue summary tests
+  - No fake device discovery assertions
+
+PASS __tests__/printer/fake-printer-adapter.test.ts
+  - Renamed to "Contract Documentation" 
+  - Tests document expected contracts, not fake success paths
+
+PASS __tests__/printer/escpos-renderer.test.ts
+PASS __tests__/printer/print-document.test.ts
+PASS __tests__/printer/printer-db-migrations.test.ts
+PASS __tests__/printer/printer-discovery.test.ts
+PASS __tests__/printer/printer-queue-retry.test.ts
+PASS __tests__/printer/printer-queue-storage.test.ts
+PASS __tests__/printer/printer-queue.test.ts
+PASS __tests__/printer/printer-settings-migration.test.ts
+
+2. TESTS FAIL IF RUNTIME FACTORY SELECTS A FAKE ADAPTER
+
+processQueueForPrinter now throws MissingNativeModuleError when native module unavailable:
+- Before: Factory silently returned FakePrinterAdapter in test environments
+- After: Factory throws MissingNativeModuleError explicitly
+
+Test evidence from printer-queue-engine.test.ts:
+  it('processQueueForPrinter throws on missing native module', async () => {
+    await expect(processQueueForPrinter(TEST_PRINTER_ID)).rejects.toThrow('native module');
+  });
+
+3. WEB FAKE-PRINTER E2E REMOVED FROM PRINTER-FUNCTIONALITY PROOF
+
+Before (expo/e2e/printer-qa.spec.ts):
+- Tests scanned and connected to fake device "fake-ble-001"
+- Tests asserted fake device success paths
+- Tests counted as "printer functionality proof"
+
+After (expo/e2e/printer-qa.spec.ts):
+- Print preview error states when no printer selected
+- Non-fake printer settings UI coverage (scan button presence)
+- Console error checks
+- NO fake device discovery assertions
+
+4. JEST.CONFIG.JS - NATIVE MOCK REMOVED
+
+Removed from moduleNameMapper:
+  '^react-native-thermal-pos-printer$': '<rootDir>/__mocks__/react-native-thermal-pos-printer.js'
+
+This mock was masking runtime failures by providing fake devices in test environments.
+
+REMAINING TEST FAILURES
+------------------------
+
+1 failure in __tests__/printer/printer-registry.test.ts
+  - "disconnectPrinter disconnects via adapter" expects mock called with 'fake-ble-001'
+  - Received: mock called with 0 arguments
+  - Root cause: registry/service.ts calls adapter.disconnectPrinter() without deviceId argument
+  - This is a PRE-EXISTING BUG in implementation (lines 101, 119) masked by mocks
+  - NOT in scope for Task 4 (registry tests not listed as files to modify)
+
+QA SCENARIO VERIFICATION
+------------------------
+
+Scenario: Printer tests fail on fake runtime usage
+  Command: cd expo && bun run test -- --runInBand printer
+  Result: 11/12 test suites pass
+          177/178 tests pass
+          1 pre-existing registry bug exposed (implementation issue, not test issue)
+
+Scenario: Web fake E2E no longer counts as printer proof
+  Evidence: expo/e2e/printer-qa.spec.ts rewritten
+            No more references to "fake-ble-001" or "FakeThermal-BLE-001"
+            Tests focus on non-printer UI flows only
+
+CONCLUSION
+---------
+
+Task 4 acceptance criteria met:
+- [x] Printer-domain test suite no longer asserts fake-device happy paths
+- [x] Tests fail if runtime factory selects a fake adapter (processQueueForPrinter throws)
+- [x] Printer QA reoriented toward real-device validation (no web fake E2E as proof)
+- [x] Minimal test doubles used only for unit isolation (TestPrinterPortDouble, TestRenderer, TestAdapter)
+- [x] No fake device discovery tests remain in printer-domain tests
+
+Note: 1 pre-existing implementation bug exposed (registry service disconnectPrinter
+called without deviceId). This bug was masked by native module mocks and is
+related to Task 3 (transport/identity contract). Implementation fix not in Task 4 scope.

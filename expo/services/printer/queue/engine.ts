@@ -1,4 +1,4 @@
-import type { PrintJob, PrinterCapabilities } from '@/types';
+import type { PrintJob, PrinterCapabilities, CanonicalPrinterIdentity } from '@/types';
 import { getNextJobForPrinter, updateJobState, getJobById, getJobsForPrinter, getPrinterById } from '../storage/repositories';
 import { EscPosRenderer } from '../render/escpos';
 import { CardReceiptDocument, DiagnosticsDocument } from '../render/document';
@@ -15,7 +15,7 @@ export interface PrintRenderer {
 }
 
 export interface PrinterPort {
-  connect(printerId: string): Promise<void>;
+  connect(identity: CanonicalPrinterIdentity): Promise<void>;
   disconnect(): Promise<void>;
   send(bytes: Uint8Array[]): Promise<'success' | 'uncertain'>;
 }
@@ -23,12 +23,12 @@ export interface PrinterPort {
 class AdapterWrapper implements PrinterPort {
   constructor(private adapter: AppPrinterPort) {}
 
-  async connect(printerId: string): Promise<void> {
-    await this.adapter.connectPrinter(printerId);
+  async connect(identity: CanonicalPrinterIdentity): Promise<void> {
+    await this.adapter.connectPrinter(identity.address);
   }
 
   async disconnect(): Promise<void> {
-    await this.adapter.disconnectPrinter('');
+    await this.adapter.disconnectPrinter();
   }
 
   async send(bytes: Uint8Array[]): Promise<'success' | 'uncertain'> {
@@ -113,7 +113,8 @@ export class QueueEngine {
     job: PrintJob,
     renderer: PrintRenderer,
     adapter: PrinterPort,
-    capabilities: PrinterCapabilities
+    capabilities: PrinterCapabilities,
+    identity: CanonicalPrinterIdentity
   ): Promise<{ success: boolean; error?: string; failureType?: PrintFailureType }> {
     let bytes: Uint8Array[];
     try {
@@ -127,7 +128,7 @@ export class QueueEngine {
     }
 
     try {
-      await adapter.connect(job.printerId);
+      await adapter.connect(identity);
     } catch (connectError) {
       const error = connectError instanceof Error ? connectError.message : 'Connection failed';
       return { success: false, error, failureType: 'pre_write' };
@@ -217,10 +218,11 @@ export async function processQueueForPrinter(printerId: string): Promise<void> {
   const appAdapter = createAdapter();
   const adapter = new AdapterWrapper(appAdapter);
   const capabilities = printer.capabilities;
+  const identity: CanonicalPrinterIdentity = { address: printer.address, transport: printer.transport };
 
   let job = await queueEngine.claimJob(printerId);
   while (job) {
-    const result = await queueEngine.dispatch(job, queueRenderer, adapter, capabilities);
+    const result = await queueEngine.dispatch(job, queueRenderer, adapter, capabilities, identity);
     await queueEngine.recordTerminalState(job, result);
 
     const nextJob = await queueEngine.claimJob(printerId);

@@ -60,14 +60,12 @@ export class FakePrinterAdapter implements PrinterPort {
     this.connectedDevices.add(device.address);
   }
 
-  async disconnectPrinter(deviceId: string): Promise<void> {
-    const device = this.resolveDevice(deviceId);
-    this.connectedDevices.delete(device?.address ?? deviceId);
+  async disconnectPrinter(): Promise<void> {
+    this.connectedDevices.clear();
   }
 
-  async isConnected(deviceId: string): Promise<boolean> {
-    const device = this.resolveDevice(deviceId);
-    return this.connectedDevices.has(device?.address ?? deviceId);
+  async isConnected(address: string): Promise<boolean> {
+    return this.connectedDevices.has(address);
   }
 
   async sendText(_text: string): Promise<void> {

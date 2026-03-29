@@ -1,6 +1,7 @@
 import ReactNativePosPrinter from 'react-native-thermal-pos-printer';
 import type { PrinterPort, PrinterDiscoveryResult } from './port';
-import type { PrinterCapabilities, PrinterTransport } from '../../../types';
+import type { PrinterCapabilities } from '../../../types';
+import { validateTransport, type PrinterTransport } from '../../../types';
 
 const DEFAULT_CAPABILITIES: PrinterCapabilities = {
   supportImage: true,
@@ -21,7 +22,7 @@ function mapNativeTypeToTransport(type: string): PrinterTransport {
   if (upperType.includes('TCP') || upperType.includes('NET')) {
     return 'tcp';
   }
-  return 'ble';
+  return validateTransport(type);
 }
 
 interface NativeDevice {
@@ -47,15 +48,15 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     await ReactNativePosPrinter.connectPrinter(deviceId);
   }
 
-  async disconnectPrinter(_deviceId: string): Promise<void> {
+  async disconnectPrinter(): Promise<void> {
     await ReactNativePosPrinter.disconnectPrinter();
   }
 
-  async isConnected(deviceId: string): Promise<boolean> {
+  async isConnected(address: string): Promise<boolean> {
     const connected = await ReactNativePosPrinter.isConnected();
     if (!connected) return false;
     const currentDevice = ReactNativePosPrinter.getCurrentDevice() as NativeDevice | null;
-    return currentDevice?.address === deviceId;
+    return currentDevice?.address === address;
   }
 
   async sendText(text: string): Promise<void> {

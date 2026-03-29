@@ -1,14 +1,54 @@
 import { Platform, NativeModules } from 'react-native';
 import type { PrinterPort } from './port';
-import { FakePrinterAdapter } from './fake';
 
+/**
+ * Error thrown when printer functionality is unavailable on the current platform.
+ */
+export class UnsupportedPlatformError extends Error {
+  readonly platform: string;
+  constructor(platform: string) {
+    super(`Thermal printing is not supported on ${platform}.`);
+    this.name = 'UnsupportedPlatformError';
+    this.platform = platform;
+  }
+}
+
+/**
+ * Error thrown when the native thermal printer module is not available.
+ */
+export class MissingNativeModuleError extends Error {
+  constructor() {
+    super('ThermalPrinter native module is not available. Ensure the native module is properly linked.');
+    this.name = 'MissingNativeModuleError';
+  }
+}
+
+/**
+ * Error thrown when no suitable printer transport is available.
+ */
+export class UnavailableTransportError extends Error {
+  constructor(reason: string) {
+    super(`Printer transport unavailable: ${reason}`);
+    this.name = 'UnavailableTransportError';
+  }
+}
+
+/**
+ * Creates the appropriate printer adapter for the current platform and environment.
+ *
+ * @throws {UnsupportedPlatformError} If running on web platform
+ * @throws {MissingNativeModuleError} If the native thermal printer module is not available
+ */
 export function createAdapter(): PrinterPort {
   const isWeb = Platform.OS === 'web';
-  const isTest = process.env.NODE_ENV === 'test';
   const hasNativeModule = NativeModules.ThermalPrinter != null;
 
-  if (isWeb || isTest || !hasNativeModule) {
-    return new FakePrinterAdapter();
+  if (isWeb) {
+    throw new UnsupportedPlatformError('web');
+  }
+
+  if (!hasNativeModule) {
+    throw new MissingNativeModuleError();
   }
 
   // Dynamically import native adapter to avoid eager loading of native module on web

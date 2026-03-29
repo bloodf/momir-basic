@@ -30,21 +30,21 @@ export interface PrinterPort {
   discoverPrinters(): Promise<PrinterDiscoveryResult[]>;
 
   /**
-   * Connect to a printer by its device ID (address).
+   * Connect to a printer by its canonical address.
    * Resolves when connection is established.
    */
-  connectPrinter(deviceId: string): Promise<void>;
+  connectPrinter(address: string): Promise<void>;
 
   /**
-   * Disconnect from a printer by its device ID (address).
+   * Disconnect from the currently connected printer.
    * Resolves when disconnection is complete.
    */
-  disconnectPrinter(deviceId: string): Promise<void>;
+  disconnectPrinter(): Promise<void>;
 
   /**
-   * Check if a printer is currently connected.
+   * Check if a printer is currently connected by address.
    */
-  isConnected(deviceId: string): Promise<boolean>;
+  isConnected(address: string): Promise<boolean>;
 
   /**
    * Send raw text to the connected printer.

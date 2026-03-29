@@ -45,18 +45,41 @@ In this codebase that maps to:
 
 ## Supported printers and transports
 
-### iOS
+> **Support Contract**: This app supports a **certified support matrix** only. Printers and transport combinations outside the certified matrix are **best-effort / non-goal** for v1 hardening. Universal compatibility claims are **blocked** until hardware proof is provided.
 
-- BLE only
-- `registryService` filters out classic Bluetooth on iOS in `filterTransport()`
-- Requires a custom dev build because Expo Go can't load `react-native-thermal-pos-printer`
+### Support Matrix Summary
+
+| Platform | BLE | Classic Bluetooth | TCP |
+|----------|-----|-------------------|-----|
+| Android  | ✅  | ✅ (certified)     | ✅  |
+| iOS      | ✅  | ❌ / MFi only      | ✅  |
+
+**iOS Classic Bluetooth**: Filtered by default. **MFi / External Accessory hardware is required** before iOS Classic can be enabled. Classic-only printers without MFi chip are **not supported**.
 
 ### Android
 
-- BLE
-- Classic Bluetooth
-- TCP is represented in the type layer with `PrinterTransport = 'ble' | 'classic' | 'tcp'`
-- The native adapter currently maps native device types to `ble`, `classic`, or `tcp`
+- **Transports**: BLE, Classic Bluetooth, TCP
+- All transports require the printer to be on the **certified support matrix** (see `HARDWARE_VALIDATION.md`)
+- Off-matrix printers: best-effort only; no guaranteed compatibility
+
+### iOS
+
+- **Transports**: BLE, TCP
+- **Classic Bluetooth**: BLOCKED — requires MFi certification hardware. Non-MFi Classic printers are **not supported** and will not appear in scan results.
+- `registryService` filters out Classic Bluetooth on iOS in `filterTransport()`
+- Requires a custom dev build because Expo Go can't load `react-native-thermal-pos-printer`
+
+### Adding New Printers to the Matrix
+
+New printer models require **certification evidence** before being added to the supported matrix:
+1. Physical validation on certified device hardware
+2. Firmware version documented
+3. Paper width verified (58mm / 80mm)
+4. Platform OS version recorded
+5. Build type (development / production) noted
+6. Sign-off from product leadership
+
+Until certified, printers are **off-matrix** and treated as best-effort.
 
 ## Storage model
 

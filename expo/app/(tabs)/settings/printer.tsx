@@ -56,11 +56,6 @@ export default function PrinterSetupScreen() {
   const fadeIn = useRef(new Animated.Value(0)).current;
 
   const isIOS = Platform.OS === 'ios';
-  const isWeb = Platform.OS === 'web';
-  const usesFakeAdapter = useMemo(() => {
-    const adapter = createAdapter() as { setFailureMode?: () => void };
-    return typeof adapter.setFailureMode === 'function';
-  }, []);
   const preferredPrinter = useMemo(
     () => printers.find((printer) => printer.id === settings.printer.preferredPrinterId) ?? null,
     [printers, settings.printer.preferredPrinterId]
@@ -568,16 +563,7 @@ export default function PrinterSetupScreen() {
             )}
           </Pressable>
 
-          {usesFakeAdapter && (
-            <View style={styles.webNotice}>
-              <Wifi size={13} color={Colors.textSecondary} />
-              <Text style={styles.webNoticeText}>
-                {isWeb
-                  ? t.printer.webSimulated
-                  : 'Using the deterministic fake printer adapter in this environment.'}
-              </Text>
-            </View>
-          )}
+
         </View>
 
         {hasPrinters && (

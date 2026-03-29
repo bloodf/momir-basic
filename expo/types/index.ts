@@ -46,8 +46,35 @@ export interface CardTypeConfig {
   count: number;
 }
 
-// Transport type
+// Transport type enum with explicit values
+export enum PrinterTransportType {
+  BLE = 'ble',
+  CLASSIC = 'classic',
+  TCP = 'tcp',
+}
+
+/** Legacy type alias for backward compatibility — prefer PrinterTransportType */
 export type PrinterTransport = 'ble' | 'classic' | 'tcp';
+
+/**
+ * Validates that a string is a known PrinterTransport.
+ * Returns the valid transport or throws if unknown.
+ */
+export function validateTransport(transport: string): PrinterTransport {
+  if (transport === 'ble' || transport === 'classic' || transport === 'tcp') {
+    return transport;
+  }
+  throw new Error(`Unsupported transport: "${transport}". Expected one of: ble, classic, tcp`);
+}
+
+/**
+ * Canonical printer identity used across registry, queue, and adapter layers.
+ * Every connect/dispatch path must use this composite key.
+ */
+export interface CanonicalPrinterIdentity {
+  address: string;
+  transport: PrinterTransport;
+}
 
 // Printer record (stored in SQLite registry, keyed by stable ID)
 export interface PrinterRecord {
