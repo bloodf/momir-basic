@@ -1,0 +1,44 @@
+# Task 11: Release Rehearsal & Launch Packet - Evidence
+
+## Files Created
+| File | Status |
+|------|--------|
+| expo/docs/release/LAUNCH_PACKET.md | ✅ EXISTS |
+| expo/docs/release/RELEASE_RUNBOOK.md | ✅ EXISTS |
+
+## Lint Check
+```
+cd expo && bun run lint
+Result: PASS (0 errors, 25 warnings - pre-existing)
+```
+
+## LAUNCH_PACKET.md Contents
+- Status: NOT YET PUBLISH-READY
+- Hard blockers: EAS linking, credentials, EXPO_TOKEN, legal values, hardware validation
+- Complete artifact table (14 items, all documented)
+- Pre-submission checklist (account setup, legal, technical, store submission)
+- DECISION NEEDED values table
+
+## RELEASE_RUNBOOK.md Contents
+- Pre-release checklist (week before + day-of)
+- Step-by-step release procedure (6 steps)
+- Rollback procedure (OTA + store rejection)
+- Emergency contacts table
+- Known limitations at launch
+
+## Verification Results
+| Check | Result |
+|-------|--------|
+| TypeScript | PASS |
+| Lint | PASS |
+| CI Workflow | Valid YAML |
+| Release Build Workflow | Valid YAML |
+| All 14 release docs | Created |
+
+## DECISION NEEDED Blockers Summary
+1. EAS project linking
+2. iOS credentials
+3. Android credentials
+4. EXPO_TOKEN in GitHub Secrets
+5. Legal entity, support email, URLs
+6. Hardware validation (iPhone + Android + printer)
