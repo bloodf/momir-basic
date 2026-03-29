@@ -29,7 +29,20 @@
       "bundleIdentifier": "app.rork.khur2ml36fu56vvhu6tre",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders."
+        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
+        "NSPhotoLibraryAddUsageDescription": "This app saves card images to your photo library so you can share them."
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
       }
     },
     "android": {
