@@ -9,13 +9,17 @@ const HEADERS = {
 const RATE_LIMIT_MS = 100;
 let lastRequestTime = 0;
 
-async function rateLimitedFetch(url: string): Promise<Response> {
+async function rateLimit(): Promise<void> {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
   if (timeSinceLastRequest < RATE_LIMIT_MS) {
     await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_MS - timeSinceLastRequest));
   }
   lastRequestTime = Date.now();
+}
+
+async function rateLimitedFetch(url: string): Promise<Response> {
+  await rateLimit();
   return fetch(url, { headers: HEADERS });
 }
 
@@ -110,9 +114,13 @@ const LOCALE_TO_SCRYFALL_LANG: Record<string, string> = {
   zht: 'zht',
 };
 
-async function fetchLocalizedCard(cardId: string, lang: string): Promise<ScryfallCard | null> {
+async function fetchLocalizedCard(
+  setCode: string,
+  collectorNumber: string,
+  lang: string,
+): Promise<ScryfallCard | null> {
   const scryfallLang = LOCALE_TO_SCRYFALL_LANG[lang] ?? lang;
-  const url = `${BASE_URL}/cards/${cardId}/${scryfallLang}`;
+  const url = `${BASE_URL}/cards/${setCode.toLowerCase()}/${collectorNumber}/${scryfallLang}`;
   console.log('[Scryfall] Fetching localized card:', url);
 
   try {
@@ -166,7 +174,7 @@ export async function fetchRandomCard(
       console.log('[Scryfall] Got card:', data.name);
 
       if (lang && lang !== 'en') {
-        const localized = await fetchLocalizedCard(data.id, lang);
+        const localized = await fetchLocalizedCard(data.set, data.collector_number, lang);
         if (localized) {
           console.log('[Scryfall] Localized card found:', localized.printed_name ?? data.name);
           return mapScryfallCard(localized);
@@ -205,15 +213,63 @@ export interface SearchResult {
   nextPageUrl: string | null;
 }
 
+async function fetchLocalizedCardsViaCollection(
+  cards: Card[],
+  lang: string,
+): Promise<Card[]> {
+  const scryfallLang = LOCALE_TO_SCRYFALL_LANG[lang] ?? lang;
+  if (scryfallLang === 'en') return cards;
+
+  const identifiers = cards.map(c => ({
+    set: c.setCode.toLowerCase(),
+    collector_number: c.collectorNumber,
+    lang: scryfallLang,
+  }));
+
+  const MAX_BATCH = 75;
+  const localizedMap = new Map<string, ScryfallCard>();
+
+  for (let i = 0; i < identifiers.length; i += MAX_BATCH) {
+    const batch = identifiers.slice(i, i + MAX_BATCH);
+    try {
+      await rateLimit();
+      const collectionResponse = await fetch(`${BASE_URL}/cards/collection`, {
+        method: 'POST',
+        headers: { ...HEADERS, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers: batch }),
+      });
+
+      if (collectionResponse.ok) {
+        const result = await collectionResponse.json() as { data: ScryfallCard[] };
+        for (const sc of result.data) {
+          const key = `${sc.set.toLowerCase()}-${sc.collector_number}`;
+          localizedMap.set(key, sc);
+        }
+      } else {
+        console.log('[Scryfall] Collection fetch failed:', collectionResponse.status);
+      }
+    } catch (e) {
+      console.log('[Scryfall] Collection localize error:', e);
+    }
+  }
+
+  return cards.map(card => {
+    const key = `${card.setCode.toLowerCase()}-${card.collectorNumber}`;
+    const localized = localizedMap.get(key);
+    if (localized && (localized.printed_name || localized.lang === scryfallLang)) {
+      return mapScryfallCard(localized);
+    }
+    return card;
+  });
+}
+
 export async function searchCards(
   query: string,
   page: number = 1,
   lang?: string,
 ): Promise<SearchResult> {
-  const langFilter = lang && lang !== 'en' ? ` lang:${LOCALE_TO_SCRYFALL_LANG[lang] ?? lang}` : '';
-  const fullQuery = langFilter ? `${query}${langFilter}` : query;
-  const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(fullQuery)}&page=${page}&unique=cards`;
-  console.log('[Scryfall] Search:', url);
+  const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&page=${page}&unique=cards`;
+  console.log('[Scryfall] Search:', url, lang ? `(lang: ${lang})` : '');
 
   const response = await rateLimitedFetch(url);
 
@@ -223,7 +279,7 @@ export async function searchCards(
 
   if (response.status === 429) {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    return searchCards(query, page);
+    return searchCards(query, page, lang);
   }
 
   if (!response.ok) {
@@ -237,8 +293,14 @@ export async function searchCards(
     next_page?: string;
   };
 
+  let cards = data.data.map(mapScryfallCard);
+
+  if (lang && lang !== 'en') {
+    cards = await fetchLocalizedCardsViaCollection(cards, lang);
+  }
+
   return {
-    cards: data.data.map(mapScryfallCard),
+    cards,
     totalCards: data.total_cards,
     hasMore: data.has_more,
     nextPageUrl: data.next_page ?? null,

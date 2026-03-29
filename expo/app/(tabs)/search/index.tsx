@@ -6,19 +6,21 @@ import {
   TextInput,
   Pressable,
   FlatList,
-  ActivityIndicator,
   Keyboard,
   Platform,
+  Animated,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Search, X, TrendingUp } from 'lucide-react-native';
+import { Search, X, LayoutList, LayoutGrid } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { searchCards, autocompleteCardName, parseAdvancedSyntax } from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
+import { CardGridItem } from '@/components/CardGridItem';
+import { SearchSkeleton, CardGridSkeleton } from '@/components/Skeleton';
 import { useI18n } from '@/i18n';
 import {
   SearchFilters,
@@ -28,16 +30,8 @@ import {
   buildFilterQuery,
 } from '@/components/SearchFilters';
 
-const POPULAR_SEARCHES = [
-  'Lightning Bolt',
-  'Black Lotus',
-  'Jace, the Mind Sculptor',
-  'Sol Ring',
-  'Counterspell',
-  'Tarmogoyf',
-  'Birds of Paradise',
-  'Path to Exile',
-];
+type ViewMode = 'list' | 'grid';
+const CARDS_PER_PAGE = 175;
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +39,9 @@ export default function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
   const { locale, t } = useI18n();
 
+  const searchParams = useLocalSearchParams<{ initialQuery?: string }>();
   const [query, setQuery] = useState('');
+  const lastInitialQuery = useRef('');
   const [results, setResults] = useState<Card[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -54,7 +50,29 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const lastSearchQuery = useRef('');
+  const pendingInitialQuery = useRef<string | null>(null);
+
+  if (searchParams.initialQuery && searchParams.initialQuery !== lastInitialQuery.current) {
+    lastInitialQuery.current = searchParams.initialQuery;
+    pendingInitialQuery.current = searchParams.initialQuery;
+  }
+
+  const totalPages = useMemo(() => Math.ceil(totalCount / CARDS_PER_PAGE), [totalCount]);
+
+  const toggleAnim = useRef(new Animated.Value(0)).current;
+
+  const handleViewModeToggle = useCallback((mode: ViewMode) => {
+    if (mode === viewMode) return;
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+    setViewMode(mode);
+    Animated.timing(toggleAnim, {
+      toValue: mode === 'grid' ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [viewMode, toggleAnim]);
 
   const buildFullQuery = useCallback((textQuery: string, currentFilters: SearchFilterState): string => {
     const parsed = parseAdvancedSyntax(textQuery);
@@ -84,6 +102,25 @@ export default function SearchScreen() {
       setHasSearched(true);
     },
   });
+
+  React.useEffect(() => {
+    if (pendingInitialQuery.current) {
+      const q = pendingInitialQuery.current;
+      pendingInitialQuery.current = null;
+      setQuery(q);
+      setSuggestions([]);
+      setResults([]);
+      setHasSearched(false);
+      setFilters(EMPTY_FILTERS);
+      setFiltersVisible(false);
+      const fullQ = buildFullQuery(q, EMPTY_FILTERS);
+      if (fullQ) {
+        lastSearchQuery.current = fullQ;
+        searchMutation.mutate({ q: fullQ, page: 1 });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.initialQuery]);
 
   const autocompleteMutation = useMutation({
     mutationFn: async (q: string) => {
@@ -140,6 +177,7 @@ export default function SearchScreen() {
     setHasMore(false);
     setHasSearched(false);
     setSuggestions([]);
+    setCurrentPage(1);
     inputRef.current?.focus();
   }, []);
 
@@ -153,14 +191,20 @@ export default function SearchScreen() {
 
   const activeFilterCount = useMemo(() => getActiveFilterCount(filters), [filters]);
 
-  const renderItem = useCallback(({ item }: { item: Card }) => (
+  const renderListItem = useCallback(({ item }: { item: Card }) => (
     <CardListItem card={item} onPress={handleCardPress} />
+  ), [handleCardPress]);
+
+  const renderGridItem = useCallback(({ item }: { item: Card }) => (
+    <CardGridItem card={item} onPress={handleCardPress} />
   ), [handleCardPress]);
 
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
   const showSuggestions = suggestions.length > 0 && !hasSearched;
-  const showPopular = !hasSearched && results.length === 0 && query.length === 0 && !filtersVisible;
+
+  const isFirstPageLoading = searchMutation.isPending && currentPage <= 1 && results.length === 0;
+  const isLoadingMore = searchMutation.isPending && results.length > 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -227,25 +271,7 @@ export default function SearchScreen() {
         </View>
       )}
 
-      {showPopular && (
-        <View style={styles.popularSection}>
-          <View style={styles.popularHeader}>
-            <TrendingUp size={14} color={Colors.gold} />
-            <Text style={styles.popularTitle}>{t.search.popularSearches}</Text>
-          </View>
-          <View style={styles.popularChips}>
-            {POPULAR_SEARCHES.map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => handleSuggestionTap(s)}
-                style={({ pressed }) => [styles.popularChip, pressed && styles.popularChipPressed]}
-              >
-                <Text style={styles.popularChipText}>{s}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
+
 
       {hasSearched && results.length === 0 && !searchMutation.isPending && (
         <View style={styles.emptyState}>
@@ -256,36 +282,89 @@ export default function SearchScreen() {
       )}
 
       {hasSearched && totalCount > 0 && (
-        <Text style={styles.resultCount}>
-          {t.search.cardsFound(totalCount)}
-        </Text>
+        <View style={styles.resultBar}>
+          <Text style={styles.resultCount}>
+            {t.search.cardsFound(totalCount)}
+          </Text>
+          <View style={styles.viewToggle}>
+            <Pressable
+              onPress={() => handleViewModeToggle('list')}
+              style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
+              testID="view-mode-list"
+            >
+              <LayoutList size={15} color={viewMode === 'list' ? Colors.gold : Colors.textMuted} />
+            </Pressable>
+            <Pressable
+              onPress={() => handleViewModeToggle('grid')}
+              style={[styles.viewToggleBtn, viewMode === 'grid' && styles.viewToggleBtnActive]}
+              testID="view-mode-grid"
+            >
+              <LayoutGrid size={15} color={viewMode === 'grid' ? Colors.gold : Colors.textMuted} />
+            </Pressable>
+          </View>
+        </View>
       )}
 
-      {results.length > 0 && (
+      {isFirstPageLoading && (
+        viewMode === 'list' ? <SearchSkeleton /> : <CardGridSkeleton />
+      )}
+
+      {results.length > 0 && viewMode === 'list' && (
         <FlatList
           data={results}
-          renderItem={renderItem}
+          renderItem={renderListItem}
           keyExtractor={keyExtractor}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.4}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
           ListFooterComponent={
-            searchMutation.isPending && currentPage > 1 ? (
-              <View style={styles.loadingMore}>
-                <ActivityIndicator color={Colors.gold} size="small" />
-              </View>
-            ) : null
+            <>
+              {isLoadingMore && (
+                <View style={styles.loadingMore}>
+                  <SearchSkeleton />
+                </View>
+              )}
+              {hasMore && !searchMutation.isPending && (
+                <View style={styles.paginationRow}>
+                  <Text style={styles.pageInfo}>
+                    {t.search.page(currentPage, totalPages)}
+                  </Text>
+                </View>
+              )}
+            </>
           }
           testID="search-results"
         />
       )}
 
-      {searchMutation.isPending && currentPage === 1 && (
-        <View style={styles.loadingState}>
-          <ActivityIndicator color={Colors.gold} size="large" />
-          <Text style={styles.loadingText}>{t.search.searchingScryfall}</Text>
-        </View>
+      {results.length > 0 && viewMode === 'grid' && (
+        <FlatList
+          data={results}
+          renderItem={renderGridItem}
+          keyExtractor={keyExtractor}
+          numColumns={2}
+          columnWrapperStyle={styles.gridRow}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="on-drag"
+          ListFooterComponent={
+            <>
+              {isLoadingMore && (
+                <CardGridSkeleton />
+              )}
+              {hasMore && !searchMutation.isPending && (
+                <View style={styles.paginationRow}>
+                  <Text style={styles.pageInfo}>
+                    {t.search.page(currentPage, totalPages)}
+                  </Text>
+                </View>
+              )}
+            </>
+          }
+          testID="search-results-grid"
+        />
       )}
     </View>
   );
@@ -310,8 +389,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 8,
   },
   searchBox: {
     flex: 1,
@@ -319,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.cardBackground,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -333,8 +412,8 @@ const styles = StyleSheet.create({
   },
   searchBtn: {
     backgroundColor: Colors.gold,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
     borderRadius: 12,
   },
   searchBtnPressed: {
@@ -354,7 +433,8 @@ const styles = StyleSheet.create({
   },
   suggestionsContainer: {
     marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 2,
+    marginBottom: 4,
     backgroundColor: Colors.cardBackground,
     borderRadius: 12,
     borderWidth: 1,
@@ -378,50 +458,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  popularSection: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    gap: 12,
-  },
-  popularHeader: {
+
+  resultBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  popularTitle: {
-    color: Colors.gold,
-    fontSize: 13,
-    fontWeight: '700' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  },
-  popularChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  popularChip: {
-    backgroundColor: Colors.cardBackground,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  popularChipPressed: {
-    backgroundColor: Colors.cardBackgroundLight,
-    borderColor: Colors.gold,
-  },
-  popularChipText: {
-    color: Colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '500' as const,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   resultCount: {
     color: Colors.textMuted,
     fontSize: 12,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  viewToggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: 'rgba(232,105,45,0.15)',
+  },
+  gridRow: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    gap: 8,
   },
   emptyState: {
     flex: 1,
@@ -445,18 +512,45 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     paddingHorizontal: 40,
   },
-  loadingState: {
-    flex: 1,
-    justifyContent: 'center',
+  loadingMore: {
+    paddingVertical: 8,
+  },
+  paginationRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     gap: 12,
   },
-  loadingText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
+  pageInfo: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '500' as const,
   },
-  loadingMore: {
-    paddingVertical: 20,
+  pageNavBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pageNavBtnPressed: {
+    backgroundColor: Colors.cardBackgroundLight,
+  },
+  pageNavBtnDisabled: {
+    opacity: 0.35,
+  },
+  pageNavText: {
+    color: Colors.gold,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  pageNavTextDisabled: {
+    color: Colors.textMuted,
   },
 });

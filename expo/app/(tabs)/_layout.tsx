@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Sparkles, ScrollText, Swords, Search, Settings } from "lucide-react-native";
+import { Sparkles, Swords, Search, Settings } from "lucide-react-native";
 import React from "react";
 import Colors from "@/constants/colors";
 
@@ -43,8 +43,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: "History",
-          tabBarIcon: ({ color, size }) => <ScrollText size={size} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

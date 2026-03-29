@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Minus, Plus, ChevronDown } from 'lucide-react-native';
+import { Minus, Plus, ChevronDown, ScrollText } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
@@ -25,9 +25,14 @@ import { useSettings } from '@/providers/SettingsProvider';
 
 import { useI18n } from '@/i18n';
 import { TypePicker } from '@/components/TypePicker';
+import { HistorySheet } from '@/components/HistorySheet';
+import { showToast } from '@/components/Toast';
+import { useNetwork } from '@/providers/NetworkProvider';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
+const MIN_MULTI_COUNT = 1;
+const MAX_MULTI_COUNT = 10;
 
 function getDominantColor(colors: string[]): string {
   if (colors.length === 0) return Colors.background;
@@ -45,21 +50,29 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { addCard, addCards } = useHistory();
+  const { addCard, addCards, cards } = useHistory();
   const { settings } = useSettings();
 
   const { t, locale } = useI18n();
+  const { isOnline: _isOnline } = useNetwork();
 
   const [cmc, setCmc] = useState(3);
   const [typeIndex, setTypeIndex] = useState(0);
   const [_lastCards, setLastCards] = useState<Card[]>([]);
   const [typePickerVisible, setTypePickerVisible] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [multiCardCounts, setMultiCardCounts] = useState<Record<string, number>>({});
 
   const cardType = CARD_TYPES[typeIndex].id;
   const currentTypeConfig = CARD_TYPES[typeIndex];
   const showCmc = currentTypeConfig.useCmc;
+  const multiCount = currentTypeConfig.multiCard
+    ? (multiCardCounts[cardType] ?? currentTypeConfig.count)
+    : currentTypeConfig.count;
 
-  const typeLabel = t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes];
+  const typeLabel = currentTypeConfig.multiCard
+    ? t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes].replace(/^\d+/, String(multiCount))
+    : t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes];
   const typeDesc = t.cardTypeDescriptions[currentTypeConfig.id as keyof typeof t.cardTypeDescriptions];
 
   const bgCache = useRef<Record<string, BgCardData>>({});
@@ -233,10 +246,36 @@ export default function HomeScreen() {
     }
   }, [typeIndex, animateTypeChange]);
 
+  const incrementMultiCount = useCallback(() => {
+    if (!currentTypeConfig.multiCard) return;
+    setMultiCardCounts(prev => {
+      const current = prev[cardType] ?? currentTypeConfig.count;
+      const next = Math.min(MAX_MULTI_COUNT, current + 1);
+      if (next !== current) {
+        if (Platform.OS !== 'web') void Haptics.selectionAsync();
+        animateCmcChange();
+      }
+      return { ...prev, [cardType]: next };
+    });
+  }, [cardType, currentTypeConfig, animateCmcChange]);
+
+  const decrementMultiCount = useCallback(() => {
+    if (!currentTypeConfig.multiCard) return;
+    setMultiCardCounts(prev => {
+      const current = prev[cardType] ?? currentTypeConfig.count;
+      const next = Math.max(MIN_MULTI_COUNT, current - 1);
+      if (next !== current) {
+        if (Platform.OS !== 'web') void Haptics.selectionAsync();
+        animateCmcChange();
+      }
+      return { ...prev, [cardType]: next };
+    });
+  }, [cardType, currentTypeConfig, animateCmcChange]);
+
   const castMutation = useMutation({
     mutationFn: async () => {
       if (currentTypeConfig.multiCard) {
-        return fetchMultipleCards(cardType, currentTypeConfig.count, settings.excludeFunnySets, locale);
+        return fetchMultipleCards(cardType, multiCount, settings.excludeFunnySets, locale);
       } else {
         const card = await fetchRandomCard(cardType, cmc, settings.excludeFunnySets, 3, locale);
         return [card];
@@ -254,6 +293,11 @@ export default function HomeScreen() {
     },
     onError: (error) => {
       console.log('[Cast] Error:', error);
+      showToast({
+        type: 'error',
+        title: t.errors.fetchFailed,
+        message: error?.message ?? t.errors.fetchFailed,
+      });
     },
   });
 
@@ -336,6 +380,8 @@ export default function HomeScreen() {
         style={[styles.innerContainer, { opacity: fadeIn }]}
         {...swipePanResponder.panHandlers}
       >
+
+
         <View style={styles.spacer} />
 
         <View style={[styles.bottomControls, { paddingBottom: Math.max(insets.bottom, 12) + 60 }]}>
@@ -403,7 +449,41 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.multiCardSection}>
-              <Text style={styles.multiCardLabel}>{t.home.fetchingCards(currentTypeConfig.count)}</Text>
+              <View style={styles.cmcHeader}>
+                <Pressable
+                  onPress={decrementMultiCount}
+                  disabled={multiCount <= MIN_MULTI_COUNT}
+                  style={({ pressed }) => [
+                    styles.cmcStepButton,
+                    multiCount <= MIN_MULTI_COUNT && styles.cmcStepButtonDisabled,
+                    pressed && multiCount > MIN_MULTI_COUNT && styles.cmcStepButtonPressed,
+                  ]}
+                  hitSlop={10}
+                  testID="multi-count-decrement"
+                >
+                  <Minus size={18} color={multiCount <= MIN_MULTI_COUNT ? Colors.textMuted : Colors.gold} />
+                </Pressable>
+
+                <Animated.View style={[styles.cmcDisplay, { transform: [{ scale: cmcPulse }] }]}>
+                  <Text style={styles.cmcValue}>{multiCount}</Text>
+                  <Text style={styles.cmcLabel}>{t.home.cardCount}</Text>
+                </Animated.View>
+
+                <Pressable
+                  onPress={incrementMultiCount}
+                  disabled={multiCount >= MAX_MULTI_COUNT}
+                  style={({ pressed }) => [
+                    styles.cmcStepButton,
+                    multiCount >= MAX_MULTI_COUNT && styles.cmcStepButtonDisabled,
+                    pressed && multiCount < MAX_MULTI_COUNT && styles.cmcStepButtonPressed,
+                  ]}
+                  hitSlop={10}
+                  testID="multi-count-increment"
+                >
+                  <Plus size={18} color={multiCount >= MAX_MULTI_COUNT ? Colors.textMuted : Colors.gold} />
+                </Pressable>
+              </View>
+              <Text style={styles.multiCardLabel}>{t.home.fetchingCards(multiCount)}</Text>
             </View>
           )}
 
@@ -426,27 +506,39 @@ export default function HomeScreen() {
             </Pressable>
           </Animated.View>
 
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== 'web') void Haptics.selectionAsync();
+              setHistoryVisible(true);
+            }}
+            style={({ pressed }) => [
+              styles.historyButton,
+              pressed && styles.historyButtonPressed,
+            ]}
+            hitSlop={8}
+            testID="open-history"
+          >
+            <ScrollText size={16} color={Colors.gold} />
+            <Text style={styles.historyButtonLabel}>{t.history.title}</Text>
+            {cards.length > 0 && (
+              <View style={styles.historyBadge}>
+                <Text style={styles.historyBadgeText}>
+                  {cards.length > 99 ? '99+' : cards.length}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+
           <TypePicker
             visible={typePickerVisible}
             selected={cardType as CardType}
             onSelect={handleTypeSelect}
             onClose={() => setTypePickerVisible(false)}
           />
-
-          {castMutation.isError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>
-                {castMutation.error?.message ?? t.errors.fetchFailed}
-              </Text>
-              <Pressable onPress={() => castMutation.reset()} style={styles.retryButton}>
-                <Text style={styles.retryText}>{t.common.dismiss}</Text>
-              </Pressable>
-            </View>
-          )}
-
-
         </View>
       </Animated.View>
+
+      <HistorySheet visible={historyVisible} onClose={() => setHistoryVisible(false)} />
     </View>
   );
 }
@@ -683,5 +775,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600' as const,
   },
-
+  historyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(232,105,45,0.15)',
+    marginTop: 4,
+  },
+  historyButtonPressed: {
+    backgroundColor: 'rgba(232,105,45,0.15)',
+    borderColor: 'rgba(232,105,45,0.3)',
+  },
+  historyButtonLabel: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.gold,
+  },
+  historyBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.gold,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  historyBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700' as const,
+  },
 });

@@ -83,6 +83,20 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   zht: '繁體中文',
 };
 
+export const LOCALE_FLAGS: Record<Locale, string> = {
+  en: '🇺🇸',
+  pt: '🇧🇷',
+  es: '🇪🇸',
+  fr: '🇫🇷',
+  de: '🇩🇪',
+  it: '🇮🇹',
+  ja: '🇯🇵',
+  ko: '🇰🇷',
+  ru: '🇷🇺',
+  zhs: '🇨🇳',
+  zht: '🇹🇼',
+};
+
 export const ALL_LOCALES: Locale[] = ['en', 'pt', 'es', 'fr', 'de', 'it', 'ja', 'ko', 'ru', 'zhs', 'zht'];
 
 function isValidLocale(value: string): value is Locale {

@@ -325,23 +325,38 @@ describe('Scryfall Service', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('applies language filter when lang is not English', async () => {
-      const data = {
-        data: [createFakeScryfallCard()],
-        total_cards: 1,
-        has_more: false,
-      };
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => data,
+    it('fetches localized collection results when lang is not English', async () => {
+      const baseCard = createFakeScryfallCard();
+      const localizedCard = createFakeScryfallCard({
+        lang: 'pt',
+        printed_name: 'Carta de Teste',
+        printed_text: 'Texto em português',
       });
 
-      await searchCards('t:creature', 1, 'pt');
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: [baseCard],
+            total_cards: 1,
+            has_more: false,
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: [localizedCard] }),
+        });
 
-      const callUrl = mockFetch.mock.calls[0][0] as string;
-      expect(callUrl).toContain('lang%3Apt');
+      const result = await searchCards('t:creature', 1, 'pt');
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[0][0]).toContain('/cards/search?q=t%3Acreature&page=1&unique=cards');
+      expect(mockFetch.mock.calls[1][0]).toContain('/cards/collection');
+      expect(mockFetch.mock.calls[1][1]).toMatchObject({ method: 'POST' });
+      expect(result.cards[0]?.name).toBe(baseCard.name);
+      expect(result.cards[0]?.printedName).toBe('Carta de Teste');
     });
 
     it('throws on non-retryable API errors', async () => {

@@ -21,6 +21,7 @@ export interface Translations {
     fetchingCards: (count: number) => string;
     printerConnected: string;
     turn: string;
+    cardCount: string;
   };
   cardTypes: {
     creature: string;
@@ -58,6 +59,14 @@ export interface Translations {
     printingsCount: (count: number) => string;
     loadingPrintings: string;
     cardType: string;
+    artBy: (artist: string) => string;
+    unknownArtist: string;
+    downloadTitle: string;
+    downloadNotAvailable: string;
+    rarityCommon: string;
+    rarityUncommon: string;
+    rarityRare: string;
+    rarityMythic: string;
   };
   printPreview: {
     title: string;
@@ -81,6 +90,13 @@ export interface Translations {
     galleryAccessRequired: string;
     saveFailed: string;
     saveFailedMsg: string;
+    ditheredPreview: string;
+    oneBitMode: string;
+    preparingPrint: string;
+    sendingData: string;
+    printComplete: string;
+    feedingPaper: string;
+    connectingPrinter: string;
   };
   tabs: {
     cast: string;
@@ -97,6 +113,12 @@ export interface Translations {
     tryDifferentSearch: string;
     cardsFound: (count: number) => string;
     searchingScryfall: string;
+    listView: string;
+    cardView: string;
+    page: (current: number, total: number) => string;
+    loadMore: string;
+    nextPage: string;
+    prevPage: string;
     filters: string;
     hideFilters: string;
     color: string;
@@ -250,9 +272,25 @@ export interface Translations {
     version: string;
     aboutBody: string;
     aboutCredit: string;
+    starOnGithub: string;
+    openSourceContributions: string;
   };
   errors: {
     fetchFailed: string;
     noCardFound: (type: string, cmc: number) => string;
+  };
+  toast: {
+    offline: string;
+    offlineMessage: string;
+    backOnline: string;
+    connectionRestored: string;
+    printerDisconnected: string;
+    printerDisconnectedMessage: string;
+    printerConnected: string;
+    printFailed: string;
+    saveFailed: string;
+    permissionDenied: string;
+    noPrinter: string;
+    noPrinterMessage: string;
   };
 }
