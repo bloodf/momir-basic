@@ -1,9 +1,9 @@
-# Store Metadata — Momir Basic
+# Store Metadata — Momir-Basic
 
 ## iOS App Store Listing
 
 ### Basic Information
-- **App Name**: Momir Basic
+- **App Name**: Momir-Basic
 - **Bundle ID**: app.rork.khur2ml36fu56vvhu6tre
 - **Primary Language**: English
 - **Category**: Games > Card > Entertainment
@@ -26,7 +26,7 @@
 Magic card browser with receipt printer support
 
 **Description** (up to 4000 chars):
-Momir Basic is a Magic: The Gathering companion app for players who want to browse, discover, and print card information.
+Momir-Basic is a Magic: The Gathering companion app for players who want to browse, discover, and print card information.
 
 Features:
 - Browse random Magic cards by type and mana value
@@ -55,7 +55,7 @@ magic, mtg, card, scryfall, printer, receipt, gatherer, randomizer
 ## Google Play Listing
 
 ### Basic Information
-- **App Name**: Momir Basic
+- **App Name**: Momir-Basic
 - **Package Name**: app.rork.khur2ml36fu56vvhu6tre
 - **Primary Category**: Entertainment > Card
 - **Content Rating**: Everyone

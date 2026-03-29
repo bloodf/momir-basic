@@ -1,4 +1,4 @@
-# Legal Inputs — Momir Basic
+# Legal Inputs — Momir-Basic
 
 ## Legal Entity
 - **Company/Developer Name**: [DECISION NEEDED: Your name or company name for App Store/Play Store]

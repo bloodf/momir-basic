@@ -1,0 +1,40 @@
+# F4: Scope Fidelity - Evidence
+
+## Commits Since Task 1 (ce84a38)
+All 10 commits are release documentation/config only:
+- 584d37d docs(release): produce launch packet and runbook
+- 28e9de7 docs(release): document hardware validation requirements
+- 8cdeded docs(release): document build rehearsal process
+- 1682c69 docs(store): prepare submission metadata and assets
+- bf646ba docs(ota): define rollout and rollback operations
+- 7d88745 chore(release): formalize signing and credential ownership
+- 89add01 ci(release): add publish readiness gates
+- 8273f7a feat(release): add crash monitoring for production
+- 67d8f45 docs(release): add privacy and store compliance artifacts
+- aeed853 chore(compliance): align permissions and privacy manifest
+
+## Source Code Check
+```
+git diff ce84a38..HEAD -- '*.ts' '*.tsx'
+Result: EMPTY - no .ts/.tsx files changed
+```
+
+## Scope Drift Check
+All commits match publish-readiness scope:
+- [x] No feature additions
+- [x] No analytics expansion beyond crash monitoring
+- [x] No bare/native migration
+- [x] No OTA to production for native changes
+- [x] No bundleIdentifier/Android package changes
+- [x] Only config/docs/workflows changed
+
+## Files Changed Since ce84a38
+- expo/app.json (permissions, privacy manifest)
+- expo/eas.json (created)
+- .github/workflows/ci.yml (created)
+- .github/workflows/release-build.yml (created)
+- expo/docs/release/*.md (14 documentation files)
+- .sisyphus/evidence/*.txt (evidence files)
+
+## VERDICT: APPROVE
+Scope was maintained — only config/docs/workflows changed. No source code modified.

@@ -1,0 +1,27 @@
+# Task 7: OTA Environment & Rollback - Evidence
+
+## Files Created
+| File | Status |
+|------|--------|
+| expo/docs/release/ENVIRONMENT.md | ✅ EXISTS |
+| expo/docs/release/ROLLBACK.md | ✅ EXISTS |
+
+## Lint Check
+```
+cd expo && bun run lint
+Result: PASS (0 errors, 25 warnings - pre-existing)
+```
+
+## ENVIRONMENT.md Contents
+- EAS Update channel table (preview/production)
+- Branch mapping (main → preview, release/* → production)
+- Environment variable guidance (no separate backend currently)
+- Build provenance (YYMM.RR runtime version format)
+
+## ROLLBACK.md Contents
+- When to rollback criteria
+- Step-by-step rollback procedure
+- Native build rollback limitations
+- Rollback decision tree
+- Rollback path testing procedure
+- Rollback ownership matrix

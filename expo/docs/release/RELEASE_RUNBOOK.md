@@ -1,4 +1,4 @@
-# Release Runbook — Momir Basic
+# Release Runbook — Momir-Basic
 
 ## Pre-Release Checklist (Complete Before Any Store Submission)
 

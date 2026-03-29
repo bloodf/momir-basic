@@ -1,0 +1,45 @@
+# F3: Real Manual QA - Evidence
+
+## QA Results
+
+### Lint
+```
+cd expo && bun run lint
+Result: PASS - 0 errors, 25 warnings (pre-existing)
+```
+
+### TypeScript
+```
+cd expo && bunx tsc --noEmit
+Result: PASS - Exit 0
+```
+
+### Unit Tests
+```
+cd expo && bun run test -- --runInBand
+Result: PASS - 13 test suites, 210 tests passed
+```
+
+### E2E Tests
+```
+cd expo && bunx playwright test e2e/printer-qa.spec.ts
+Result: PASS - 9 passed, 1 skipped
+```
+
+### Release Docs
+Count: 15 files
+BUILD_REHEARSAL.md, ENVIRONMENT.md, HARDWARE_VALIDATION.md, LAUNCH_PACKET.md, LEGAL_INPUTS.md, OBSERVABILITY.md, PRIVACY_POLICY.md, RELEASE_CREDENTIALS.md, RELEASE_POLICY.md, RELEASE_RUNBOOK.md, ROLLBACK.md, STORE_ASSETS_MANIFEST.md, STORE_COMPLIANCE.md, STORE_METADATA.md, TERMS.md
+
+### Evidence Files
+Count: 13 files
+
+## QA Pass Criteria
+- [x] Lint: 0 errors - PASS
+- [x] TypeScript: exit 0 - PASS
+- [x] Unit tests: all pass - PASS (210/210)
+- [x] E2E: 9+ pass - PASS (9/9 + 1 skip documented)
+- [x] Release docs: 14+ files - PASS (15 files)
+- [x] Evidence: 11+ files - PASS (13 files)
+
+## VERDICT: APPROVE
+All release-critical checks pass.

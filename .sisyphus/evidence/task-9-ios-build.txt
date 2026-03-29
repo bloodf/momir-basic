@@ -1,0 +1,33 @@
+# Task 9: iOS Build Rehearsal - Evidence
+
+## Dry-Run Validation
+
+### eas.json Validation
+```
+cd expo && cat eas.json | jq .
+Result: VALID (valid JSON with preview and production profiles)
+```
+
+### app.json Validation (via Expo CLI)
+```
+npx expo config --json
+Result: VALID (Expo CLI handles JSON-with-comments; full config resolved)
+```
+
+Note: `jq` rejects JSON-with-JavaScript-comments but Expo tooling accepts it.
+
+### TypeScript Validation
+```
+cd expo && bunx tsc --noEmit
+Result: PASS (no errors)
+```
+
+## Production Build Status
+- **Actual EAS builds**: BLOCKED - requires `eas project:associate` and credentials
+- **Dry-run validation**: PASS - all configs are valid
+
+## Pre-Requisites Before Production Builds
+- [ ] `eas project:associate` (replaces TODO in app.json)
+- [ ] iOS credentials via `eas credentials --platform ios`
+- [ ] Android credentials via `eas credentials --platform android`
+- [ ] `EXPO_TOKEN` in GitHub Secrets

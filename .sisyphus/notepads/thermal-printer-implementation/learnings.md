@@ -178,3 +178,47 @@ cd expo && bun run test -- --runInBand # 209 tests pass
 cd expo && bun run test -- --runInBand scryfall  # 41 tests pass
 cd expo && bun run test -- --runInBand           # 209 tests pass (13 suites)
 ```
+
+Note: Pre-existing lint errors in `card.tsx` (hooks called after early return at line 254) existed before this task - not introduced by these changes.
+
+## Task 12: Queue Lifecycle and Status UX
+
+### Key Decisions
+
+1. **processQueue function**: Created exported `processQueue()` function in `queue/engine.ts` that processes all pending jobs for the preferred printer. Uses an `AdapterWrapper` to translate between the high-level app `PrinterPort` interface and the low-level interface expected by the queue engine.
+
+2. **AdapterWrapper pattern**: The app's `PrinterPort` from `adapters/port.ts` has high-level operations (`connectPrinter`, `sendText`, etc.), but the queue engine expects a low-level interface (`connect`, `disconnect`, `send(bytes)`). Created `AdapterWrapper` class to translate between them.
+
+3. **getQueueSummary**: Created exported `getQueueSummary(printerId)` function that returns counts of pending/completed/failed jobs plus the actual failed job records for displaying in the UI.
+
+4. **retryJob function**: Created exported `retryJob(jobId)` function that moves a `failed_manual` job back to `queued` state for reprocessing.
+
+5. **AppState integration**: Added `useEffect` in `SettingsProvider` that watches `AppState` changes and triggers `processQueue()` when the app comes to foreground if a printer is connected.
+
+6. **Queue status in printer settings**: Added `queueSummary` state and `handleRetryJob` callback. Queue status card shows pending/completed/failed counts with colored badges, and lists failed jobs with retry buttons.
+
+7. **testID conventions**: 
+   - `queue-status-badge` in print-preview.tsx for enqueue status banner
+   - `retry-print-job-${job.id}` in printer.tsx for retry buttons
+   - `preferred-printer-status` was already present in printer.tsx
+
+### Files Modified
+
+- `expo/services/printer/storage/repositories.ts` - Added `getJobsForPrinter` function
+- `expo/services/printer/queue/engine.ts` - Added `QueueRenderer`, `AdapterWrapper`, `processQueue`, `retryJob`, `getQueueSummary`
+- `expo/providers/SettingsProvider.tsx` - Added AppState listener for queue processing
+- `expo/app/(tabs)/settings/printer.tsx` - Added queue status display and retry buttons
+- `expo/app/print-preview.tsx` - Added `queue-status-badge` testID
+
+### Gotchas
+
+- **DiagnosticsDocument constructor**: Takes positional arguments, not an options object. Was passing object causing TypeScript error.
+- **Adapter interface mismatch**: The queue engine's `PrinterPort` expects `connect(printerId)`, `disconnect()`, `send(bytes)` but the app adapter has `connectPrinter(deviceId)`, `disconnectPrinter(deviceId)`, `sendText(text)`. Solved with `AdapterWrapper`.
+- **Import cycles**: Using dynamic `import('../services/printer/queue/engine')` inside useEffect to avoid circular dependencies with SettingsProvider.
+
+### Verification
+
+```bash
+cd expo && bun run test -- --runInBand           # 209 tests pass
+cd expo && bunx tsc --noEmit                   # passes
+```

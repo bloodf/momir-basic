@@ -1,0 +1,33 @@
+# Task 9: Android Build Rehearsal - Evidence
+
+## Dry-Run Validation
+
+### eas.json Validation
+```
+cd expo && cat eas.json | jq .
+Result: VALID
+android.buildType: "app-bundle" for production profile ✅
+```
+
+### app.json Validation (via Expo CLI)
+```
+npx expo config --json | jq .
+Result: VALID
+android.package: "app.rork.khur2ml36fu56vvhu6tre" ✅
+android.permissions: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN ✅
+```
+
+## Production Build Commands
+When credentials are ready:
+```bash
+eas build --platform android --profile production --non-interactive
+```
+
+## Build Artifact
+- Output: .aab (Android App Bundle)
+- Destination: EAS Build records + Google Play
+
+## Known Limitations
+- EAS project not linked (projectId is TODO)
+- Android credentials not configured
+- EXPO_TOKEN not in GitHub Secrets

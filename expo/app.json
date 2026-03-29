@@ -1,17 +1,17 @@
 {
   "expo": {
-    // NOTE: Thermal printer and Bluetooth features (react-native-thermal-pos-printer)
-    // require custom dev builds via expo-dev-client. These features will NOT work in Expo Go.
-    // Use `bun run start --dev-client` to run with a development build.
-    "name": "Momir Basic",
-    "slug": "khur2ml36fu56vvhu6tre",
+    "name": "Momir-Basic",
+    "slug": "momir-basic",
     "version": "1.0.0",
     "cli": {
       "appVersionSource": "remote"
     },
     "extra": {
       "eas": {
-        "projectId": "TODO: Run `eas project:associate` to link your EAS project"
+        "projectId": "8518e773-8656-4479-92ae-ef47db80efa4"
+      },
+      "router": {
+        "origin": "https://rork.com/"
       }
     },
     "orientation": "portrait",
@@ -36,11 +36,15 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
-            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
           },
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -74,6 +78,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "bloodf"
   }
 }

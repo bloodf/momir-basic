@@ -1,4 +1,4 @@
-# Momir Basic — MTG Card Generator App
+# Momir-Basic — MTG Card Generator App
 
 ## Features
 

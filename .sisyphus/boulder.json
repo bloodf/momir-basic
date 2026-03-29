@@ -1,0 +1,98 @@
+{
+  "active_plan": "/Users/heitor/Developer/github.com/bloodf/rork-momir-basic/.sisyphus/plans/thermal-printer-implementation.md",
+  "started_at": "2026-03-28T20:25:27.663Z",
+  "session_ids": [
+    "ses_2cb476c20ffea4d6m63pLGfbjg",
+    "ses_2c9dec0acffeTeKdk86byR2Fhj",
+    "ses_2c9def8fffferH0pbR4YS69CqG",
+    "ses_2c9d032c9ffe9fU50V6gU4ZSbE",
+    "ses_2c9cac08dffehGWGas73juU3Zi",
+    "ses_2c9af0f49ffelJBd4hb3xY9QXc",
+    "ses_2c9af3839ffe0o1NHe6SOONeJY",
+    "ses_2c9af88f2ffexCIH8PAikVu8tj",
+    "ses_2c99c6fddffeXik0itrPeqvIGc",
+    "ses_2c99bcb85ffe1ce2RlyC1kIWOr",
+    "ses_2c99c074dffePcTI8uO6uosDOn",
+    "ses_2c99c4f51ffe8gukaF1byQYEhM",
+    "ses_2c99c91c2ffebhN16ehEdVUJvw",
+    "ses_2c96e65f6ffegc33fm7f7xRS1o",
+    "ses_2c96e0665ffefguGMBrfNbWcCX",
+    "ses_2c96e3dbaffekXu0iuOSkd4fJL",
+    "ses_2c96e9f70ffe6cubFVPJf5Gh3W",
+    "ses_2c95a403dffeVHVEJVx7LbBzup",
+    "ses_2c95a4211ffemv6X60xTQ6D3GN",
+    "ses_2c95a411fffexIVwccWWyRlKCC",
+    "ses_2c95a4405ffeNwJ4n9FAh3DKEu",
+    "ses_2c95a4318ffeZ1makMmDJA0zWE",
+    "ses_2c9560e0cffeU1lYokwoXki94d",
+    "ses_2c9560df8ffeicPX7aCHr2TMpj",
+    "ses_2c9565b78ffeu7kMfgR0Gw2lZ6",
+    "ses_2c94be1a3ffemkjLvWpW6u6Ezp",
+    "ses_2c9196a28ffeii1NP8c6cK7isr",
+    "ses_2c9097295ffe5xXksvrcYtRRIX",
+    "ses_2c909be0dffesKgeYGd7UPWjUt",
+    "ses_2c909dfe7ffe9RLXDmteR0pFlg",
+    "ses_2c9097286ffeGtEBxjhnsrDz4Q",
+    "ses_2c909953affemuMJ76y7umGbc1",
+    "ses_2c8f219cbffeXsomivYkSZ7jZi",
+    "ses_2c8808371ffeOjKaScbBsGOl6F"
+  ],
+  "plan_name": "thermal-printer-implementation",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Add printer test infrastructure",
+      "session_id": "ses_2c9def8fffferH0pbR4YS69CqG",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-28T20:33:26.599Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Expand printer domain types and migrate settings shape",
+      "session_id": "ses_2c9d032c9ffe9fU50V6gU4ZSbE",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-28T20:46:50.741Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Add SQLite-backed printer registry and print-job storage",
+      "session_id": "ses_2c9cac08dffehGWGas73juU3Zi",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-28T20:55:35.514Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Implement the print queue engine and retry policy",
+      "session_id": "ses_2c9af88f2ffexCIH8PAikVu8tj",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-03-28T21:33:53.869Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Implement printer registry and saved-printer use cases",
+      "session_id": "ses_2c99c91c2ffebhN16ehEdVUJvw",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-03-28T22:00:53.194Z"
+    },
+    "todo:9": {
+      "task_key": "todo:9",
+      "task_label": "9",
+      "task_title": "Replace the printer settings screen’s mock behavior with real registry + adapter actions",
+      "session_id": "ses_2c8808371ffeOjKaScbBsGOl6F",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-29T02:53:16.854Z"
+    }
+  }
+}

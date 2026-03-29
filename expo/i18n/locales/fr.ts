@@ -272,7 +272,7 @@ const fr: Translations = {
     devModeHint: 'Impression factice : sauvegarde l\'image dans la galerie',
     about: 'À Propos',
     version: 'Version',
-    aboutBody: 'Momir Basic est une application compagnon Magic: The Gathering pour le format Momir Basic. Données de cartes fournies par l\'API Scryfall.',
+    aboutBody: 'Momir-Basic est une application compagnon Magic: The Gathering pour le format Momir-Basic. Données de cartes fournies par l\'API Scryfall.',
     aboutCredit: 'Scryfall n\'est pas affilié à Wizards of the Coast. MTG est une marque déposée de Wizards of the Coast LLC.',
     starOnGithub: 'Étoile sur GitHub',
     openSourceContributions: 'Projet open source — contributions bienvenues !',

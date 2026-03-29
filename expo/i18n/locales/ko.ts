@@ -272,7 +272,7 @@ const ko: Translations = {
     devModeHint: '가짜 인쇄: 카드 이미지를 갤러리에 저장',
     about: '앱 정보',
     version: '버전',
-    aboutBody: 'Momir Basic은 Momir Basic 포맷을 위한 Magic: The Gathering 동반 앱입니다. 카드 데이터는 Scryfall API에서 제공됩니다.',
+    aboutBody: 'Momir-Basic은 Momir-Basic 포맷을 위한 Magic: The Gathering 동반 앱입니다. 카드 데이터는 Scryfall API에서 제공됩니다.',
     aboutCredit: 'Scryfall은 Wizards of the Coast와 관련이 없습니다. MTG는 Wizards of the Coast LLC의 상표입니다.',
     starOnGithub: 'GitHub에서 스타',
     openSourceContributions: '오픈소스 프로젝트 — 기여를 환영합니다!',

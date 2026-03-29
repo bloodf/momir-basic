@@ -1,6 +1,6 @@
 # Release Policy
 
-This document outlines the versioning and OTA (Over-The-Air) update policy for the Momir Basic Expo application.
+This document outlines the versioning and OTA (Over-The-Air) update policy for the Momir-Basic Expo application.
 
 ## Versioning Policy
 

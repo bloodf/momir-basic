@@ -1,4 +1,4 @@
-# Hardware Validation — Momir Basic
+# Hardware Validation — Momir-Basic
 
 ## Overview
 

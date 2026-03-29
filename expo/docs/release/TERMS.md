@@ -1,14 +1,14 @@
-# Terms of Service — Momir Basic
+# Terms of Service — Momir-Basic
 
-[Company name] ("we", "our", or "us") offers the Momir Basic app.
+[Company name] ("we", "our", or "us") offers the Momir-Basic app.
 
 ## Acceptance
 
-By using Momir Basic, you agree to these terms.
+By using Momir-Basic, you agree to these terms.
 
 ## Description
 
-Momir Basic is a Magic: The Gathering card browser and thermal printer companion app.
+Momir-Basic is a Magic: The Gathering card browser and thermal printer companion app.
 
 ## User Responsibilities
 

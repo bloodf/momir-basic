@@ -1,4 +1,4 @@
-# Launch Packet — Momir Basic
+# Launch Packet — Momir-Basic
 
 ## Status: NOT YET PUBLISH-READY
 

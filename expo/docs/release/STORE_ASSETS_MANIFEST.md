@@ -1,4 +1,4 @@
-# Store Assets Manifest — Momir Basic
+# Store Assets Manifest — Momir-Basic
 
 ## App Store (iOS)
 

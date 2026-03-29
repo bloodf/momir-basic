@@ -1,6 +1,6 @@
-# Privacy Policy — Momir Basic
+# Privacy Policy — Momir-Basic
 
-[Your company name] ("we", "our", or "us") operates the Momir Basic mobile application.
+[Your company name] ("we", "our", or "us") operates the Momir-Basic mobile application.
 
 ## Information We Collect
 

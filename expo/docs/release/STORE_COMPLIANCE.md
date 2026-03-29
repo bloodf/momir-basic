@@ -1,4 +1,4 @@
-# Store Compliance — Momir Basic
+# Store Compliance — Momir-Basic
 
 ## App Store (iOS)
 

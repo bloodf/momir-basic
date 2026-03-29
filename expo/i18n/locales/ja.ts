@@ -272,7 +272,7 @@ const ja: Translations = {
     devModeHint: '擬似印刷：カード画像をギャラリーに保存',
     about: 'アプリについて',
     version: 'バージョン',
-    aboutBody: 'Momir Basicは、Momir Basicフォーマット用のMagic: The Gatheringコンパニオンアプリです。カードデータはScryfall APIによって提供されています。',
+    aboutBody: 'Momir-Basicは、Momir-Basicフォーマット用のMagic: The Gatheringコンパニオンアプリです。カードデータはScryfall APIによって提供されています。',
     aboutCredit: 'ScryfallはWizards of the Coastとは提携していません。MTGはWizards of the Coast LLCの商標です。',
     starOnGithub: 'GitHubでスターを付ける',
     openSourceContributions: 'オープンソースプロジェクト — コントリビューション歓迎！',

@@ -1,4 +1,4 @@
-# Environment Separation — Momir Basic
+# Environment Separation — Momir-Basic
 
 ## EAS Update Channels
 

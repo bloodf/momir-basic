@@ -1,0 +1,23 @@
+# Task 9: Build Rehearsal - Evidence
+
+## Files Created
+| File | Status |
+|------|--------|
+| expo/docs/release/BUILD_REHEARSAL.md | ✅ EXISTS |
+
+## Validation Results
+| Check | Result |
+|-------|--------|
+| eas.json (jq) | VALID |
+| app.json (Expo CLI) | VALID |
+| TypeScript | PASS (0 errors) |
+| Lint | PASS (0 errors) |
+
+## Build Profiles
+- **preview**: internal testing (apk for Android, internal for iOS)
+- **production**: store submission (app-bundle for Android, store for iOS)
+
+## Blockers for Actual Production Builds
+1. `eas project:associate` not run (projectId is TODO)
+2. iOS/Android credentials not configured
+3. `EXPO_TOKEN` not in GitHub Secrets

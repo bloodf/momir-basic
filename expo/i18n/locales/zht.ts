@@ -272,7 +272,7 @@ const zht: Translations = {
     devModeHint: '模擬列印：將卡牌圖片儲存到相簿',
     about: '關於',
     version: '版本',
-    aboutBody: 'Momir Basic是一款適用於Momir Basic賽制的魔法風雲會伴侶應用。卡牌資料由Scryfall API提供。',
+    aboutBody: 'Momir-Basic是一款適用於Momir-Basic賽制的魔法風雲會伴侶應用。卡牌資料由Scryfall API提供。',
     aboutCredit: 'Scryfall與Wizards of the Coast無關。MTG是Wizards of the Coast LLC的商標。',
     starOnGithub: '在GitHub上加星',
     openSourceContributions: '開源專案 — 歡迎貢獻！',

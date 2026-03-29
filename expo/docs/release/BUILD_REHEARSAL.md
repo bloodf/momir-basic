@@ -1,4 +1,4 @@
-# Build Rehearsal — Momir Basic
+# Build Rehearsal — Momir-Basic
 
 ## Build Profiles
 

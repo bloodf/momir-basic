@@ -1,0 +1,35 @@
+# Task 5: CI/CD Release Gates - Evidence
+
+## Files Created
+| File | Status |
+|------|--------|
+| .github/workflows/ci.yml | ✅ EXISTS |
+| .github/workflows/release-build.yml | ✅ EXISTS |
+
+## YAML Validation
+```
+python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"
+Result: valid YAML
+
+python3 -c "import yaml; yaml.safe_load(open('.github/workflows/release-build.yml'))"
+Result: valid YAML
+```
+
+## Lint Check
+```
+cd expo && bun run lint
+Result: PASS (0 errors, 25 warnings - pre-existing)
+```
+
+## CI Workflow Jobs
+- lint: `cd expo && bun run lint`
+- typecheck: `cd expo && bunx tsc --noEmit`
+- test: `cd expo && bun run test -- --runInBand`
+- e2e-printer: conditional on e2e test file existence (continue-on-error: true)
+
+## Release Build Workflow
+- Trigger: manual workflow_dispatch
+- Inputs: platform (ios/android/all), dry_run (boolean)
+- Jobs: validate (always), build-ios (conditional), build-android (conditional)
+- dry_run=true: config validation only (no actual builds)
+- Uses EXPO_TOKEN from GitHub secrets

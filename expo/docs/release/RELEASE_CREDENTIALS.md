@@ -1,4 +1,4 @@
-# Release Credentials — Momir Basic
+# Release Credentials — Momir-Basic
 
 ## iOS Credentials
 
@@ -15,7 +15,7 @@ cd expo && eas credentials --platform ios --non-interactive
 This will show existing credentials or guide through creation.
 
 ### App Store Connect
-- **App Name**: Momir Basic
+- **App Name**: Momir-Basic
 - **Bundle ID**: app.rork.khur2ml36fu56vvhu6tre
 - **Account**: [DECISION NEEDED: Apple account email used for App Store Connect]
 
