@@ -41,7 +41,7 @@ const isAndroid = Platform.OS === 'android';
 const isIOS = Platform.OS === 'ios';
 
 function hasNativeModule(): boolean {
-  return NativeModules.ThermalPrinter != null;
+  return NativeModules.ThermalPrinterDriver != null;
 }
 
 export class PrinterCapabilityService {

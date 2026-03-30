@@ -8,6 +8,7 @@ module.exports = {
     '^expo-media-library$': '<rootDir>/__mocks__/expo-media-library.js',
     '^@react-native-async-storage/async-storage$': '<rootDir>/__mocks__/@react-native-async-storage/async-storage.js',
     '^@nkzw/create-context-hook$': '<rootDir>/__mocks__/@nkzw/create-context-hook.js',
+    '^react-native-thermal-printer-driver$': '<rootDir>/__mocks__/react-native-thermal-printer-driver.js',
     '^services/printer/registry/service$': '<rootDir>/services/printer/registry/service.ts',
   },
   transformIgnorePatterns: [

@@ -1,4 +1,4 @@
-import ReactNativePosPrinter, { ThermalPrinterDevice, resetPrinterMock } from 'react-native-thermal-pos-printer';
+import ThermalPrinter, { resetPrinterMock, FAKE_DEVICES } from 'react-native-thermal-printer-driver';
 
 describe('Printer Discovery', () => {
   beforeEach(() => {
@@ -6,155 +6,86 @@ describe('Printer Discovery', () => {
     resetPrinterMock();
   });
 
-  it('discovers fake BLE printers via getDeviceList', async () => {
-    const printers = await ReactNativePosPrinter.getDeviceList();
-    
-    expect(printers).toHaveLength(3);
-    expect(printers).toEqual(
+  it('scan returns paired and found devices', async () => {
+    const result = await ThermalPrinter.scan();
+
+    expect(result.paired).toHaveLength(3);
+    expect(result.paired).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: 'POS-58 BLE', address: 'AA:BB:CC:DD:EE:01', type: 'BLUETOOTH' }),
-        expect.objectContaining({ name: 'Thermal Mini BLE', address: 'AA:BB:CC:DD:EE:04', type: 'BLUETOOTH' }),
-        expect.objectContaining({ name: 'Thermal-80mm BT', address: 'AA:BB:CC:DD:EE:02', type: 'BLUETOOTH' }),
+        expect.objectContaining({ name: 'POS-58 BLE', address: 'AA:BB:CC:DD:EE:01' }),
+        expect.objectContaining({ name: 'Thermal Mini BLE', address: 'AA:BB:CC:DD:EE:04' }),
+        expect.objectContaining({ name: 'Thermal-80mm BT', address: 'AA:BB:CC:DD:EE:02' }),
       ])
     );
+    expect(result.found).toHaveLength(0);
   });
 
-  it('returns ThermalPrinterDevice instances with required fields', async () => {
-    const printers = await ReactNativePosPrinter.getDeviceList();
-    
-    printers.forEach(printer => {
-      expect(printer).toBeInstanceOf(ThermalPrinterDevice);
-      expect(printer).toHaveProperty('name');
-      expect(printer).toHaveProperty('address');
-      expect(printer).toHaveProperty('id');
-      expect(printer).toHaveProperty('type');
-      expect(printer).toHaveProperty('connected');
+  it('returns devices with required fields', async () => {
+    const result = await ThermalPrinter.scan();
+
+    result.paired.forEach((device: { name: string; address: string; deviceType: string }) => {
+      expect(device).toHaveProperty('name');
+      expect(device).toHaveProperty('address');
+      expect(device).toHaveProperty('deviceType');
     });
   });
 
-  it('discovers printers with RSSI signal strength', async () => {
-    const printers = await ReactNativePosPrinter.getDeviceList();
-    
-    printers.forEach(printer => {
-      expect(typeof printer.rssi).toBe('number');
-      expect(printer.rssi).toBeLessThan(0);
+  it('testConnection succeeds for valid address', async () => {
+    const result = await ThermalPrinter.testConnection('bt:AA:BB:CC:DD:EE:01');
+    expect(result.success).toBe(true);
+  });
+
+  it('testConnection can report failure', async () => {
+    (ThermalPrinter.testConnection as jest.Mock).mockResolvedValueOnce({
+      success: false,
+      error: { code: 'CONNECTION_FAILED', message: 'Timeout' },
     });
+
+    const result = await ThermalPrinter.testConnection('bt:FF:FF:FF:FF:FF:FF');
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toBe('Timeout');
   });
 
-  it('connects to a valid printer address', async () => {
-    const device = await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    
-    expect(device).toBeInstanceOf(ThermalPrinterDevice);
-    expect(device.address).toBe('AA:BB:CC:DD:EE:01');
-    expect(device.name).toBe('POS-58 BLE');
-    expect(device.connected).toBe(true);
+  it('disconnect resolves without error', async () => {
+    await expect(ThermalPrinter.disconnect('bt:AA:BB:CC:DD:EE:01')).resolves.not.toThrow();
   });
 
-  it('throws error when connecting to unknown address', async () => {
-    await expect(ReactNativePosPrinter.connectPrinter('invalid-address')).rejects.toThrow(
-      'Device with address invalid-address not found'
-    );
+  it('printRaw sends data successfully', async () => {
+    const data = [0x1B, 0x40, 0x48, 0x65, 0x6C, 0x6C, 0x6F]; // ESC @ Hello
+    const result = await ThermalPrinter.printRaw('bt:AA:BB:CC:DD:EE:01', data);
+    expect(result.success).toBe(true);
   });
 
-  it('isConnected returns false when not connected', async () => {
-    const connected = await ReactNativePosPrinter.isConnected();
-    expect(connected).toBe(false);
+  it('stopScan resolves without error', async () => {
+    await expect(ThermalPrinter.stopScan()).resolves.not.toThrow();
   });
 
-  it('isConnected returns true after connecting', async () => {
-    await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    const connected = await ReactNativePosPrinter.isConnected();
-    expect(connected).toBe(true);
+  it('scan includes found devices when available', async () => {
+    (ThermalPrinter.scan as jest.Mock).mockResolvedValueOnce({
+      paired: [{ name: 'POS-58 BLE', address: 'AA:BB:CC:DD:EE:01', deviceType: 'bt' }],
+      found: [{ name: 'New Printer', address: 'FF:FF:FF:FF:FF:01', deviceType: 'bt' }],
+    });
+
+    const result = await ThermalPrinter.scan();
+    expect(result.paired).toHaveLength(1);
+    expect(result.found).toHaveLength(1);
+    expect(result.found[0].name).toBe('New Printer');
   });
 
-  it('disconnects successfully', async () => {
-    await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    await ReactNativePosPrinter.disconnectPrinter();
-    const connected = await ReactNativePosPrinter.isConnected();
-    expect(connected).toBe(false);
-  });
+  it('multiple paired devices have unique addresses', async () => {
+    const result = await ThermalPrinter.scan();
+    const addresses = result.paired.map((d: { address: string }) => d.address);
 
-  it('prints text successfully when connected', async () => {
-    await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    await expect(ReactNativePosPrinter.printText('Hello, Printer!')).resolves.not.toThrow();
-  });
-
-  it('throws when printing text without connection', async () => {
-    await expect(ReactNativePosPrinter.printText('Hello, Printer!')).rejects.toThrow(
-      'No printer connected'
-    );
-  });
-
-  it('prints image successfully when connected', async () => {
-    await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    await expect(ReactNativePosPrinter.printImage('base64data')).resolves.not.toThrow();
-  });
-
-  it('throws when printing image without connection', async () => {
-    await expect(ReactNativePosPrinter.printImage('base64data')).rejects.toThrow(
-      'No printer connected'
-    );
-  });
-
-  it('prints QR code successfully when connected', async () => {
-    await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    await expect(ReactNativePosPrinter.printQRCode('https://example.com')).resolves.not.toThrow();
-  });
-
-  it('throws when printing QR code without connection', async () => {
-    await expect(ReactNativePosPrinter.printQRCode('https://example.com')).rejects.toThrow(
-      'No printer connected'
-    );
-  });
-
-  it('cuts paper successfully when connected', async () => {
-    await ReactNativePosPrinter.connectPrinter('AA:BB:CC:DD:EE:01');
-    await expect(ReactNativePosPrinter.cutPaper()).resolves.not.toThrow();
-  });
-
-  it('throws when cutting paper without connection', async () => {
-    await expect(ReactNativePosPrinter.cutPaper()).rejects.toThrow(
-      'No printer connected'
-    );
-  });
-
-  it('ThermalPrinterDevice instance methods work correctly', async () => {
-    const printers = await ReactNativePosPrinter.getDeviceList();
-    const printer = printers[0];
-    
-    expect(printer.isConnected()).toBe(false);
-    
-    await printer.connect();
-    expect(printer.isConnected()).toBe(true);
-    expect(printer.getName()).toBe('POS-58 BLE');
-    expect(printer.getAddress()).toBe('AA:BB:CC:DD:EE:01');
-    expect(printer.getType()).toBe('BLUETOOTH');
-    
-    await printer.disconnect();
-    expect(printer.isConnected()).toBe(false);
-  });
-
-  it('getCurrentDevice returns connected device', async () => {
-    const printers = await ReactNativePosPrinter.getDeviceList();
-    await ReactNativePosPrinter.connectPrinter(printers[0].address);
-    
-    const current = ReactNativePosPrinter.getCurrentDevice();
-    expect(current).toBeInstanceOf(ThermalPrinterDevice);
-    expect(current?.address).toBe(printers[0].address);
-  });
-
-  it('getCurrentDevice returns null when disconnected', async () => {
-    const current = ReactNativePosPrinter.getCurrentDevice();
-    expect(current).toBeNull();
-  });
-
-  it('multiple devices can be listed', async () => {
-    const devices = await ReactNativePosPrinter.getDeviceList();
-    expect(devices).toHaveLength(3);
-    
-    const addresses = devices.map(d => d.address);
     expect(addresses).toContain('AA:BB:CC:DD:EE:01');
     expect(addresses).toContain('AA:BB:CC:DD:EE:02');
     expect(addresses).toContain('AA:BB:CC:DD:EE:04');
+    expect(new Set(addresses).size).toBe(addresses.length);
+  });
+
+  it('FAKE_DEVICES has the expected devices', () => {
+    expect(FAKE_DEVICES).toHaveLength(3);
+    expect(FAKE_DEVICES[0]).toEqual(
+      expect.objectContaining({ name: 'POS-58 BLE', address: 'AA:BB:CC:DD:EE:01' })
+    );
   });
 });

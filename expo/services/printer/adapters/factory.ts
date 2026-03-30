@@ -18,7 +18,7 @@ export class UnsupportedPlatformError extends Error {
  */
 export class MissingNativeModuleError extends Error {
   constructor() {
-    super('ThermalPrinter native module is not available. Ensure the native module is properly linked.');
+    super('ThermalPrinterDriver native module is not available. Ensure react-native-thermal-printer-driver is properly installed and linked.');
     this.name = 'MissingNativeModuleError';
   }
 }
@@ -34,20 +34,27 @@ export class UnavailableTransportError extends Error {
 }
 
 /**
+ * Checks if react-native-thermal-printer-driver native module is available.
+ * The package registers as 'ThermalPrinterDriver' in NativeModules.
+ */
+function isNativeModuleAvailable(): boolean {
+  return NativeModules.ThermalPrinterDriver != null;
+}
+
+/**
  * Creates the appropriate printer adapter for the current platform and environment.
  *
  * @throws {UnsupportedPlatformError} If running on web platform
- * @throws {MissingNativeModuleError} If the native thermal printer module is not available
+ * @throws {MissingNativeModuleError} If the RNThermalPrinter native module is not available
  */
 export function createAdapter(): PrinterPort {
   const isWeb = Platform.OS === 'web';
-  const hasNativeModule = NativeModules.ThermalPrinter != null;
 
   if (isWeb) {
     throw new UnsupportedPlatformError('web');
   }
 
-  if (!hasNativeModule) {
+  if (!isNativeModuleAvailable()) {
     throw new MissingNativeModuleError();
   }
 

@@ -74,7 +74,8 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-dev-client"
+      "expo-dev-client",
+      "react-native-thermal-printer-driver"
     ],
     "experiments": {
       "typedRoutes": true

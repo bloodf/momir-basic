@@ -1,8 +1,7 @@
-import ReactNativePosPrinter from 'react-native-thermal-pos-printer';
+import { Platform, PermissionsAndroid } from 'react-native';
 import type { PrinterPort, PrinterDiscoveryResult, PrinterDevice } from './port';
 import { PrinterAdapterError, PrinterErrorCode } from './port';
-import type { PrinterCapabilities } from '../../../types';
-import { validateTransport, type PrinterTransport } from '../../../types';
+import type { PrinterCapabilities, PrinterTransport } from '../../../types';
 
 const DEFAULT_CAPABILITIES: PrinterCapabilities = {
   supportImage: true,
@@ -12,289 +11,267 @@ const DEFAULT_CAPABILITIES: PrinterCapabilities = {
   paperWidth: 58,
 };
 
-const TCP_CONNECT_TIMEOUT_MS = 10_000;
+async function requestBluetoothPermissions(): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return true;
+  }
 
-function mapNativeTypeToTransport(type: string): PrinterTransport {
-  const upperType = type.toUpperCase();
-  if (upperType.includes('BLE') || upperType.includes('BLUETOOTH_LE')) {
-    return 'ble';
-  }
-  if (upperType.includes('CLASSIC') || upperType.includes('SPP')) {
-    return 'classic';
-  }
-  if (upperType.includes('TCP') || upperType.includes('NET')) {
-    return 'tcp';
-  }
-  return validateTransport(type);
+  const permissions = [
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+  ];
+
+  const results = await PermissionsAndroid.requestMultiple(permissions);
+  return Object.values(results).every(
+    (result) => result === PermissionsAndroid.RESULTS.GRANTED
+  );
 }
 
-function inferTransportFromAddress(address: string): PrinterTransport {
-  if (address.includes(':') && address.split(':').length === 2) {
-    const parts = address.split(':');
-    const port = parseInt(parts[1], 10);
-    if (!isNaN(port) && port > 0 && port <= 65535) {
-      return 'tcp';
-    }
+function toBtAddress(address: string): string {
+  if (address.startsWith('bt:') || address.startsWith('ble:') || address.startsWith('lan:')) {
+    return address;
   }
-  return 'ble';
+  return `bt:${address}`;
 }
 
-function validateTcpAddress(address: string): void {
-  if (!address.includes(':')) {
-    throw new PrinterAdapterError(
-      PrinterErrorCode.TCP_INVALID_ADDRESS,
-      `TCP address must be in host:port format, got "${address}"`,
-      'tcp'
-    );
-  }
-  const colonIndex = address.lastIndexOf(':');
-  const host = address.substring(0, colonIndex);
-  const portStr = address.substring(colonIndex + 1);
-  const port = parseInt(portStr, 10);
-
-  if (!host || host.trim().length === 0) {
-    throw new PrinterAdapterError(
-      PrinterErrorCode.TCP_INVALID_ADDRESS,
-      `TCP host is empty in address "${address}"`,
-      'tcp'
-    );
-  }
-  if (isNaN(port) || port <= 0 || port > 65535) {
-    throw new PrinterAdapterError(
-      PrinterErrorCode.TCP_INVALID_ADDRESS,
-      `TCP port is invalid in address "${address}": ${portStr}`,
-      'tcp'
-    );
-  }
-}
-
-function validateBluetoothAddress(address: string): void {
-  if (!address || address.trim().length === 0) {
-    throw new PrinterAdapterError(
-      PrinterErrorCode.CONNECTION_FAILED,
-      `Bluetooth address cannot be empty`,
-      undefined
-    );
-  }
-}
-
-interface NativeDevice {
-  address: string;
+interface ScanDevice {
   name: string;
-  type: string;
+  address: string;
+  deviceType?: string;
+}
+
+interface ScanResult {
+  paired?: ScanDevice[];
+  found?: ScanDevice[];
 }
 
 export class NativeThermalPrinterAdapter implements PrinterPort {
-  private _currentTransport: PrinterTransport | null = null;
-  private _lastConnectedAddress: string | null = null;
+  private _connectedAddress: string | null = null;
 
-  async discoverPrinters(): Promise<PrinterDiscoveryResult[]> {
-    await ReactNativePosPrinter.init();
-    const devices = await ReactNativePosPrinter.getDeviceList();
-    return (devices as unknown as NativeDevice[]).map(device => ({
-      id: device.address,
-      name: device.name,
-      transport: mapNativeTypeToTransport(device.type),
-      address: device.address,
-      capabilities: DEFAULT_CAPABILITIES,
-    }));
+  private getThermalPrinter() {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('react-native-thermal-printer-driver').default;
   }
 
-  async connectPrinter(address: string, transport?: PrinterTransport): Promise<void> {
-    const inferred = transport ?? inferTransportFromAddress(address);
-    if (inferred === 'tcp') {
-      validateTcpAddress(address);
-    } else {
-      validateBluetoothAddress(address);
+  async discoverPrinters(): Promise<PrinterDiscoveryResult[]> {
+    const hasPermissions = await requestBluetoothPermissions();
+    if (!hasPermissions) {
+      throw new PrinterAdapterError(
+        PrinterErrorCode.CONNECTION_REJECTED,
+        'Bluetooth permissions not granted',
+        'ble'
+      );
     }
 
-    let nativeError: unknown;
+    const ThermalPrinter = this.getThermalPrinter();
+    const result: ScanResult = await ThermalPrinter.scan();
+
+    const devices: PrinterDiscoveryResult[] = [];
+    const seen = new Set<string>();
+
+    const addDevices = (list: ScanDevice[]) => {
+      for (const device of list) {
+        if (!device.address || seen.has(device.address)) continue;
+        seen.add(device.address);
+
+        const transport: PrinterTransport =
+          device.deviceType === 'ble' ? 'ble' : 'classic';
+
+        devices.push({
+          id: device.address,
+          name: device.name || 'Unknown Printer',
+          transport,
+          address: device.address,
+          capabilities: DEFAULT_CAPABILITIES,
+        });
+      }
+    };
+
+    if (result.paired) addDevices(result.paired);
+    if (result.found) addDevices(result.found);
+
+    return devices;
+  }
+
+  async connectPrinter(address: string): Promise<void> {
     try {
-      await ReactNativePosPrinter.connectPrinter(address);
-    } catch (err) {
-      nativeError = err;
-    }
-
-    if (nativeError) {
-      const msg = nativeError instanceof Error ? nativeError.message : String(nativeError);
-      if (msg.toLowerCase().includes('timeout')) {
-        throw new PrinterAdapterError(
-          PrinterErrorCode.TCP_TIMEOUT,
-          `TCP connection timed out for ${address}`,
-          'tcp'
-        );
-      }
-      if (msg.toLowerCase().includes('refused') || msg.toLowerCase().includes('reject')) {
-        throw new PrinterAdapterError(
-          PrinterErrorCode.CONNECTION_REJECTED,
-          `Connection rejected for ${address}: ${msg}`,
-          inferred
-        );
-      }
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = toBtAddress(address);
+      await ThermalPrinter.connect(btAddress);
+      this._connectedAddress = address;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.CONNECTION_FAILED,
         `Failed to connect to ${address}: ${msg}`,
-        inferred
+        'classic'
       );
     }
-
-    this._currentTransport = inferred;
-    this._lastConnectedAddress = address;
   }
 
   async disconnectPrinter(address?: string): Promise<void> {
-    if (address !== undefined && this._lastConnectedAddress !== address) {
-      return;
-    }
     try {
-      await ReactNativePosPrinter.disconnectPrinter();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = address ? toBtAddress(address) : undefined;
+      await ThermalPrinter.disconnect(btAddress);
+
+      if (!address || address === this._connectedAddress) {
+        this._connectedAddress = null;
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.DISCONNECT_FAILED,
-        `Disconnect failed: ${msg}`,
-        this._currentTransport ?? undefined
+        `Failed to disconnect from ${address || 'device'}: ${msg}`,
+        'classic'
       );
-    } finally {
-      this._currentTransport = null;
-      this._lastConnectedAddress = null;
     }
   }
 
   async isConnected(address: string): Promise<boolean> {
-    const nativeConnected = await ReactNativePosPrinter.isConnected();
-    if (!nativeConnected) {
-      this._currentTransport = null;
-      this._lastConnectedAddress = null;
+    try {
+      if (this._connectedAddress !== address) {
+        return false;
+      }
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = toBtAddress(address);
+      return await ThermalPrinter.isConnected(btAddress);
+    } catch {
       return false;
     }
-    const currentDevice = ReactNativePosPrinter.getCurrentDevice() as NativeDevice | null;
-    if (!currentDevice) {
-      this._currentTransport = null;
-      this._lastConnectedAddress = null;
-      return false;
-    }
-    if (currentDevice.address !== this._lastConnectedAddress) {
-      return false;
-    }
-    return currentDevice.address === address;
   }
 
   async sendText(text: string): Promise<void> {
-    if (!this._lastConnectedAddress) {
+    if (!this._connectedAddress) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NOT_CONNECTED,
         'No printer connected — cannot send text'
       );
     }
+
     try {
-      await ReactNativePosPrinter.printText(text);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = toBtAddress(this._connectedAddress);
+
+      const encoder = new TextEncoder();
+      const textBytes = encoder.encode(text + '\n');
+      const data = [0x1B, 0x40, ...Array.from(textBytes), 0x0A];
+
+      await ThermalPrinter.printRaw(btAddress, data, { keepAlive: true });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendText failed: ${msg}`,
-        this._currentTransport ?? undefined
+        'classic'
       );
     }
   }
 
-  async sendImage(base64: string, _width?: number, _height?: number): Promise<void> {
-    if (!this._lastConnectedAddress) {
+  async sendImage(base64: string, width: number): Promise<void> {
+    if (!this._connectedAddress) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NOT_CONNECTED,
         'No printer connected — cannot send image'
       );
     }
+
     try {
-      await ReactNativePosPrinter.printImage(base64);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = toBtAddress(this._connectedAddress);
+      const { image } = require('react-native-thermal-printer-driver');
+
+      await ThermalPrinter.print(btAddress, [image({ base64, width })], { keepAlive: true });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendImage failed: ${msg}`,
-        this._currentTransport ?? undefined
+        'classic'
       );
     }
   }
 
-  async sendQRCode(data: string, _size?: number): Promise<void> {
-    if (!this._lastConnectedAddress) {
+  async sendQRCode(data: string, size: number): Promise<void> {
+    if (!this._connectedAddress) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NOT_CONNECTED,
         'No printer connected — cannot send QR code'
       );
     }
+
     try {
-      await ReactNativePosPrinter.printQRCode(data);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = toBtAddress(this._connectedAddress);
+
+      const dataBytes = new TextEncoder().encode(data);
+      const storeLen = dataBytes.length + 3;
+      const pL = storeLen & 0xFF;
+      const pH = (storeLen >> 8) & 0xFF;
+
+      const qrCommands: number[] = [
+        0x1B, 0x40,
+        0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00,
+        0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, Math.min(size, 16),
+        0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33,
+        0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30,
+        ...Array.from(dataBytes),
+        0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30,
+        0x0A,
+      ];
+
+      await ThermalPrinter.printRaw(btAddress, qrCommands, { keepAlive: true });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendQRCode failed: ${msg}`,
-        this._currentTransport ?? undefined
+        'classic'
       );
     }
   }
 
   async cutPaper(): Promise<void> {
-    if (!this._lastConnectedAddress) {
+    if (!this._connectedAddress) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NOT_CONNECTED,
         'No printer connected — cannot cut paper'
       );
     }
+
     try {
-      await ReactNativePosPrinter.cutPaper();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const ThermalPrinter = this.getThermalPrinter();
+      const btAddress = toBtAddress(this._connectedAddress);
+
+      await ThermalPrinter.printRaw(btAddress, [0x1D, 0x56, 0x00], { keepAlive: false });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `cutPaper failed: ${msg}`,
-        this._currentTransport ?? undefined
+        'classic'
       );
     }
   }
 
   async getCapabilities(): Promise<PrinterCapabilities> {
-    if (!this._lastConnectedAddress) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected'
-      );
-    }
-    const connected = await ReactNativePosPrinter.isConnected();
-    if (!connected) {
-      this._currentTransport = null;
-      this._lastConnectedAddress = null;
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected'
-      );
-    }
     return DEFAULT_CAPABILITIES;
   }
 
   async getCurrentDevice(): Promise<PrinterDevice> {
-    const connected = await ReactNativePosPrinter.isConnected();
-    if (!connected || !this._lastConnectedAddress) {
+    if (!this._connectedAddress) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NO_DEVICE_CONNECTED,
-        'No printer currently connected'
+        'No device connected',
+        'classic'
       );
     }
-    const currentDevice = ReactNativePosPrinter.getCurrentDevice() as NativeDevice | null;
-    if (!currentDevice) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NO_DEVICE_CONNECTED,
-        'No printer currently connected'
-      );
-    }
-    const transport = this._currentTransport ?? inferTransportFromAddress(currentDevice.address);
+
     return {
-      address: currentDevice.address,
-      name: currentDevice.name,
-      transport,
+      address: this._connectedAddress,
+      name: 'Thermal Printer',
+      transport: 'classic',
     };
   }
 }
