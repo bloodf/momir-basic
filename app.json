@@ -3,9 +3,6 @@
     "name": "Momir-Basic",
     "slug": "momir-basic",
     "version": "1.0.0",
-    "cli": {
-      "appVersionSource": "remote"
-    },
     "extra": {
       "eas": {
         "projectId": "8518e773-8656-4479-92ae-ef47db80efa4"
@@ -75,7 +72,8 @@
       "expo-font",
       "expo-web-browser",
       "expo-dev-client",
-      "react-native-thermal-printer-driver"
+      "react-native-thermal-printer-driver",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
