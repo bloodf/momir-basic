@@ -26,20 +26,11 @@ jobs:
     name: Validate Config
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: cd expo && bun install
-
-      - name: Validate eas.json
-        run: cd expo && cat eas.json | jq .
-
-      - name: Validate app.json
-        run: cd expo && cat app.json | jq .
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: cat eas.json | jq .
+      - run: cat app.json | jq .
 
   build-ios:
     name: Build iOS
@@ -47,20 +38,14 @@ jobs:
     needs: validate
     if: (inputs.platform == 'ios' || inputs.platform == 'all') && inputs.dry_run == 'false'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: cd expo && bun install
-
-      - name: Install EAS CLI
-        run: bun add -g eas-cli
-
-      - name: Build iOS
-        run: cd expo && eas build --platform ios --profile production --non-interactive
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas build --platform ios --profile production --non-interactive
 
   build-android:
     name: Build Android
@@ -68,17 +53,11 @@ jobs:
     needs: validate
     if: (inputs.platform == 'android' || inputs.platform == 'all') && inputs.dry_run == 'false'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: cd expo && bun install
-
-      - name: Install EAS CLI
-        run: bun add -g eas-cli
-
-      - name: Build Android
-        run: cd expo && eas build --platform android --profile production --non-interactive
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas build --platform android --profile production --non-interactive

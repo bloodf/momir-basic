@@ -254,7 +254,7 @@ export default function PrinterSetupScreen() {
           name: d.name,
           address: d.address,
           transport: d.transport as PrinterTransport,
-          capabilities: d.capabilities,
+          capabilities: d.capabilities ?? { supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth: 58 },
           lastSeenAt: now,
           createdAt: now,
         }));

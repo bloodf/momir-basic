@@ -7,12 +7,13 @@ describe('Printer DB Migrations', () => {
   });
 
   it('has correct schema version', () => {
-    expect(SCHEMA_VERSION).toBe(1);
+    expect(SCHEMA_VERSION).toBe(2);
   });
 
-  it('has one migration defined', () => {
-    expect(MIGRATIONS).toHaveLength(1);
+  it('has migrations defined', () => {
+    expect(MIGRATIONS).toHaveLength(2);
     expect(MIGRATIONS[0].version).toBe(1);
+    expect(MIGRATIONS[1].version).toBe(2);
   });
 
   it('migration creates printers table', () => {

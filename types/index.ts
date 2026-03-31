@@ -187,7 +187,10 @@ export function migratePrinterPreferences(
     preferredPrinterId: null,
     paperWidth: legacy.paperWidth === 58 || legacy.paperWidth === 80 ? legacy.paperWidth : 58,
     printArt: typeof legacy.printArt === 'boolean' ? legacy.printArt : true,
+    printQR: true,
+    printFlavorText: true,
     autoPrint: typeof legacy.autoPrint === 'boolean' ? legacy.autoPrint : false,
+    printMode: 'full' as const,
   };
 }
 

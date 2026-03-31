@@ -156,7 +156,7 @@ export default function SettingsScreen() {
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>Print Flavor Text</Text>
-                  <Text style={styles.settingHint}>Include the card's flavor text</Text>
+                  <Text style={styles.settingHint}>Include the card&apos;s flavor text</Text>
                 </View>
                 <Switch
                   value={settings.printer.printFlavorText ?? true}
