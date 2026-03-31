@@ -240,7 +240,7 @@ adb logcat --pid=$(adb shell pidof host.exp.exponent) -s PrinterSession:* *:S
 
 **iOS:**
 ```bash
-log stream --predicate 'subsystem == "com.rork.momir-basic.PrinterSession"' --level debug
+log stream --predicate 'subsystem == "com.bloodf.momirbasic.PrinterSession"' --level debug
 ```
 
 ---

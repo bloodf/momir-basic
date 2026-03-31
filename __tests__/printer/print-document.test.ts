@@ -228,7 +228,7 @@ describe('DiagnosticsDocument', () => {
     };
 
     const doc = new DiagnosticsDocument(
-      'Rork App',
+      'Momir Basic',
       'iOS',
       'ble',
       58,
@@ -241,7 +241,7 @@ describe('DiagnosticsDocument', () => {
     const text = chunks.map(c => new TextDecoder().decode(c)).join('');
 
     expect(text).toContain('PRINTER DIAGNOSTICS');
-    expect(text).toContain('App: Rork App');
+    expect(text).toContain('App: Momir Basic');
     expect(text).toContain('Platform: iOS');
     expect(text).toContain('Transport: ble');
     expect(text).toContain('Paper: 58mm');

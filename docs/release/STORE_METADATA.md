@@ -4,7 +4,7 @@
 
 ### Basic Information
 - **App Name**: Momir-Basic
-- **Bundle ID**: app.rork.khur2ml36fu56vvhu6tre
+- **Bundle ID**: com.bloodf.momirbasic
 - **Primary Language**: English
 - **Category**: Games > Card > Entertainment
 - **Subcategory**: [DECISION NEEDED: Or use Utilities > Entertainment]
@@ -56,7 +56,7 @@ magic, mtg, card, scryfall, printer, receipt, gatherer, randomizer
 
 ### Basic Information
 - **App Name**: Momir-Basic
-- **Package Name**: app.rork.khur2ml36fu56vvhu6tre
+- **Package Name**: com.bloodf.momirbasic
 - **Primary Category**: Entertainment > Card
 - **Content Rating**: Everyone
 

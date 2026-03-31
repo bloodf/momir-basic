@@ -21,7 +21,7 @@ This guide routes AI agents and developers through the Momir Basic codebase. It 
 # Install dependencies
 bun install
 
-# Start dev server (uses Rork tunneling for remote testing)
+# Start dev server (uses Expo tunnel for remote testing)
 bun start
 
 # Build for iOS simulator
@@ -70,7 +70,7 @@ bunx playwright test        # E2E tests
 ### Directory Structure
 
 ```
-rork-momir-basic/
+momir-basic/
 ├── app/                        # Expo Router screens (navigation structure)
 │   ├── (tabs)/                 # Tabbed layout
 │   │   ├── home/
@@ -953,7 +953,7 @@ Use subagents for:
 
 ### Local Development
 
-- Dev server: `bun start` (Rork tunnel for remote testing)
+- Dev server: `bun start` (Expo tunnel for remote testing)
 - Custom dev client required (printer needs native code)
 - TypeScript: `npx tsc --noEmit` before commits
 - Linting: `bun run lint` (eslint.config.js v9)

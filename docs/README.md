@@ -1,6 +1,6 @@
-# Rork Momir-Basic Docs
+# Momir Basic Docs
 
-This Expo app is a Magic: The Gathering browser, randomizer, and thermal receipt printer built with Rork AI. The main flow lets players cast random cards by type and mana value, inspect details, search the Scryfall catalog, save card history, and prepare receipt-style print output for supported thermal printers.
+This Expo app is a Magic: The Gathering browser, randomizer, and thermal receipt printer built with the community. The main flow lets players cast random cards by type and mana value, inspect details, search the Scryfall catalog, save card history, and prepare receipt-style print output for supported thermal printers.
 
 ## What the app does
 

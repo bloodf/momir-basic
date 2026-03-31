@@ -18,7 +18,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'bunx rork start -p khur2ml36fu56vvhu6tre --web --localhost',
+    command: 'npx expo start --web --localhost',
     url: 'http://localhost:8081',
     reuseExistingServer: false,
     timeout: 120000,

@@ -8,12 +8,12 @@
         "projectId": "8518e773-8656-4479-92ae-ef47db80efa4"
       },
       "router": {
-        "origin": "https://rork.com/"
+        "origin": "https://momir-basic.app/"
       }
     },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rork-app",
+    "scheme": "momir-basic",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -23,7 +23,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.khur2ml36fu56vvhu6tre",
+      "bundleIdentifier": "com.bloodf.momirbasic",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
         "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
@@ -51,7 +51,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.khur2ml36fu56vvhu6tre",
+      "package": "com.bloodf.momirbasic",
       "permissions": [
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
@@ -66,7 +66,7 @@
       [
         "expo-router",
         {
-          "origin": "https://rork.com/"
+          "origin": "https://momir-basic.app/"
         }
       ],
       "expo-font",

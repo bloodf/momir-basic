@@ -16,14 +16,14 @@ This will show existing credentials or guide through creation.
 
 ### App Store Connect
 - **App Name**: Momir-Basic
-- **Bundle ID**: app.rork.khur2ml36fu56vvhu6tre
+- **Bundle ID**: com.bloodf.momirbasic
 - **Account**: [DECISION NEEDED: Apple account email used for App Store Connect]
 
 ## Android Credentials
 
 ### Google Play Publisher
 - **Publisher Account**: [DECISION NEEDED: Who owns the Google Play Publisher account?]
-- **Package Name**: app.rork.khur2ml36fu56vvhu6tre
+- **Package Name**: com.bloodf.momirbasic
 - **Recovery**: [How to recover if the owner is unavailable]
 
 ### EAS Android Credentials

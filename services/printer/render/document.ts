@@ -223,7 +223,7 @@ export class DiagnosticsDocument implements PrintDocument {
     if (capabilities.supportQR) {
       renderer.feedLine();
       renderer.setAlignment('center');
-      const testQrUrl = buildQrUrl('https://rork.com');
+      const testQrUrl = buildQrUrl('https://github.com/bloodf/momir-basic');
       renderer.printQRCode(testQrUrl, 6);
     }
 

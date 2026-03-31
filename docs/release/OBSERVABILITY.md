@@ -60,13 +60,13 @@ adb logcat -v time --pid=$(adb shell pidof host.exp.exponent) -s PrinterSession:
 
 ```bash
 # Using Console.app (open on macOS with device connected)
-# Filter by subsystem: com.rork.momir-basic.PrinterSession
+# Filter by subsystem: com.bloodf.momirbasic.PrinterSession
 
 # Using log command-line tool
-log stream --predicate 'subsystem == "com.rork.momir-basic.PrinterSession"' --level debug
+log stream --predicate 'subsystem == "com.bloodf.momirbasic.PrinterSession"' --level debug
 
 # Save to file for certification evidence
-log show --predicate 'subsystem == "com.rork.momir-basic.PrinterSession"' --level debug --output printer-session-$(date +%Y%m%d-%H%M%S).log
+log show --predicate 'subsystem == "com.bloodf.momirbasic.PrinterSession"' --level debug --output printer-session-$(date +%Y%m%d-%H%M%S).log
 ```
 
 ### Evidence Collection for Certification

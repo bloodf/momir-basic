@@ -23,6 +23,6 @@
 - **Google Play Publisher**: [DECISION NEEDED]
 
 ## App Identifiers
-- **iOS Bundle ID**: app.rork.khur2ml36fu56vvhu6tre
-- **Android Package**: app.rork.khur2ml36fu56vvhu6tre
+- **iOS Bundle ID**: com.bloodf.momirbasic
+- **Android Package**: com.bloodf.momirbasic
 - **App Slug**: khur2ml36fu56vvhu6tre
