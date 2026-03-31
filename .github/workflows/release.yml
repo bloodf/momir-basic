@@ -1,15 +1,47 @@
-name: Release APK
+name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  build-and-upload:
-    name: Build & Upload APK
+  changelog:
+    name: Generate Changelog & Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      tag: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: .github/cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: CHANGELOG.md
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.content }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') }}
+
+  build-android:
+    name: Build Android APK
+    needs: changelog
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,9 +65,81 @@ jobs:
         run: cd android && ./gradlew assembleRelease
 
       - name: Rename APK
-        run: mv android/app/build/outputs/apk/release/app-release.apk momir-basic-${{ github.event.release.tag_name }}.apk
+        run: mv android/app/build/outputs/apk/release/app-release.apk momir-basic-${{ needs.changelog.outputs.tag }}-android.apk
 
       - name: Upload APK to release
         uses: softprops/action-gh-release@v2
         with:
-          files: momir-basic-${{ github.event.release.tag_name }}.apk
+          tag_name: ${{ needs.changelog.outputs.tag }}
+          files: momir-basic-${{ needs.changelog.outputs.tag }}-android.apk
+
+  build-ios:
+    name: Build iOS IPA
+    needs: changelog
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install
+
+      - name: Expo prebuild
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build iOS archive
+        run: |
+          cd ios
+          xcodebuild -workspace MomirBasic.xcworkspace \
+            -scheme MomirBasic \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath ${{ runner.temp }}/MomirBasic.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="-" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export IPA
+        run: |
+          mkdir -p export
+          cat > export/ExportOptions.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath ${{ runner.temp }}/MomirBasic.xcarchive \
+            -exportPath export \
+            -exportOptionsPlist export/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            CODE_SIGN_IDENTITY="-" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_ALLOWED=NO || true
+
+          # If export fails (no signing), create IPA from archive directly
+          if [ ! -f export/MomirBasic.ipa ] && [ -d "${{ runner.temp }}/MomirBasic.xcarchive" ]; then
+            cd "${{ runner.temp }}/MomirBasic.xcarchive/Products/Applications"
+            mkdir -p Payload
+            cp -r *.app Payload/
+            zip -r "${{ github.workspace }}/momir-basic-${{ needs.changelog.outputs.tag }}-ios.ipa" Payload
+          else
+            mv export/MomirBasic.ipa "${{ github.workspace }}/momir-basic-${{ needs.changelog.outputs.tag }}-ios.ipa"
+          fi
+
+      - name: Upload IPA to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.changelog.outputs.tag }}
+          files: momir-basic-${{ needs.changelog.outputs.tag }}-ios.ipa
+        if: hashFiles(format('momir-basic-{0}-ios.ipa', needs.changelog.outputs.tag)) != ''
