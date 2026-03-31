@@ -1,3 +1,35 @@
 node_modules
 .env
 .expo
+.DS_Store
+
+# Native builds
+expo/android/
+expo/ios/
+
+# Expo
+expo/.expo/
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OMC / Claude state
+.omc/
+.sisyphus/
+.claude/settings.local.json
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+Thumbs.db

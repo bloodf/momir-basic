@@ -1,0 +1,40 @@
+name: PR Preview
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'expo/**'
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+defaults:
+  run:
+    working-directory: expo
+
+jobs:
+  preview:
+    name: EAS Preview Update
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas update --branch pr-${{ github.event.number }} --message "PR #${{ github.event.number }}" --non-interactive
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Preview Update Published\nBranch: \`pr-${{ github.event.number }}\`\n\nScan with Expo Go or a development build to preview.`
+            });

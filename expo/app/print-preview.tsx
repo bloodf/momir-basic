@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   Dimensions,
   Platform,
   Animated,
@@ -21,13 +20,12 @@ import { X, Printer, Download, Check, AlertTriangle, WifiOff, Loader } from 'luc
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useSettings } from '@/providers/SettingsProvider';
+import { showToast } from '@/components/Toast';
 import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
-import { createJob, getJobById } from '../services/printer/storage/repositories';
-import { processQueueForPrinter } from '../services/printer/queue/engine';
+import { NativeModules } from 'react-native';
 import { createAdapter } from '../services/printer/adapters/factory';
-import type { PrintJob, PrintJobState } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
@@ -114,7 +112,7 @@ export default function PrintPreviewScreen() {
   const handleDevPrint = useCallback(async () => {
     if (!card || !receiptRef.current) return;
     if (Platform.OS as string === 'web') {
-      Alert.alert(t.printPreview.notAvailable, t.printPreview.devPrintNotSupported);
+      showToast({ type: 'info', title: t.printPreview.notAvailable, message: t.printPreview.devPrintNotSupported });
       return;
     }
 
@@ -123,7 +121,7 @@ export default function PrintPreviewScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t.printPreview.permissionDenied, t.printPreview.galleryAccessRequired);
+        showToast({ type: 'error', title: t.printPreview.permissionDenied, message: t.printPreview.galleryAccessRequired });
         setIsSaving(false);
         return;
       }
@@ -142,7 +140,7 @@ export default function PrintPreviewScreen() {
 
       showSuccessFlash();
     } catch {
-      Alert.alert(t.printPreview.saveFailed, t.printPreview.saveFailedMsg);
+      showToast({ type: 'error', title: t.printPreview.saveFailed, message: t.printPreview.saveFailedMsg });
     } finally {
       setIsSaving(false);
     }
@@ -177,7 +175,7 @@ export default function PrintPreviewScreen() {
 
     if (!preferredPrinterId) {
       setPrintOutcome({ type: 'failed', message: 'No printer selected. Go to Settings to select a printer.' });
-      Alert.alert('No Printer', 'Please select a printer in Settings first.');
+      showToast({ type: 'warning', title: 'No Printer', message: 'Please select a printer in Settings first.' });
       return;
     }
 
@@ -187,7 +185,7 @@ export default function PrintPreviewScreen() {
       const isConnected = await adapter.isConnected(preferredPrinterId);
       if (!isConnected) {
         setPrintOutcome({ type: 'failed', message: 'Printer is not connected. Go to Settings to reconnect.' });
-        Alert.alert('Printer Disconnected', 'The printer is not connected. Please reconnect from Settings.');
+        showToast({ type: 'error', title: 'Printer Disconnected', message: 'Please reconnect from Settings.' });
         return;
       }
     } catch {
@@ -211,55 +209,138 @@ export default function PrintPreviewScreen() {
     try {
       setIsQueueing(true);
 
-      const jobId = `card-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      await createJob({
-        id: jobId,
-        printerId: preferredPrinterId,
-        documentType: 'card_receipt',
-        payload: JSON.stringify(cardReceiptData),
-      });
+      const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
+      const printMode = settings.printer?.printMode ?? 'full';
+      const printArt = settings.printer?.printArt ?? false;
+      const imageUrl = cardReceiptData.imageUrl;
+      const widthPx = paperWidth === 80 ? 576 : 384;
 
-      // Process the queue to attempt printing
-      await processQueueForPrinter(preferredPrinterId);
+      const btAddress = preferredPrinterId.startsWith('bt:') ? preferredPrinterId : `bt:${preferredPrinterId}`;
+      await NativeModules.ThermalPrinterDriver.connect(btAddress, 10000);
 
-      // Fetch the final job state after processing
-      const job = await getJobById(jobId);
-
-      if (job?.state === 'printed_confirmed') {
-        if (Platform.OS !== 'web') {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (printMode === 'image_only') {
+        // FULL CARD MODE: Print the full card face image
+        const fullCardUrl = card.normalImageUrl || card.artCropUrl;
+        if (fullCardUrl) {
+          await NativeModules.ThermalPrinterDriver.printImage(
+            btAddress, fullCardUrl, 'url',
+            widthPx,
+            1, // align center
+            false,
+            25000
+          );
+        } else {
+          throw new Error('No card image available to print.');
         }
-        setPrintOutcome({ type: 'success', message: 'Card receipt printed successfully.' });
-        Alert.alert('Print Complete', 'Your card receipt was printed successfully.');
-        return;
+      } else {
+        // RECEIPT MODE: ESC/POS with split calls matching preview order
+        // Name+Mana → Art → Type → Oracle → Flavor → Stats → QR
+        const encoder = new TextEncoder();
+        const printArt = settings.printer?.printArt ?? true;
+        const printQR = settings.printer?.printQR ?? true;
+        const printFlavor = settings.printer?.printFlavorText ?? true;
+        const artUrl = card.artCropUrl || card.normalImageUrl;
+        const maxCols = paperWidth === 80 ? 48 : 32;
+        const sep = '='.repeat(maxCols) + '\n';
+
+        // --- PART 1: Header (name + mana on same line) ---
+        const manaCost = cardReceiptData.manaCost || '';
+        const nameLine = manaCost
+          ? `${cardReceiptData.name} ${manaCost}`
+          : cardReceiptData.name;
+
+        const headerBytes = Array.from(encoder.encode([
+          '\x1B\x40',          // Init
+          '\x1B\x61\x01',      // Center
+          '\x1B\x45\x01',      // Bold
+          nameLine + '\n',
+          '\x1B\x45\x00',      // Bold off
+          sep,
+        ].join('')));
+
+        await NativeModules.ThermalPrinterDriver.printRaw(btAddress, headerBytes, true, 10000);
+
+        // --- PART 2: Art crop image ---
+        if (printArt && artUrl) {
+          try {
+            await NativeModules.ThermalPrinterDriver.printImage(
+              btAddress, artUrl, 'url',
+              widthPx, 1, true, 25000
+            );
+          } catch {
+            // Image failed — continue
+          }
+        }
+
+        // --- PART 3: Body (type → oracle → flavor → stats) ---
+        const wrapText = (text: string, width: number): string => {
+          const words = text.split(' ');
+          const lines: string[] = [];
+          let line = '';
+          for (const word of words) {
+            if (line.length + word.length + 1 > width) {
+              lines.push(line);
+              line = word;
+            } else {
+              line = line ? `${line} ${word}` : word;
+            }
+          }
+          if (line) lines.push(line);
+          return lines.join('\n') + '\n';
+        };
+
+        const body: string[] = [
+          '\x1B\x61\x01',      // Center
+          cardReceiptData.type + '\n',
+          sep,
+        ];
+
+        if (cardReceiptData.oracleText) {
+          body.push('\x1B\x61\x00'); // Left
+          body.push(wrapText(cardReceiptData.oracleText, maxCols));
+        }
+
+        if (printFlavor && cardReceiptData.flavorText) {
+          body.push('\n\x1B\x61\x01'); // Center
+          body.push(`"${cardReceiptData.flavorText}"\n`);
+        }
+
+        if (cardReceiptData.power !== undefined && cardReceiptData.toughness !== undefined) {
+          body.push('\n\x1B\x61\x02'); // Right
+          body.push('\x1B\x45\x01');   // Bold
+          body.push(`${cardReceiptData.power}/${cardReceiptData.toughness}\n`);
+          body.push('\x1B\x45\x00');
+        }
+
+        const bodyBytes = Array.from(encoder.encode(body.join('')));
+        await NativeModules.ThermalPrinterDriver.printRaw(btAddress, bodyBytes, true, 10000);
+
+        // --- PART 4: QR code ---
+        if (printQR) {
+          try {
+            await NativeModules.ThermalPrinterDriver.printImage(
+              btAddress, qrUrl, 'url',
+              120, 1, true, 15000
+            );
+          } catch {
+            // QR failed — continue
+          }
+        }
+
+        // --- PART 5: Footer ---
+        const footerBytes = Array.from(encoder.encode('\n\n\n'));
+        await NativeModules.ThermalPrinterDriver.printRaw(btAddress, footerBytes, false, 5000);
       }
 
-      if (job?.state === 'sent_unknown') {
-        if (Platform.OS !== 'web') {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
-        const msg = 'Print delivery is uncertain. The printer may have received partial data. Check the printer output.';
-        setPrintOutcome({ type: 'uncertain', message: msg });
-        Alert.alert('Uncertain Delivery', msg);
-        return;
+      if (Platform.OS !== 'web') {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-
-      if (job?.state === 'failed_terminal' || job?.state === 'failed_retryable') {
-        if (Platform.OS !== 'web') {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }
-        const msg = job.lastError ?? 'Print failed. Please try again or check the printer.';
-        setPrintOutcome({ type: 'failed', message: msg });
-        Alert.alert('Print Failed', msg);
-        return;
-      }
-
-      // Job is still queued or printing — this shouldn't happen since we just processed
-      setPrintOutcome({ type: 'queued', message: 'Print job queued for processing.' });
+      setPrintOutcome({ type: 'success', message: 'Card receipt printed successfully.' });
+      showToast({ type: 'success', title: 'Print Complete', message: 'Your card receipt was printed successfully.' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to queue the print job.';
+      const message = error instanceof Error ? error.message : 'Print failed.';
       setPrintOutcome({ type: 'failed', message });
-      Alert.alert('Print Failed', message);
+      showToast({ type: 'error', title: 'Print Failed', message });
     } finally {
       setIsQueueing(false);
     }
@@ -283,6 +364,11 @@ export default function PrintPreviewScreen() {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(scryfallUrl)}&bgcolor=FFFFFF&color=000000&margin=0`;
 
   const isDevMode = settings.devMode;
+  const printMode = settings.printer?.printMode ?? 'full';
+  const isImageOnly = printMode === 'image_only';
+  const showArt = settings.printer?.printArt ?? true;
+  const showQR = settings.printer?.printQR ?? true;
+  const showFlavor = settings.printer?.printFlavorText ?? true;
 
   const canPrint = printerConnection === 'connected' || isDevMode;
 
@@ -309,57 +395,78 @@ export default function PrintPreviewScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.previewLabel}>
-          {isDevMode ? t.printPreview.devModeLabel : t.printPreview.thermalReceipt(settings.printer.paperWidth ?? 58)}
+          {isDevMode
+            ? t.printPreview.devModeLabel
+            : isImageOnly
+              ? 'FULL CARD IMAGE'
+              : t.printPreview.thermalReceipt(settings.printer.paperWidth ?? 58)}
         </Text>
 
         <Animated.View style={{ opacity: receiptOpacity, transform: [{ translateY: receiptSlide }] }}>
           <View ref={receiptRef} collapsable={false} style={styles.receipt}>
-            <View style={styles.receiptHeader}>
-              <Text style={styles.receiptCardName} numberOfLines={2}>
-                {card.name}
-              </Text>
-              <PrintManaCost manaCost={card.manaCost} size={16} gap={2} />
-            </View>
-
-            <View style={styles.receiptArtWrap}>
-              <Image
-                source={{ uri: card.artCropUrl || card.normalImageUrl }}
-                style={styles.receiptArt}
-                contentFit="cover"
-                transition={200}
-              />
-            </View>
-
-            <Text style={styles.receiptTypeLine}>
-              {card.typeLine.replace('—', '\u2014')}
-            </Text>
-
-            {card.oracleText ? (
-              <View style={styles.receiptOracleWrap}>
-                <PrintOracleText text={card.oracleText} fontSize={12} color="#000000" />
+            {isImageOnly ? (
+              <View style={styles.imageOnlyWrap}>
+                <Image
+                  source={{ uri: card.normalImageUrl || card.artCropUrl }}
+                  style={styles.imageOnlyArt}
+                  contentFit="contain"
+                  transition={200}
+                />
               </View>
-            ) : null}
+            ) : (
+              <>
+                <View style={styles.receiptHeader}>
+                  <Text style={styles.receiptCardName} numberOfLines={2}>
+                    {card.name}
+                  </Text>
+                  <PrintManaCost manaCost={card.manaCost} size={16} gap={2} />
+                </View>
 
-            {card.flavorText ? (
-              <Text style={styles.receiptFlavor}>
-                {card.flavorText}
-              </Text>
-            ) : null}
+                {showArt && (
+                  <View style={styles.receiptArtWrap}>
+                    <Image
+                      source={{ uri: card.artCropUrl || card.normalImageUrl }}
+                      style={styles.receiptArt}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                  </View>
+                )}
 
-            {hasStats && (
-              <View style={styles.receiptStatsRow}>
-                <Text style={styles.receiptStatValue}>{card.power} / {card.toughness}</Text>
-              </View>
+                <Text style={styles.receiptTypeLine}>
+                  {card.typeLine.replace('—', '\u2014')}
+                </Text>
+
+                {card.oracleText ? (
+                  <View style={styles.receiptOracleWrap}>
+                    <PrintOracleText text={card.oracleText} fontSize={12} color="#000000" />
+                  </View>
+                ) : null}
+
+                {showFlavor && card.flavorText ? (
+                  <Text style={styles.receiptFlavor}>
+                    {card.flavorText}
+                  </Text>
+                ) : null}
+
+                {hasStats && (
+                  <View style={styles.receiptStatsRow}>
+                    <Text style={styles.receiptStatValue}>{card.power} / {card.toughness}</Text>
+                  </View>
+                )}
+
+                {showQR && (
+                  <View style={styles.receiptQrWrap}>
+                    <Image
+                      source={{ uri: qrUrl }}
+                      style={styles.receiptQr}
+                      contentFit="contain"
+                      transition={200}
+                    />
+                  </View>
+                )}
+              </>
             )}
-
-            <View style={styles.receiptQrWrap}>
-              <Image
-                source={{ uri: qrUrl }}
-                style={styles.receiptQr}
-                contentFit="contain"
-                transition={200}
-              />
-            </View>
           </View>
         </Animated.View>
 
@@ -367,7 +474,9 @@ export default function PrintPreviewScreen() {
           <Text style={styles.infoText}>
             {isDevMode
               ? t.printPreview.devModeInfo
-              : t.printPreview.thermalInfo(settings.printer.paperWidth ?? 58)
+              : isImageOnly
+                ? 'Prints the full card face image only.'
+                : t.printPreview.thermalInfo(settings.printer.paperWidth ?? 58)
             }
           </Text>
           {card.artist && (
@@ -610,6 +719,13 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     lineHeight: 22,
+  },
+  imageOnlyWrap: {
+    alignItems: 'center' as const,
+  },
+  imageOnlyArt: {
+    width: RECEIPT_WIDTH - 32,
+    height: (RECEIPT_WIDTH - 32) * 1.4,
   },
   receiptArtWrap: {
     width: ART_WIDTH,

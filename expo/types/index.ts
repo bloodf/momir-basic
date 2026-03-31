@@ -99,11 +99,16 @@ export interface PrinterCapabilities {
 }
 
 // User preferences for printing (lives in SettingsProvider/AsyncStorage)
+export type PrintMode = 'full' | 'image_only';
+
 export interface PrinterPreferences {
   preferredPrinterId: string | null;  // null = no printer selected
   paperWidth: 58 | 80;
   printArt: boolean;
+  printQR: boolean;
+  printFlavorText: boolean;
   autoPrint: boolean;
+  printMode: PrintMode;  // 'full' = receipt layout, 'image_only' = full card image
 }
 
 // Legacy printer config (for migration only)
@@ -191,7 +196,10 @@ export const DEFAULT_PRINTER_PREFERENCES: PrinterPreferences = {
   preferredPrinterId: null,
   paperWidth: 58,
   printArt: true,
+  printQR: true,
+  printFlavorText: true,
   autoPrint: false,
+  printMode: 'full' as const,
 };
 
 export interface AppSettings {

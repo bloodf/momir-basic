@@ -30,4 +30,11 @@ function resetPrinterMock() {
   ThermalPrinter.printRaw.mockResolvedValue({ success: true });
 }
 
-module.exports = { default: ThermalPrinter, ...ThermalPrinter, resetPrinterMock, FAKE_DEVICES };
+// Node factory mocks (matching the real library's named exports)
+function image(source) { return { type: 'image', source }; }
+function text(content, style) { return { type: 'text', content, style }; }
+function qr(content, options) { return { type: 'qr', content, ...options }; }
+function cut(options) { return { type: 'cut', partial: options?.partial }; }
+function feed(lines) { return { type: 'feed', lines }; }
+
+module.exports = { default: ThermalPrinter, ...ThermalPrinter, resetPrinterMock, FAKE_DEVICES, image, text, qr, cut, feed };

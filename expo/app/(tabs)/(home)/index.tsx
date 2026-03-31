@@ -56,7 +56,7 @@ export default function HomeScreen() {
   const { t, locale } = useI18n();
   const { isOnline: _isOnline } = useNetwork();
 
-  const [cmc, setCmc] = useState(3);
+  const [cmc, setCmc] = useState(1);
   const [typeIndex, setTypeIndex] = useState(0);
   const [_lastCards, setLastCards] = useState<Card[]>([]);
   const [typePickerVisible, setTypePickerVisible] = useState(false);

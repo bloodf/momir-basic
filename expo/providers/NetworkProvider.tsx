@@ -26,6 +26,7 @@ export const [NetworkProvider, useNetwork] = createContextHook(() => {
   const queryClient = useQueryClient();
   const wasOfflineRef = useRef(false);
   const hasShownOfflineRef = useRef(false);
+  const isInitializedRef = useRef(false);
 
   const connectivityQuery = useQuery({
     queryKey: ['networkConnectivity'],
@@ -37,8 +38,19 @@ export const [NetworkProvider, useNetwork] = createContextHook(() => {
 
   const isOnline = connectivityQuery.data ?? true;
 
+  // Track how many connectivity results we've seen to suppress cold-start false offline
+  const checkCountRef = useRef(0);
+
   useEffect(() => {
-    if (!isOnline && !hasShownOfflineRef.current) {
+    checkCountRef.current += 1;
+
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      return;
+    }
+
+    // Suppress offline toast on the first 4 checks (cold start may report offline briefly)
+    if (!isOnline && !hasShownOfflineRef.current && checkCountRef.current > 4) {
       wasOfflineRef.current = true;
       hasShownOfflineRef.current = true;
       showToast({
@@ -47,7 +59,6 @@ export const [NetworkProvider, useNetwork] = createContextHook(() => {
         message: 'Some features may not be available',
         duration: 6000,
       });
-      console.log('[Network] Device went offline');
     }
 
     if (isOnline && wasOfflineRef.current) {

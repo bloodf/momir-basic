@@ -1,4 +1,4 @@
-import { Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 import type { PrinterPort, PrinterDiscoveryResult, PrinterDevice } from './port';
 import { PrinterAdapterError, PrinterErrorCode } from './port';
 import type { PrinterCapabilities, PrinterTransport } from '../../../types';
@@ -64,8 +64,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
       );
     }
 
-    const ThermalPrinter = this.getThermalPrinter();
-    const result: ScanResult = await ThermalPrinter.scan();
+    const result: ScanResult = await NativeModules.ThermalPrinterDriver.scanDevices();
 
     const devices: PrinterDiscoveryResult[] = [];
     const seen = new Set<string>();
@@ -91,14 +90,15 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     if (result.paired) addDevices(result.paired);
     if (result.found) addDevices(result.found);
 
+    // eslint-disable-next-line no-console
+    console.error('[DIAG] adapter returning', devices.length, 'devices');
     return devices;
   }
 
   async connectPrinter(address: string): Promise<void> {
     try {
-      const ThermalPrinter = this.getThermalPrinter();
       const btAddress = toBtAddress(address);
-      await ThermalPrinter.connect(btAddress);
+      await NativeModules.ThermalPrinterDriver.connect(btAddress, 10000);
       this._connectedAddress = address;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -112,9 +112,8 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
 
   async disconnectPrinter(address?: string): Promise<void> {
     try {
-      const ThermalPrinter = this.getThermalPrinter();
-      const btAddress = address ? toBtAddress(address) : undefined;
-      await ThermalPrinter.disconnect(btAddress);
+      const btAddress = address ? toBtAddress(address) : null;
+      await NativeModules.ThermalPrinterDriver.disconnect(btAddress);
 
       if (!address || address === this._connectedAddress) {
         this._connectedAddress = null;
@@ -131,12 +130,9 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
 
   async isConnected(address: string): Promise<boolean> {
     try {
-      if (this._connectedAddress !== address) {
-        return false;
-      }
-      const ThermalPrinter = this.getThermalPrinter();
       const btAddress = toBtAddress(address);
-      return await ThermalPrinter.isConnected(btAddress);
+      const result = await NativeModules.ThermalPrinterDriver.testConnection(btAddress);
+      return result?.success === true;
     } catch {
       return false;
     }
@@ -158,7 +154,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
       const textBytes = encoder.encode(text + '\n');
       const data = [0x1B, 0x40, ...Array.from(textBytes), 0x0A];
 
-      await ThermalPrinter.printRaw(btAddress, data, { keepAlive: true });
+      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, data, true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
@@ -169,7 +165,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     }
   }
 
-  async sendImage(base64: string, width: number): Promise<void> {
+  async sendImage(base64: string, width: number, _height: number): Promise<void> {
     if (!this._connectedAddress) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NOT_CONNECTED,
@@ -182,7 +178,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
       const btAddress = toBtAddress(this._connectedAddress);
       const { image } = require('react-native-thermal-printer-driver');
 
-      await ThermalPrinter.print(btAddress, [image({ base64, width })], { keepAlive: true });
+      await NativeModules.ThermalPrinterDriver.printImage(btAddress, base64, 'base64', width, 0, true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
@@ -221,7 +217,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
         0x0A,
       ];
 
-      await ThermalPrinter.printRaw(btAddress, qrCommands, { keepAlive: true });
+      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, qrCommands, true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
@@ -244,7 +240,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
       const ThermalPrinter = this.getThermalPrinter();
       const btAddress = toBtAddress(this._connectedAddress);
 
-      await ThermalPrinter.printRaw(btAddress, [0x1D, 0x56, 0x00], { keepAlive: false });
+      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, [0x1D, 0x56, 0x00], false, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(

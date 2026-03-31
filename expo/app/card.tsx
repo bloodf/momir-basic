@@ -44,7 +44,6 @@ import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/sc
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
-import { createJob } from '../services/printer/storage/repositories';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_HEIGHT * 0.48;
@@ -104,27 +103,69 @@ export default function CardDetailScreen() {
     if (!settings.printer.autoPrint) return;
     if (!settings.printer.preferredPrinterId) return;
 
-    const cardReceiptData = {
-      name: cardToPrint.name,
-      manaCost: cardToPrint.manaCost,
-      type: cardToPrint.typeLine,
-      oracleText: cardToPrint.oracleText,
-      flavorText: cardToPrint.flavorText,
-      power: cardToPrint.power,
-      toughness: cardToPrint.toughness,
-      imageUrl: cardToPrint.normalImageUrl || cardToPrint.artCropUrl,
-      setCode: cardToPrint.setCode,
-      scryfallId: cardToPrint.id,
-    };
+    const { NativeModules } = require('react-native');
+    const nativePrinter = NativeModules.ThermalPrinterDriver;
+    if (!nativePrinter) return;
 
-    const jobId = `card-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    await createJob({
-      id: jobId,
-      printerId: settings.printer.preferredPrinterId,
-      documentType: 'card_receipt',
-      payload: JSON.stringify(cardReceiptData),
-    });
-  }, [settings.printer.autoPrint, settings.printer.preferredPrinterId]);
+    const printMode = settings.printer?.printMode ?? 'full';
+    const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
+    const widthPx = paperWidth === 80 ? 576 : 384;
+    const imageUrl = cardToPrint.normalImageUrl || cardToPrint.artCropUrl;
+    const btAddress = settings.printer.preferredPrinterId.startsWith('bt:')
+      ? settings.printer.preferredPrinterId
+      : `bt:${settings.printer.preferredPrinterId}`;
+
+    try {
+      await nativePrinter.connect(btAddress, 10000);
+
+      if (printMode === 'image_only') {
+        if (imageUrl) {
+          await nativePrinter.printImage(btAddress, imageUrl, 'url', widthPx, 1, false, 25000);
+        }
+      } else {
+        const { EscPosRenderer } = await import('../services/printer/render/escpos');
+        const { CardReceiptDocument } = await import('../services/printer/render/document');
+
+        const cardReceiptData = {
+          name: cardToPrint.name,
+          manaCost: cardToPrint.manaCost,
+          type: cardToPrint.typeLine,
+          oracleText: cardToPrint.oracleText,
+          flavorText: cardToPrint.flavorText,
+          power: cardToPrint.power,
+          toughness: cardToPrint.toughness,
+          imageUrl,
+          setCode: cardToPrint.setCode,
+          scryfallId: cardToPrint.id,
+        };
+
+        const capabilities = { supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth };
+        const renderer = new EscPosRenderer();
+        const doc = new CardReceiptDocument(cardReceiptData, { printArt: false, printQR: true, cut: false, paperWidth });
+        await doc.render(renderer, capabilities);
+
+        const chunks = renderer.getChunks();
+        const allBytes: number[] = [];
+        for (const chunk of chunks) {
+          for (let i = 0; i < chunk.length; i++) {
+            allBytes.push(chunk[i]);
+          }
+        }
+
+        if (settings.printer?.printArt && imageUrl) {
+          try {
+            await nativePrinter.printImage(btAddress, imageUrl, 'url', widthPx, 1, true, 25000);
+          } catch {
+            // Image failed — continue with text
+          }
+        }
+
+        await nativePrinter.printRaw(btAddress, allBytes, false, 15000);
+      }
+    } catch {
+      // Auto-print failure is silent — user can print manually from preview
+    }
+  }, [settings.printer]);
 
   const rerollMutation = useMutation({
     mutationFn: async () => {

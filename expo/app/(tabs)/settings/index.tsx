@@ -103,16 +103,70 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t.printer.printCardArt}</Text>
-              <Text style={styles.settingHint}>{t.printer.printCardArtHint}</Text>
+              <Text style={styles.settingLabel}>Print Mode</Text>
+              <Text style={styles.settingHint}>Receipt prints name, art, text and QR. Full Card prints the entire card image.</Text>
             </View>
-            <Switch
-              value={settings.printer.printArt}
-              onValueChange={(val) => updatePrinter({ printArt: val })}
-              trackColor={{ false: Colors.border, true: Colors.goldDark }}
-              thumbColor={settings.printer.printArt ? Colors.gold : Colors.textMuted}
-            />
+            <Pressable
+              onPress={() => updatePrinter({
+                printMode: settings.printer.printMode === 'full' ? 'image_only' : 'full'
+              })}
+              style={{
+                backgroundColor: Colors.cardBackground,
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <Text style={{ color: Colors.gold, fontSize: 13, fontWeight: '600' }}>
+                {settings.printer.printMode === 'image_only' ? 'Full Card' : 'Receipt'}
+              </Text>
+            </Pressable>
           </View>
+
+          {settings.printer.printMode !== 'image_only' && (
+            <>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{t.printer.printCardArt}</Text>
+                  <Text style={styles.settingHint}>{t.printer.printCardArtHint}</Text>
+                </View>
+                <Switch
+                  value={settings.printer.printArt}
+                  onValueChange={(val) => updatePrinter({ printArt: val })}
+                  trackColor={{ false: Colors.border, true: Colors.goldDark }}
+                  thumbColor={settings.printer.printArt ? Colors.gold : Colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Print QR Code</Text>
+                  <Text style={styles.settingHint}>Scryfall link QR code at the bottom</Text>
+                </View>
+                <Switch
+                  value={settings.printer.printQR ?? true}
+                  onValueChange={(val) => updatePrinter({ printQR: val })}
+                  trackColor={{ false: Colors.border, true: Colors.goldDark }}
+                  thumbColor={(settings.printer.printQR ?? true) ? Colors.gold : Colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Print Flavor Text</Text>
+                  <Text style={styles.settingHint}>Include the card's flavor text</Text>
+                </View>
+                <Switch
+                  value={settings.printer.printFlavorText ?? true}
+                  onValueChange={(val) => updatePrinter({ printFlavorText: val })}
+                  trackColor={{ false: Colors.border, true: Colors.goldDark }}
+                  thumbColor={(settings.printer.printFlavorText ?? true) ? Colors.gold : Colors.textMuted}
+                />
+              </View>
+            </>
+          )}
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>

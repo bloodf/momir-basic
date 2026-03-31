@@ -265,7 +265,7 @@ export const SearchFilters = React.memo(function SearchFilters({
 
   const containerHeight = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 620],
+    outputRange: [0, 900],
   });
 
   const containerOpacity = animValue.interpolate({

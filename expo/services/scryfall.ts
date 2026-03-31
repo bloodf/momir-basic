@@ -176,10 +176,16 @@ export async function fetchRandomCard(
       if (lang && lang !== 'en') {
         const localized = await fetchLocalizedCard(data.set, data.collector_number, lang);
         if (localized) {
-          console.log('[Scryfall] Localized card found:', localized.printed_name ?? data.name);
-          return mapScryfallCard(localized);
+          // Use localized text but fall back to English images if localized has none
+          const localizedCard = mapScryfallCard(localized);
+          const englishCard = mapScryfallCard(data);
+          return {
+            ...localizedCard,
+            artCropUrl: localizedCard.artCropUrl || englishCard.artCropUrl,
+            normalImageUrl: localizedCard.normalImageUrl || englishCard.normalImageUrl,
+            smallImageUrl: localizedCard.smallImageUrl || englishCard.smallImageUrl,
+          };
         }
-        console.log('[Scryfall] No localized version, using English');
       }
 
       return mapScryfallCard(data);
@@ -257,7 +263,13 @@ async function fetchLocalizedCardsViaCollection(
     const key = `${card.setCode.toLowerCase()}-${card.collectorNumber}`;
     const localized = localizedMap.get(key);
     if (localized && (localized.printed_name || localized.lang === scryfallLang)) {
-      return mapScryfallCard(localized);
+      const localizedCard = mapScryfallCard(localized);
+      return {
+        ...localizedCard,
+        artCropUrl: localizedCard.artCropUrl || card.artCropUrl,
+        normalImageUrl: localizedCard.normalImageUrl || card.normalImageUrl,
+        smallImageUrl: localizedCard.smallImageUrl || card.smallImageUrl,
+      };
     }
     return card;
   });

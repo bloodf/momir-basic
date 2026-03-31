@@ -58,6 +58,13 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
   const getPreferences = deps.getPreferences ?? getPrinterPreferencesFromSettings;
   const savePreferences = deps.savePreferences ?? savePrinterPreferencesToSettings;
 
+  // Cache the adapter instance so connection state persists across calls
+  let cachedAdapter: ReturnType<typeof adapterFactory> | null = null;
+  function getAdapter() {
+    if (!cachedAdapter) cachedAdapter = adapterFactory();
+    return cachedAdapter;
+  }
+
   async function upsertDiscovered(discovered: PrinterDiscoveryResult): Promise<void> {
     const existing = await repoGetPrinterByAddress(discovered.address);
     if (existing) {
@@ -88,7 +95,7 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
   return {
     async discoverPrinters(): Promise<PrinterRecord[]> {
       const start = Date.now();
-      const adapter = adapterFactory();
+      const adapter = getAdapter();
       emitDiscoveryStarted();
       let discovered = await adapter.discoverPrinters();
       const filtered = filterTransport(discovered);
@@ -112,7 +119,7 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       if (!printer) {
         throw new Error(`Printer with id ${deviceId} not found in registry`);
       }
-      const adapter = adapterFactory();
+      const adapter = getAdapter();
       const start = Date.now();
       emitConnectStarted(printer.address, printer.transport);
       try {
@@ -132,7 +139,7 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       if (!printer) {
         return;
       }
-      const adapter = adapterFactory();
+      const adapter = getAdapter();
       await adapter.disconnectPrinter(printer.address);
       emitDisconnected(printer.address, printer.transport);
     },
@@ -150,7 +157,7 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       if (!printer) {
         return;
       }
-      const adapter = adapterFactory();
+      const adapter = getAdapter();
       try {
         await adapter.disconnectPrinter(printer.address);
       } catch {

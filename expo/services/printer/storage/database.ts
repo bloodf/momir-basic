@@ -226,20 +226,26 @@ class MemoryPrinterDatabase implements PrinterDatabase {
 }
 
 let dbInstance: PrinterDatabase | null = null;
+let dbInitPromise: Promise<PrinterDatabase> | null = null;
 
 export async function getDatabase(): Promise<PrinterDatabase> {
   if (dbInstance) return dbInstance;
+  if (dbInitPromise) return dbInitPromise;
 
-  if (Platform.OS === 'web') {
-    dbInstance = new MemoryPrinterDatabase();
-  } else {
-    const sqliteDb = await SQLite.openDatabaseAsync('printer.db');
-    dbInstance = new NativePrinterDatabase(sqliteDb);
-  }
+  dbInitPromise = (async () => {
+    if (Platform.OS === 'web') {
+      dbInstance = new MemoryPrinterDatabase();
+    } else {
+      const sqliteDb = await SQLite.openDatabaseAsync('printer.db');
+      dbInstance = new NativePrinterDatabase(sqliteDb);
+    }
 
-  const database = dbInstance;
-  await initializeDatabase(database);
-  return database;
+    const database = dbInstance;
+    await initializeDatabase(database);
+    return database;
+  })();
+
+  return dbInitPromise;
 }
 
 export async function initializeDatabase(db: PrinterDatabase): Promise<void> {
@@ -253,6 +259,17 @@ export async function initializeDatabase(db: PrinterDatabase): Promise<void> {
   for (const migration of MIGRATIONS) {
     if (migration.version > currentVersion) {
       await db.execAsync(migration.up);
+
+      // Handle addColumnIfMissing (safe for both fresh and upgraded databases)
+      if ('addColumnIfMissing' in migration && migration.addColumnIfMissing) {
+        const { table, column, type } = migration.addColumnIfMissing as { table: string; column: string; type: string };
+        try {
+          await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+        } catch {
+          // Column already exists — safe to ignore
+        }
+      }
+
       await db.runAsync('INSERT OR REPLACE INTO schema_version (version) VALUES (?)', [migration.version]);
     }
   }

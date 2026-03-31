@@ -13,6 +13,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import { showToast } from '@/components/Toast';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -39,12 +40,11 @@ import {
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
-import type { PrinterRecord, PrintJob, PrinterTransport } from '@/types';
+import type { PrinterRecord, PrinterTransport } from '@/types';
 import { useI18n } from '@/i18n';
 import { registryService } from '@/services/printer/registry/service';
 import { createAdapter } from '@/services/printer/adapters/factory';
-import { createJob, getJobById } from '@/services/printer/storage/repositories';
-import { getQueueSummary, processQueueForPrinter, retryJob, abandonJob } from '@/services/printer/queue/engine';
+import { upsertPrinter } from '@/services/printer/storage/repositories';
 import {
   printerCapabilityService,
   type AndroidBluetoothPermissionStatus,
@@ -68,18 +68,8 @@ type PrinterUiState =
   | 'tcp_setup'              // TCP printer entry modal is open
   | 'connecting'             // Attempting to establish physical connection to a printer
   | 'connected'              // Physically connected and verified via adapter.isConnected()
-  | 'disconnected'           // Was connected; real connection check now fails
-  | 'uncertain_delivery';    // Connected printer has sent_unknown jobs requiring reconciliation
+  | 'disconnected';           // Was connected; real connection check now fails
 
-interface QueueSummary {
-  pending: number;
-  completed: number;
-  uncertain: number;
-  failedRetryable: number;
-  failedTerminal: number;
-  sentUnknownJobs: PrintJob[];
-  failedTerminalJobs: PrintJob[];
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -124,8 +114,6 @@ export default function PrinterSetupScreen() {
   // --- Diagnostics test print ---
   const [testing, setTesting] = useState<string | null>(null);
 
-  // --- Queue reconciliation ---
-  const [queueSummary, setQueueSummary] = useState<QueueSummary | null>(null);
 
   // --- TCP modal ---
   const [tcpModalOpen, setTcpModalOpen] = useState(false);
@@ -175,7 +163,8 @@ export default function PrinterSetupScreen() {
     const prefId = settings.printer.preferredPrinterId;
     if (!prefId) {
       setConnectedPrinter(null);
-      if (uiState !== 'initializing' && uiState !== 'tcp_setup') {
+      // Only reset to scan_empty if we're NOT currently showing discovered devices
+      if (uiState !== 'initializing' && uiState !== 'tcp_setup' && uiState !== 'discovered' && uiState !== 'scanning') {
         setUiState(preferredPrinter ? 'discovered' : 'scan_empty');
       }
       return;
@@ -207,7 +196,7 @@ export default function PrinterSetupScreen() {
         setConnectedPrinter(null);
         // Only transition to disconnected if we were previously connected
         // or if we have no other meaningful state to show
-        if (uiState === 'connected' || uiState === 'uncertain_delivery') {
+        if (uiState === 'connected') {
           setUiState('disconnected');
         }
       }
@@ -219,28 +208,6 @@ export default function PrinterSetupScreen() {
     }
   }, [settings.printer.preferredPrinterId, printers, uiState]);
 
-  /**
-   * loadQueueSummary — Fetches current queue state for the preferred printer.
-   *
-   * If sent_unknown jobs exist while connected, transition to uncertain_delivery
-   * so the operator can reconcile.
-   */
-  const loadQueueSummary = useCallback(async () => {
-    const prefId = settings.printer.preferredPrinterId;
-    if (!prefId) {
-      setQueueSummary(null);
-      return;
-    }
-    try {
-      const summary = await getQueueSummary(prefId);
-      setQueueSummary(summary);
-      if (summary.sentUnknownJobs.length > 0 && uiState === 'connected') {
-        setUiState('uncertain_delivery');
-      }
-    } catch {
-      setQueueSummary(null);
-    }
-  }, [settings.printer.preferredPrinterId, uiState]);
 
   /**
    * Initialise — runs once on mount.
@@ -276,11 +243,44 @@ export default function PrinterSetupScreen() {
 
       // Verify real connection state
       await checkRealConnectionState();
-      await loadQueueSummary();
 
-      // Set default UI state if nothing else was set
-      if (uiState === 'initializing') {
-        setUiState(preferredPrinter ? 'discovered' : 'scan_empty');
+      // Auto-scan for printers on first load
+      try {
+        const adapter = createAdapter();
+        const rawDevices = await adapter.discoverPrinters();
+        const now = new Date().toISOString();
+        const records: PrinterRecord[] = rawDevices.map((d) => ({
+          id: d.id,
+          name: d.name,
+          address: d.address,
+          transport: d.transport as PrinterTransport,
+          capabilities: d.capabilities,
+          lastSeenAt: now,
+          createdAt: now,
+        }));
+        setPrinters(records);
+        setUiState(records.length > 0 ? 'discovered' : 'scan_empty');
+
+        // Auto-connect to saved preferred printer if found
+        const prefId = settings.printer.preferredPrinterId;
+        if (prefId) {
+          const prefDevice = records.find((p) => p.id === prefId);
+          if (prefDevice) {
+            try {
+              const connectAdapter = createAdapter();
+              await connectAdapter.connectPrinter(prefDevice.address);
+              setConnectedPrinter(prefDevice);
+              setUiState('connected');
+            } catch {
+              // Connection failed, just show discovered
+            }
+          }
+        }
+      } catch {
+        // Auto-scan failed, fall back to manual
+        if (uiState === 'initializing') {
+          setUiState('scan_empty');
+        }
       }
     };
 
@@ -292,8 +292,7 @@ export default function PrinterSetupScreen() {
   useFocusEffect(
     useCallback(() => {
       void checkRealConnectionState();
-      void loadQueueSummary();
-    }, [checkRealConnectionState, loadQueueSummary])
+    }, [checkRealConnectionState])
   );
 
   const openBluetoothSettings = useCallback(() => {
@@ -304,7 +303,7 @@ export default function PrinterSetupScreen() {
         void Linking.openSettings();
       });
     } else {
-      Alert.alert(t.printer.bluetoothSettings, t.printer.bluetoothSettingsMsg);
+      showToast({ type: 'info', title: t.printer.bluetoothSettings, message: t.printer.bluetoothSettingsMsg });
     }
   }, [isIOS, isAndroid, t]);
 
@@ -324,21 +323,28 @@ export default function PrinterSetupScreen() {
         await printerCapabilityService.ensureBluetoothPermissions();
       }
 
-      const discovered = await registryService.discoverPrinters();
-      const merged = await registryService.mergeDiscoveredWithRegistry(
-        discovered.map((printer) => ({
-          ...printer,
-          lastSeenAt: new Date().toISOString(),
-        }))
-      );
+      // Use adapter directly to avoid database roundtrip issues
+      const adapter = createAdapter();
+      const rawDevices = await adapter.discoverPrinters();
 
-      setPrinters(merged);
+      // Convert discovery results to PrinterRecord format for display
+      const now = new Date().toISOString();
+      const records: PrinterRecord[] = rawDevices.map((d) => ({
+        id: d.id,
+        name: d.name,
+        address: d.address,
+        transport: d.transport as PrinterTransport,
+        capabilities: d.capabilities,
+        lastSeenAt: now,
+        createdAt: now,
+      }));
 
-      if (merged.length === 0) {
-        setUiState('scan_empty');
-      } else {
-        setUiState('discovered');
-      }
+      // eslint-disable-next-line no-console
+      console.error('[DIAG-UI] records count:', records.length, 'setting discovered');
+      setPrinters(records);
+      setUiState(records.length === 0 ? 'scan_empty' : 'discovered');
+      // eslint-disable-next-line no-console
+      console.error('[DIAG-UI] state set. printers:', records.length, 'uiState: discovered');
     } catch (error) {
       if (error instanceof Error && error.message.includes('[PrinterCapability]')) {
         const state = await printerCapabilityService.getAndroidPermissionState();
@@ -386,19 +392,29 @@ export default function PrinterSetupScreen() {
         await printerCapabilityService.ensureBluetoothPermissions();
       }
 
-      // This calls adapter.connectPrinter internally
-      await registryService.connectPrinter(printer.id);
+      // Connect directly via adapter (bypass registry DB lookup)
+      const adapter = createAdapter();
+      await adapter.connectPrinter(printer.address);
+
+      // Persist printer to registry in background
+      registryService.mergeDiscoveredWithRegistry([printer]).catch(() => {});
 
       // CRITICAL: Verify the connection is real before declaring connected
-      const adapter = createAdapter();
       const isReallyConnected = await adapter.isConnected(printer.address);
 
       if (isReallyConnected) {
+        // Ensure printer is in DB before saving as preferred
+        await upsertPrinter({
+          id: printer.id,
+          name: printer.name,
+          address: printer.address,
+          transport: printer.transport,
+          capabilities: printer.capabilities,
+        });
         await savePreferredPrinter(printer.id);
         setConnectedPrinter(printer);
         setUiState('connected');
-        await loadQueueSummary();
-        Alert.alert(t.printer.connected, t.printer.connectedTo(printer.name));
+        showToast({ type: 'success', title: t.printer.connected, message: t.printer.connectedTo(printer.name) });
       } else {
         // Connect command returned but adapter says not connected — treat as failure
         setErrorMessage(`Connection to ${printer.name} was not established. The printer may be out of range or unreachable.`);
@@ -421,7 +437,7 @@ export default function PrinterSetupScreen() {
     } finally {
       setConnecting(null);
     }
-  }, [isIOS, savePreferredPrinter, loadQueueSummary, t]);
+  }, [isIOS, savePreferredPrinter, t]);
 
   const handleDisconnect = useCallback(async () => {
     const prefId = settings.printer.preferredPrinterId;
@@ -451,75 +467,53 @@ export default function PrinterSetupScreen() {
     setErrorMessage(null);
 
     try {
-      const jobId = `diag-${Date.now()}`;
-      await createJob({
-        id: jobId,
-        printerId: printer.id,
-        documentType: 'diagnostics',
-        payload: JSON.stringify({
-          appName: 'Rork',
-          platform: Platform.OS,
-          transport: printer.transport,
-          paperWidth: settings.printer.paperWidth,
-          timestamp: new Date().toISOString(),
-        }),
-      });
+      // Direct print — bypass queue/database entirely
+      const btAddress = printer.address.startsWith('bt:') ? printer.address : `bt:${printer.address}`;
+      const { NativeModules: NM } = require('react-native');
+      const nativePrinter = NM.ThermalPrinterDriver;
 
-      await processQueueForPrinter(printer.id);
+      // Connect
+      await nativePrinter.connect(btAddress, 10000);
 
-      const [job, summary] = await Promise.all([
-        getJobById(jobId),
-        getQueueSummary(printer.id),
-      ]);
-      setQueueSummary(summary);
+      // Build ESC/POS test page
+      const encoder = new TextEncoder();
+      const now = new Date().toISOString();
+      const testText = [
+        '\x1B\x40',          // ESC @ — init
+        '\x1B\x61\x01',      // Center align
+        '\x1B\x45\x01',      // Bold on
+        'MOMIR PRINTER TEST\n',
+        '\x1B\x45\x00',      // Bold off
+        '================================\n',
+        '\x1B\x61\x00',      // Left align
+        `Printer: ${printer.name}\n`,
+        `Address: ${printer.address}\n`,
+        `Transport: ${printer.transport}\n`,
+        `Platform: ${Platform.OS}\n`,
+        `Time: ${now}\n`,
+        '================================\n',
+        '\x1B\x61\x01',      // Center
+        'Print test successful!\n',
+        '\x1B\x61\x00',      // Left
+        '\n\n\n',             // Feed
+      ].join('');
 
-      if (job?.state === 'printed_confirmed') {
-        const message = `Diagnostics print completed successfully for ${printer.name}.`;
-        setErrorMessage(null);
-        Alert.alert(t.printer.testPrint, message);
-        return;
-      }
+      const data = Array.from(encoder.encode(testText));
+      await nativePrinter.printRaw(btAddress, data, false, 10000);
 
-      if (job?.state === 'sent_unknown') {
-        const message = `Diagnostics print sent but delivery is uncertain for ${printer.name}. The printer may have received partial data. Check output and retry if needed.`;
-        setErrorMessage(message);
-        Alert.alert(t.printer.testPrint, message);
-        return;
-      }
-
-      if (job?.state === 'failed_terminal' || job?.state === 'failed_retryable') {
-        const message = job.lastError ?? `Diagnostics print failed for ${printer.name}.`;
-        setErrorMessage(message);
-        Alert.alert(t.printer.testPrint, message);
-        return;
-      }
-
-      const message = `Diagnostics print queued for ${printer.name}.`;
-      Alert.alert(t.printer.testPrint, message);
+      showToast({ type: 'success', title: t.printer.testPrint, message: `Diagnostics print completed successfully for ${printer.name}.` });
+      setErrorMessage(null);
+      setTesting(null);
+      return;
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Unable to queue diagnostics print.'));
+      const message = error instanceof Error ? error.message : 'Print failed';
+      setErrorMessage(message);
+      showToast({ type: 'error', title: t.printer.testPrint, message });
     } finally {
       setTesting(null);
     }
-  }, [settings.printer.paperWidth, t]);
+  }, [t]);
 
-  const handleRetryJob = useCallback(async (jobId: string) => {
-    try {
-      await retryJob(jobId);
-      await loadQueueSummary();
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Unable to retry job.'));
-    }
-  }, [loadQueueSummary]);
-
-  const handleAbandonJob = useCallback(async (jobId: string) => {
-    try {
-      await abandonJob(jobId);
-      await loadQueueSummary();
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error, 'Unable to abandon job.'));
-    }
-  }, [loadQueueSummary]);
 
   /**
    * handleAddTcpPrinter — validates and adds a TCP printer entry.
@@ -530,11 +524,11 @@ export default function PrinterSetupScreen() {
     const port = parseInt(tcpPort.trim(), 10);
 
     if (!host) {
-      Alert.alert('TCP Printer', 'Please enter a hostname or IP address.');
+      showToast({ type: 'warning', title: 'TCP Printer', message: 'Please enter a hostname or IP address.' });
       return;
     }
     if (isNaN(port) || port < 1 || port > 65535) {
-      Alert.alert('TCP Printer', 'Please enter a valid port number (1-65535).');
+      showToast({ type: 'warning', title: 'TCP Printer', message: 'Please enter a valid port number (1-65535).' });
       return;
     }
 
@@ -562,7 +556,7 @@ export default function PrinterSetupScreen() {
       setTcpPort('9100');
       await handleScan();
     } catch (error) {
-      Alert.alert('TCP Printer', getErrorMessage(error, 'Failed to add TCP printer.'));
+      showToast({ type: 'error', title: 'TCP Printer', message: getErrorMessage(error, 'Failed to add TCP printer.') });
     } finally {
       setTcpAdding(false);
     }
@@ -819,123 +813,6 @@ export default function PrinterSetupScreen() {
     </View>
   );
 
-  /**
-   * renderUncertainDelivery — shows sent_unknown jobs requiring operator reconciliation.
-   * Only shown when uiState is 'uncertain_delivery'.
-   */
-  const renderUncertainDelivery = () => {
-    if (!queueSummary || queueSummary.sentUnknownJobs.length === 0) return null;
-
-    return (
-      <View style={styles.uncertainCard}>
-        <View style={styles.uncertainHeader}>
-          <AlertTriangle size={20} color={Colors.gold} />
-          <Text style={styles.uncertainTitle}>Uncertain Print Delivery</Text>
-        </View>
-        <Text style={styles.uncertainText}>
-          The following print jobs were sent but delivery could not be confirmed. The printer may have received partial data. Choose to retry or abandon each job.
-        </Text>
-        <View style={styles.uncertainJobList}>
-          {queueSummary.sentUnknownJobs.map((job) => (
-            <View key={job.id} style={styles.uncertainJobItem}>
-              <View style={styles.uncertainJobInfo}>
-                <Text style={styles.uncertainJobType}>
-                  {job.documentType === 'card_receipt' ? 'Card Receipt' : 'Diagnostics'}
-                </Text>
-                <Text style={styles.uncertainJobError} numberOfLines={1}>
-                  {job.lastError ?? 'Delivery uncertain'}
-                </Text>
-              </View>
-              <View style={styles.uncertainJobActions}>
-                <Pressable
-                  onPress={() => { void handleRetryJob(job.id); }}
-                  style={styles.uncertainRetryButton}
-                  testID={`retry-job-${job.id}`}
-                >
-                  <RefreshCw size={12} color="#fff" />
-                  <Text style={styles.uncertainRetryText}>Retry</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => { void handleAbandonJob(job.id); }}
-                  style={styles.uncertainAbandonButton}
-                  testID={`abandon-job-${job.id}`}
-                >
-                  <Text style={styles.uncertainAbandonText}>Abandon</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
-  /**
-   * renderQueueCard — shows all jobs requiring reconciliation (sent_unknown + failed_terminal).
-   * Displayed when connected and queue has problematic jobs.
-   */
-  const renderQueueCard = () => {
-    if (!queueSummary) return null;
-    if (queueSummary.sentUnknownJobs.length === 0 && queueSummary.failedTerminalJobs.length === 0) return null;
-
-    return (
-      <View style={styles.queueReconcileCard}>
-        <View style={styles.queueReconcileHeader}>
-          <Text style={styles.queueReconcileTitle}>Print Queue — Reconciliation Required</Text>
-        </View>
-        {queueSummary.sentUnknownJobs.length > 0 && (
-          <View style={styles.queueReconcileSection}>
-            <Text style={styles.queueReconcileSectionLabel}>Uncertain Delivery ({queueSummary.sentUnknownJobs.length})</Text>
-            {queueSummary.sentUnknownJobs.map((job) => (
-              <View key={job.id} style={styles.queueReconcileJob}>
-                <View style={styles.queueReconcileJobInfo}>
-                  <Text style={styles.queueReconcileJobType}>{job.documentType === 'card_receipt' ? 'Card' : 'Diag'}</Text>
-                  <Text style={styles.queueReconcileJobError} numberOfLines={1}>{job.lastError ?? '—'}</Text>
-                </View>
-                <Pressable
-                  onPress={() => { void handleRetryJob(job.id); }}
-                  style={styles.queueReconcileRetry}
-                >
-                  <Text style={styles.queueReconcileRetryText}>Retry</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => { void handleAbandonJob(job.id); }}
-                  style={styles.queueReconcileAbandon}
-                >
-                  <Text style={styles.queueReconcileAbandonText}>Abandon</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-        {queueSummary.failedTerminalJobs.length > 0 && (
-          <View style={styles.queueReconcileSection}>
-            <Text style={styles.queueReconcileSectionLabel}>Terminal Failures ({queueSummary.failedTerminalJobs.length})</Text>
-            {queueSummary.failedTerminalJobs.map((job) => (
-              <View key={job.id} style={styles.queueReconcileJob}>
-                <View style={styles.queueReconcileJobInfo}>
-                  <Text style={styles.queueReconcileJobType}>{job.documentType === 'card_receipt' ? 'Card' : 'Diag'}</Text>
-                  <Text style={styles.queueReconcileJobError} numberOfLines={1}>{job.lastError ?? '—'}</Text>
-                </View>
-                <Pressable
-                  onPress={() => { void handleRetryJob(job.id); }}
-                  style={styles.queueReconcileRetry}
-                >
-                  <Text style={styles.queueReconcileRetryText}>Retry</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => { void handleAbandonJob(job.id); }}
-                  style={styles.queueReconcileAbandon}
-                >
-                  <Text style={styles.queueReconcileAbandonText}>Abandon</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  };
 
   /**
    * renderConnectedCard — shows canonical printer details when physically connected.
@@ -1005,54 +882,6 @@ export default function PrinterSetupScreen() {
     );
   };
 
-  /**
-   * renderQueueSummaryStrip — shows live queue counts.
-   * Only shown when there is actual queue activity.
-   */
-  const renderQueueSummaryStrip = () => {
-    if (!queueSummary) return null;
-    if (queueSummary.pending === 0 && queueSummary.completed === 0 && queueSummary.uncertain === 0 && queueSummary.failedRetryable === 0 && queueSummary.failedTerminal === 0) {
-      return null;
-    }
-
-    return (
-      <View style={styles.queueStrip}>
-        <Text style={styles.queueStripTitle}>Queue</Text>
-        <View style={styles.queueStripCounts}>
-          {queueSummary.pending > 0 && (
-            <View style={[styles.queueBadge, styles.queueBadgePending]}>
-              <Text style={styles.queueBadgeText}>{queueSummary.pending}</Text>
-              <Text style={styles.queueBadgeLabel}>pending</Text>
-            </View>
-          )}
-          {queueSummary.completed > 0 && (
-            <View style={[styles.queueBadge, styles.queueBadgeCompleted]}>
-              <Text style={styles.queueBadgeText}>{queueSummary.completed}</Text>
-              <Text style={styles.queueBadgeLabel}>done</Text>
-            </View>
-          )}
-          {queueSummary.uncertain > 0 && (
-            <View style={[styles.queueBadge, styles.queueBadgeUncertain]}>
-              <Text style={styles.queueBadgeText}>{queueSummary.uncertain}</Text>
-              <Text style={styles.queueBadgeLabel}>uncertain</Text>
-            </View>
-          )}
-          {queueSummary.failedRetryable > 0 && (
-            <View style={[styles.queueBadge, styles.queueBadgeRetryable]}>
-              <Text style={styles.queueBadgeText}>{queueSummary.failedRetryable}</Text>
-              <Text style={styles.queueBadgeLabel}>retry</Text>
-            </View>
-          )}
-          {queueSummary.failedTerminal > 0 && (
-            <View style={[styles.queueBadge, styles.queueBadgeFailed]}>
-              <Text style={styles.queueBadgeText}>{queueSummary.failedTerminal}</Text>
-              <Text style={styles.queueBadgeLabel}>failed</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    );
-  };
 
   /**
    * renderConnectingState — shown when a connect attempt is in progress.
@@ -1245,17 +1074,8 @@ export default function PrinterSetupScreen() {
         {/* Disconnected recovery */}
         {uiState === 'disconnected' && renderDisconnectedState()}
 
-        {/* Uncertain delivery reconciliation */}
-        {uiState === 'uncertain_delivery' && renderUncertainDelivery()}
-
         {/* Connected printer card */}
         {uiState === 'connected' && renderConnectedCard()}
-
-        {/* Queue reconciliation */}
-        {uiState === 'connected' && renderQueueCard()}
-
-        {/* Queue summary strip */}
-        {uiState === 'connected' && renderQueueSummaryStrip()}
 
         {/* iOS flow */}
         {uiState !== 'connected' && renderIosFlowCard()}

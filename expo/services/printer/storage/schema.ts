@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const MIGRATIONS = [
   {
@@ -17,6 +17,7 @@ export const MIGRATIONS = [
       CREATE TABLE IF NOT EXISTS print_jobs (
         id TEXT PRIMARY KEY,
         printer_id TEXT NOT NULL,
+        canonical_identity TEXT,
         document_type TEXT NOT NULL,
         payload TEXT NOT NULL,
         state TEXT NOT NULL DEFAULT 'queued',
@@ -31,5 +32,16 @@ export const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_print_jobs_state ON print_jobs(state);
       CREATE INDEX IF NOT EXISTS idx_print_jobs_printer ON print_jobs(printer_id);
     `,
+  },
+  {
+    version: 2,
+    // Adds canonical_identity for databases created before v1 included it.
+    // Uses a no-op marker; actual column addition handled in initializeDatabase.
+    up: `SELECT 1;`,
+    addColumnIfMissing: {
+      table: 'print_jobs',
+      column: 'canonical_identity',
+      type: 'TEXT',
+    },
   },
 ];

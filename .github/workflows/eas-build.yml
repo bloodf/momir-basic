@@ -1,0 +1,70 @@
+name: EAS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - ios
+          - android
+          - all
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+defaults:
+  run:
+    working-directory: expo
+
+jobs:
+  validate:
+    name: Validate Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: cat eas.json | jq .
+      - run: cat app.json | jq .
+
+  build-ios:
+    name: Build iOS
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.platform == 'ios' || inputs.platform == 'all'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive
+
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.platform == 'android' || inputs.platform == 'all'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive
