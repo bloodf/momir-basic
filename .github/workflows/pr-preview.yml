@@ -4,14 +4,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'expo/**'
+      - 'app/**'
+      - 'components/**'
+      - 'services/**'
+      - 'providers/**'
+      - 'i18n/**'
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-defaults:
-  run:
-    working-directory: expo
 
 jobs:
   preview:

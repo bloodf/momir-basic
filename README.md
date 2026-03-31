@@ -30,7 +30,7 @@ Built with React Native, Expo, and TypeScript. Supports 11 languages.
 ```bash
 # Clone the repo
 git clone https://github.com/bloodf/momir-basic.git
-cd momir-basic/expo
+cd momir-basic
 
 # Install dependencies
 bun install
@@ -76,25 +76,28 @@ eas build --platform ios --profile production
 
 ```
 momir-basic/
-├── expo/                       # Expo app
-│   ├── app/                    # Expo Router screens
-│   │   ├── (tabs)/             # Tab navigation
-│   │   │   ├── (home)/         # Card randomizer (main screen)
-│   │   │   ├── search/         # Advanced card search
-│   │   │   ├── history/        # Card history
-│   │   │   └── settings/       # App & printer settings
-│   │   ├── card.tsx            # Card detail modal
-│   │   ├── print-preview.tsx   # Print preview & printing
-│   │   └── life-counter.tsx    # Life counter
-│   ├── components/             # Reusable UI components
-│   ├── constants/              # Colors, theme
-│   ├── i18n/                   # Internationalization (11 languages)
-│   ├── providers/              # React context providers
-│   ├── services/               # API & business logic
-│   │   ├── scryfall.ts         # Scryfall API integration
-│   │   └── printer/            # Thermal printer services
-│   └── types/                  # TypeScript type definitions
+├── app/                        # Expo Router screens
+│   ├── (tabs)/                 # Tab navigation
+│   │   ├── (home)/             # Card randomizer (main screen)
+│   │   ├── search/             # Advanced card search
+│   │   ├── history/            # Card history
+│   │   └── settings/           # App & printer settings
+│   ├── card.tsx                # Card detail modal
+│   ├── print-preview.tsx       # Print preview & printing
+│   └── life-counter.tsx        # Life counter
+├── components/                 # Reusable UI components
+├── constants/                  # Colors, theme
+├── i18n/                       # Internationalization (11 languages)
+├── providers/                  # React context providers
+├── services/                   # API & business logic
+│   ├── scryfall.ts             # Scryfall API integration
+│   └── printer/                # Thermal printer services
+├── types/                      # TypeScript type definitions
+├── __tests__/                  # Unit tests
+├── e2e/                        # End-to-end tests
 ├── .github/workflows/          # CI/CD pipelines
+├── app.json                    # Expo configuration
+├── eas.json                    # EAS Build profiles
 └── LICENSE
 ```
 

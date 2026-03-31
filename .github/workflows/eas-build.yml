@@ -24,10 +24,6 @@ on:
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-defaults:
-  run:
-    working-directory: expo
-
 jobs:
   validate:
     name: Validate Config
