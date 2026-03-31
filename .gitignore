@@ -21,10 +21,16 @@ lancedb/
 *.swp
 *.swo
 
-# OMC / Claude state
+# OMC / Claude / Sisyphus state
 .omc/
 .sisyphus/
-.claude/settings.local.json
+.claude/
+
+# Rork
+rork.json
+
+# Legacy expo subdirectory
+expo/
 
 # Debug
 npm-debug.*

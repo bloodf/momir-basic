@@ -1,1 +1,0 @@
-export { registryService } from './service';
