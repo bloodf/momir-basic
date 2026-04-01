@@ -143,6 +143,25 @@ export async function fetchRandomCard(
   retries: number = 3,
   lang?: string,
 ): Promise<Card> {
+  // Try the requested CMC, then fall back to lower CMCs until we find a card
+  for (let currentCmc = cmc; currentCmc >= 0; currentCmc--) {
+    const result = await fetchRandomCardAtCmc(cardType, currentCmc, excludeFunny, retries, lang);
+    if (result) return result;
+    if (currentCmc > 0) {
+      console.log(`[Scryfall] No ${cardType} at CMC ${currentCmc}, trying CMC ${currentCmc - 1}`);
+    }
+  }
+
+  throw new Error(`No ${cardType} found at CMC ${cmc} or below`);
+}
+
+async function fetchRandomCardAtCmc(
+  cardType: CardType,
+  cmc: number,
+  excludeFunny: boolean,
+  retries: number,
+  lang?: string,
+): Promise<Card | null> {
   const query = buildQuery(cardType, cmc, excludeFunny);
   const url = `${BASE_URL}/cards/random?q=${encodeURIComponent(query)}`;
 
@@ -153,10 +172,8 @@ export async function fetchRandomCard(
       const response = await rateLimitedFetch(url);
 
       if (response.status === 404) {
-        console.log(`[Scryfall] 404 on attempt ${attempt + 1}/${retries}`);
-        if (attempt === retries - 1) {
-          throw new Error(`No ${cardType} found at CMC ${cmc}`);
-        }
+        console.log(`[Scryfall] 404 on attempt ${attempt + 1}/${retries} for CMC ${cmc}`);
+        if (attempt === retries - 1) return null;
         continue;
       }
 
@@ -171,12 +188,11 @@ export async function fetchRandomCard(
       }
 
       const data: ScryfallCard = await response.json();
-      console.log('[Scryfall] Got card:', data.name);
+      console.log('[Scryfall] Got card:', data.name, `(CMC ${cmc})`);
 
       if (lang && lang !== 'en') {
         const localized = await fetchLocalizedCard(data.set, data.collector_number, lang);
         if (localized) {
-          // Use localized text but fall back to English images if localized has none
           const localizedCard = mapScryfallCard(localized);
           const englishCard = mapScryfallCard(data);
           return {
@@ -195,7 +211,7 @@ export async function fetchRandomCard(
     }
   }
 
-  throw new Error('Failed to fetch card after all retries');
+  return null;
 }
 
 export async function fetchMultipleCards(
