@@ -265,7 +265,7 @@ export const SearchFilters = React.memo(function SearchFilters({
 
   const containerHeight = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 900],
+    outputRange: [0, 2000],
   });
 
   const containerOpacity = animValue.interpolate({
@@ -302,9 +302,10 @@ export const SearchFilters = React.memo(function SearchFilters({
 
       <Animated.View style={[styles.filtersContainer, { maxHeight: containerHeight, opacity: containerOpacity }]}>
         <ScrollView
-          showsVerticalScrollIndicator={false}
-          bounces={false}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
           nestedScrollEnabled
+          style={{ maxHeight: 500 }}
         >
           <View style={styles.filterSection}>
             <Text style={styles.filterLabel}>{t.search.color}</Text>
