@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Printer, ChevronRight, Zap, Info, Bug, Globe, ChevronDown, Github, Star, ExternalLink } from 'lucide-react-native';
+import { Printer, ChevronRight, Zap, Info, Globe, ChevronDown, Github, Star, ExternalLink } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/i18n';
@@ -261,26 +261,6 @@ export default function SettingsScreen() {
               })}
             </View>
           </Animated.View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Bug size={16} color={Colors.gold} />
-            <Text style={styles.sectionTitle}>{t.settings.developer}</Text>
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t.settings.devMode}</Text>
-              <Text style={styles.settingHint}>{t.settings.devModeHint}</Text>
-            </View>
-            <Switch
-              value={settings.devMode}
-              onValueChange={(val) => updateSettings({ devMode: val })}
-              trackColor={{ false: Colors.border, true: Colors.goldDark }}
-              thumbColor={settings.devMode ? Colors.gold : Colors.textMuted}
-            />
-          </View>
         </View>
 
         <View style={styles.section}>
