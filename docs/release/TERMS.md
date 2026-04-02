@@ -2,6 +2,11 @@
 
 [Company name] ("we", "our", or "us") offers the Momir-Basic app.
 
+Related policy documents:
+
+- Privacy Policy: `docs/privacy-policy.md`
+- Support information: `docs/support.md`
+
 ## Acceptance
 
 By using Momir-Basic, you agree to these terms.

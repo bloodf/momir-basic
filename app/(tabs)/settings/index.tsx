@@ -77,7 +77,7 @@ export default function SettingsScreen() {
               <Text style={styles.settingLabel}>{t.settings.printerSetup}</Text>
               <Text style={styles.settingValue}>
                 {settings.printer.preferredPrinterId
-                  ? (settings.printerConnected ? t.printer.connected : 'Preferred printer saved')
+                  ? (settings.printerConnected ? t.printer.connected : t.printer.preferredPrinterSaved)
                   : t.printer.notConnected}
               </Text>
             </View>
@@ -103,7 +103,7 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Print Mode</Text>
+                  <Text style={styles.settingLabel}>{t.printer.printMode}</Text>
               <Text style={styles.settingHint}>Receipt prints name, art, text and QR. Full Card prints the entire card image.</Text>
             </View>
             <Pressable
@@ -142,7 +142,7 @@ export default function SettingsScreen() {
 
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Print QR Code</Text>
+                  <Text style={styles.settingLabel}>{t.printer.printQRCode}</Text>
                   <Text style={styles.settingHint}>Scryfall link QR code at the bottom</Text>
                 </View>
                 <Switch
@@ -155,7 +155,7 @@ export default function SettingsScreen() {
 
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Print Flavor Text</Text>
+                  <Text style={styles.settingLabel}>{t.printer.printFlavorText}</Text>
                   <Text style={styles.settingHint}>Include the card&apos;s flavor text</Text>
                 </View>
                 <Switch

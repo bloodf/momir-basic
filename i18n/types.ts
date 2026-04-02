@@ -253,6 +253,14 @@ export interface Translations {
     bluetoothSettings: string;
     bluetoothSettingsMsg: string;
     connectedTo: (name: string) => string;
+    preferredPrinterSaved: string;
+    printMode: string;
+    printQRCode: string;
+    printFlavorText: string;
+    noPrinterSelected: string;
+    verificationFailed: string;
+    moduleUnavailableTitle: string;
+    moduleUnavailableText: string;
   };
   settings: {
     title: string;
@@ -287,6 +295,11 @@ export interface Translations {
     printerDisconnected: string;
     printerDisconnectedMessage: string;
     printerConnected: string;
+    printerReady: string;
+    printerReconnectTitle: string;
+    printerReconnectMessage: string;
+    printerVerificationFailed: string;
+    printerNoPrinterSelected: string;
     printFailed: string;
     saveFailed: string;
     permissionDenied: string;

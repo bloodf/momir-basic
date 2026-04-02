@@ -119,7 +119,14 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       if (!printer) {
         throw new Error(`Printer with id ${deviceId} not found in registry`);
       }
-      const adapter = getAdapter();
+      let adapter: ReturnType<typeof adapterFactory>;
+      try {
+        adapter = getAdapter();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        emitConnectFailed(printer.address, printer.transport, PrinterErrorCode.CONNECTION_FAILED, msg, 0);
+        throw err;
+      }
       const start = Date.now();
       emitConnectStarted(printer.address, printer.transport);
       try {

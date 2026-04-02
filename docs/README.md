@@ -47,9 +47,8 @@ Routes live in `expo/app/`.
 
 - `services/scryfall.ts`, all Scryfall API calls, advanced search parsing, localization lookup
 - `services/printer/registry/service.ts`, discovery, preferred printer selection, registry merge
-- `services/printer/queue/engine.ts`, retry and terminal queue state handling
 - `services/printer/render/document.ts`, card receipt and diagnostics document builders
-- `services/printer/adapters/*`, native and fake transport adapters
+- `services/printer/adapters/*`, native and fake transport adapters and direct print execution
 - `services/printer/storage/*`, SQLite bootstrapping, schema, repositories
 
 ### Types

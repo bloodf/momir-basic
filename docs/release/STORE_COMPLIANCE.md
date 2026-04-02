@@ -18,13 +18,26 @@
 
 ### Data Safety
 - **Collects data**: YES — local device data (card history, print queue)
-- **Data is encrypted**: YES — stored locally only
+- **Data is encrypted**: NO — data stored locally via AsyncStorage/SQLite without encryption at rest
 - **Can be deleted**: YES — user can clear app data
 - **Shares data**: NO
 
 ### Permissions Justification
 - **Bluetooth**: Required for thermal printer connectivity. User-initiated pairing.
-- **No location permission required** unless [REPLACE]
+- **Location (ACCESS_FINE_LOCATION)**: Required on Android for Bluetooth device scanning (Bluetooth MAC addresses are considered location data on Android 10+). User-initiated pairing.
 
 ## Hardware Limitations Disclosure
 This app supports thermal receipt printers. Printing requires a compatible ESC/POS Bluetooth printer. The app does not guarantee compatibility with all printer models.
+
+## External Blockers
+
+The following items CANNOT be resolved from code and require external input:
+
+| Item | Blocker Type |
+|------|--------------|
+| Legal entity name for content rating | External — legal decision |
+| Content rating questionnaire completion | External — store submission |
+| Support email configuration | External — must be configured |
+| Privacy policy URL hosting | External — must be hosted |
+| Support URL hosting | External — must be hosted |
+| Bluetooth usage disclosure text for review notes | External — legal/marketing |

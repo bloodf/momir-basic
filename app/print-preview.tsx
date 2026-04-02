@@ -24,7 +24,6 @@ import { showToast } from '@/components/Toast';
 import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
-import { NativeModules } from 'react-native';
 import { createAdapter } from '../services/printer/adapters/factory';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -174,7 +173,7 @@ export default function PrintPreviewScreen() {
     const preferredPrinterId = settings.printer?.preferredPrinterId;
 
     if (!preferredPrinterId) {
-      setPrintOutcome({ type: 'failed', message: 'No printer selected. Go to Settings to select a printer.' });
+        setPrintOutcome({ type: 'failed', message: t.printer.noPrinterSelected });
       showToast({ type: 'warning', title: 'No Printer', message: 'Please select a printer in Settings first.' });
       return;
     }
@@ -184,12 +183,12 @@ export default function PrintPreviewScreen() {
       const adapter = createAdapter();
       const isConnected = await adapter.isConnected(preferredPrinterId);
       if (!isConnected) {
-        setPrintOutcome({ type: 'failed', message: 'Printer is not connected. Go to Settings to reconnect.' });
-        showToast({ type: 'error', title: 'Printer Disconnected', message: 'Please reconnect from Settings.' });
+        setPrintOutcome({ type: 'failed', message: t.toast.printerReconnectMessage });
+        showToast({ type: 'error', title: t.toast.printerReconnectTitle, message: t.toast.printerReconnectMessage });
         return;
       }
     } catch {
-      setPrintOutcome({ type: 'failed', message: 'Unable to verify printer connection.' });
+      setPrintOutcome({ type: 'failed', message: t.printer.verificationFailed });
       return;
     }
 
@@ -209,33 +208,26 @@ export default function PrintPreviewScreen() {
     try {
       setIsQueueing(true);
 
+      const adapter = createAdapter();
+      // preferredPrinterId is a registry DB key — adapter.connectPrinter handles address lookup
+      await adapter.connectPrinter(preferredPrinterId);
+
       const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
       const printMode = settings.printer?.printMode ?? 'full';
-      const printArt = settings.printer?.printArt ?? false;
       const imageUrl = cardReceiptData.imageUrl;
       const widthPx = paperWidth === 80 ? 576 : 384;
-
-      const btAddress = preferredPrinterId.startsWith('bt:') ? preferredPrinterId : `bt:${preferredPrinterId}`;
-      await NativeModules.ThermalPrinterDriver.connect(btAddress, 10000);
 
       if (printMode === 'image_only') {
         // FULL CARD MODE: Print the full card face image
         const fullCardUrl = card.normalImageUrl || card.artCropUrl;
         if (fullCardUrl) {
-          await NativeModules.ThermalPrinterDriver.printImage(
-            btAddress, fullCardUrl, 'url',
-            widthPx,
-            1, // align center
-            false,
-            25000
-          );
+          await adapter.sendImage(fullCardUrl, widthPx, 0);
         } else {
           throw new Error('No card image available to print.');
         }
       } else {
         // RECEIPT MODE: ESC/POS with split calls matching preview order
         // Name+Mana → Art → Type → Oracle → Flavor → Stats → QR
-        const encoder = new TextEncoder();
         const printArt = settings.printer?.printArt ?? true;
         const printQR = settings.printer?.printQR ?? true;
         const printFlavor = settings.printer?.printFlavorText ?? true;
@@ -249,24 +241,21 @@ export default function PrintPreviewScreen() {
           ? `${cardReceiptData.name} ${manaCost}`
           : cardReceiptData.name;
 
-        const headerBytes = Array.from(encoder.encode([
+        const headerText = [
           '\x1B\x40',          // Init
           '\x1B\x61\x01',      // Center
           '\x1B\x45\x01',      // Bold
           nameLine + '\n',
           '\x1B\x45\x00',      // Bold off
           sep,
-        ].join('')));
+        ].join('');
 
-        await NativeModules.ThermalPrinterDriver.printRaw(btAddress, headerBytes, true, 10000);
+        await adapter.sendText(headerText);
 
         // --- PART 2: Art crop image ---
         if (printArt && artUrl) {
           try {
-            await NativeModules.ThermalPrinterDriver.printImage(
-              btAddress, artUrl, 'url',
-              widthPx, 1, true, 25000
-            );
+            await adapter.sendImage(artUrl, widthPx, 0);
           } catch {
             // Image failed — continue
           }
@@ -312,24 +301,19 @@ export default function PrintPreviewScreen() {
           body.push('\x1B\x45\x00');
         }
 
-        const bodyBytes = Array.from(encoder.encode(body.join('')));
-        await NativeModules.ThermalPrinterDriver.printRaw(btAddress, bodyBytes, true, 10000);
+        await adapter.sendText(body.join(''));
 
         // --- PART 4: QR code ---
         if (printQR) {
           try {
-            await NativeModules.ThermalPrinterDriver.printImage(
-              btAddress, qrUrl, 'url',
-              120, 1, true, 15000
-            );
+            await adapter.sendImage(qrUrl, 120, 0);
           } catch {
             // QR failed — continue
           }
         }
 
         // --- PART 5: Footer ---
-        const footerBytes = Array.from(encoder.encode('\n\n\n'));
-        await NativeModules.ThermalPrinterDriver.printRaw(btAddress, footerBytes, false, 5000);
+        await adapter.sendText('\n\n\n');
       }
 
       if (Platform.OS !== 'web') {
@@ -562,7 +546,7 @@ export default function PrintPreviewScreen() {
 
       {!isDevMode && printerConnection === 'no_printer' && (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.noPrinterBanner}>
+          <View style={styles.noPrinterBanner} testID="queue-status-badge">
             <Printer size={14} color={Colors.gold} />
             <Text style={styles.noPrinterBannerText}>No printer selected — tap to choose in Settings</Text>
           </View>

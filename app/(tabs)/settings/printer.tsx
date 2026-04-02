@@ -40,7 +40,7 @@ import {
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
-import type { PrinterRecord, PrinterTransport } from '@/types';
+import type { PrinterRecord, PrinterTransport, PrinterCapabilities } from '@/types';
 import { useI18n } from '@/i18n';
 import { registryService } from '@/services/printer/registry/service';
 import { createAdapter } from '@/services/printer/adapters/factory';
@@ -217,7 +217,7 @@ export default function PrinterSetupScreen() {
     const init = async () => {
       // Check native module first
       if (!printerCapabilityService.isNativeModuleAvailable()) {
-        setErrorMessage('Thermal printer module is not available. Printer functionality requires a custom development build.');
+        setErrorMessage(t.printer.moduleUnavailableText);
         setUiState('module_unavailable');
         return;
       }
@@ -254,7 +254,7 @@ export default function PrinterSetupScreen() {
           name: d.name,
           address: d.address,
           transport: d.transport as PrinterTransport,
-          capabilities: d.capabilities ?? { supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth: 58 },
+          capabilities: d.capabilities ?? ({ supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth: 58 } as PrinterCapabilities),
           lastSeenAt: now,
           createdAt: now,
         }));
@@ -334,7 +334,7 @@ export default function PrinterSetupScreen() {
         name: d.name,
         address: d.address,
         transport: d.transport as PrinterTransport,
-        capabilities: d.capabilities ?? { supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth: 58 },
+        capabilities: d.capabilities ?? ({ supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth: 58 } as PrinterCapabilities),
         lastSeenAt: now,
         createdAt: now,
       }));
@@ -467,16 +467,12 @@ export default function PrinterSetupScreen() {
     setErrorMessage(null);
 
     try {
-      // Direct print — bypass queue/database entirely
-      const btAddress = printer.address.startsWith('bt:') ? printer.address : `bt:${printer.address}`;
-      const { NativeModules: NM } = require('react-native');
-      const nativePrinter = NM.ThermalPrinterDriver;
+      const adapter = createAdapter();
 
-      // Connect
-      await nativePrinter.connect(btAddress, 10000);
+      // Connect using registry DB key — adapter.connectPrinter handles address lookup
+      await adapter.connectPrinter(printer.id);
 
       // Build ESC/POS test page
-      const encoder = new TextEncoder();
       const now = new Date().toISOString();
       const testText = [
         '\x1B\x40',          // ESC @ — init
@@ -498,8 +494,7 @@ export default function PrinterSetupScreen() {
         '\n\n\n',             // Feed
       ].join('');
 
-      const data = Array.from(encoder.encode(testText));
-      await nativePrinter.printRaw(btAddress, data, false, 10000);
+      await adapter.sendText(testText);
 
       showToast({ type: 'success', title: t.printer.testPrint, message: `Diagnostics print completed successfully for ${printer.name}.` });
       setErrorMessage(null);
@@ -703,10 +698,10 @@ export default function PrinterSetupScreen() {
     <View style={styles.permissionDeniedCard}>
       <View style={styles.permissionDeniedHeader}>
         <ShieldOff size={20} color={Colors.error} />
-        <Text style={styles.permissionDeniedTitle}>Printer Module Unavailable</Text>
+        <Text style={styles.permissionDeniedTitle}>{t.printer.moduleUnavailableTitle}</Text>
       </View>
       <Text style={styles.permissionDeniedText}>
-        The thermal printer native module is not available. Printer functionality requires a custom development build with the thermal printer Expo module installed.
+        {t.printer.moduleUnavailableText}
       </Text>
       <Pressable
         onPress={() => router.back()}
@@ -716,7 +711,7 @@ export default function PrinterSetupScreen() {
         ]}
         testID="go-back"
       >
-        <Text style={styles.permissionDeniedButtonText}>Go Back</Text>
+        <Text style={styles.permissionDeniedButtonText}>{t.common.goBack}</Text>
       </Pressable>
     </View>
   );

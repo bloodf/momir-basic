@@ -3,13 +3,14 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import React, { useEffect, useRef } from "react";
-import { NativeModules, Platform } from "react-native";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HistoryProvider } from "@/providers/HistoryProvider";
 import { SettingsProvider, useSettings } from "@/providers/SettingsProvider";
 import { NetworkProvider } from "@/providers/NetworkProvider";
-import { I18nProvider } from "@/i18n";
+import { I18nProvider, useI18n } from "@/i18n";
 import { ToastProvider, showToast } from "@/components/Toast";
+import { registryService } from "../services/printer/registry/service";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -18,9 +19,11 @@ const queryClient = new QueryClient();
 /**
  * PrinterAutoConnect — attempts to reconnect to the preferred printer on app startup.
  * Runs once in background, shows toast on result. Does not block app startup.
+ * Uses registryService to connect using a registry DB key (NOT raw Bluetooth address).
  */
 function PrinterAutoConnect() {
   const { settings } = useSettings();
+  const { t } = useI18n();
   const attemptedRef = useRef(false);
 
   useEffect(() => {
@@ -31,20 +34,14 @@ function PrinterAutoConnect() {
     if (!prefId) return;
 
     attemptedRef.current = true;
-    const nativePrinter = NativeModules.ThermalPrinterDriver;
-    if (!nativePrinter) return;
-
-    const btAddress = prefId.startsWith('bt:') ? prefId : `bt:${prefId}`;
 
     (async () => {
       try {
-        await nativePrinter.connect(btAddress, 10000);
-        const result = await nativePrinter.testConnection(btAddress);
-        if (result?.success) {
-          showToast({ type: 'success', title: 'Printer Connected', message: 'Ready to print.' });
-        }
+        // preferredPrinterId is a registry DB key — registryService handles address lookup
+        await registryService.connectPrinter(prefId);
+        showToast({ type: 'success', title: t.toast.printerConnected, message: t.toast.printerReady });
       } catch {
-        showToast({ type: 'warning', title: 'Printer Not Found', message: 'Could not auto-connect. Reconnect in Settings.' });
+        showToast({ type: 'warning', title: t.toast.printerReconnectTitle, message: t.toast.printerReconnectMessage });
       }
     })();
   }, [settings.printer?.preferredPrinterId]);

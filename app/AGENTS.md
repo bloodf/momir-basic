@@ -42,7 +42,7 @@ The `app/` directory contains the Expo Router navigation structure and all top-l
 - Print preview modal with two render modes: receipt (thermal printer) and full card (image)
 - Integrates with printer service for capability detection
 - Shows dithered image preview for thermal printer output
-- Handles print job queue and error states
+- Handles direct print execution and error states
 
 ### life-counter.tsx
 - Full-screen life counter for 2-8 players

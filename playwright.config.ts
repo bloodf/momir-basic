@@ -18,7 +18,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx expo start --web --localhost',
+    command: 'CI=1 npx expo start --web --localhost',
     url: 'http://localhost:8081',
     reuseExistingServer: false,
     timeout: 120000,

@@ -44,6 +44,7 @@ import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/sc
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
+import { createAdapter } from '../services/printer/adapters/factory';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_HEIGHT * 0.48;
@@ -103,24 +104,19 @@ export default function CardDetailScreen() {
     if (!settings.printer.autoPrint) return;
     if (!settings.printer.preferredPrinterId) return;
 
-    const { NativeModules } = require('react-native');
-    const nativePrinter = NativeModules.ThermalPrinterDriver;
-    if (!nativePrinter) return;
-
     const printMode = settings.printer?.printMode ?? 'full';
     const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
     const widthPx = paperWidth === 80 ? 576 : 384;
     const imageUrl = cardToPrint.normalImageUrl || cardToPrint.artCropUrl;
-    const btAddress = settings.printer.preferredPrinterId.startsWith('bt:')
-      ? settings.printer.preferredPrinterId
-      : `bt:${settings.printer.preferredPrinterId}`;
 
     try {
-      await nativePrinter.connect(btAddress, 10000);
+      const adapter = createAdapter();
+      // preferredPrinterId is a registry DB key — adapter.connectPrinter handles address lookup
+      await adapter.connectPrinter(settings.printer.preferredPrinterId);
 
       if (printMode === 'image_only') {
         if (imageUrl) {
-          await nativePrinter.printImage(btAddress, imageUrl, 'url', widthPx, 1, false, 25000);
+          await adapter.sendImage(imageUrl, widthPx, 0);
         }
       } else {
         const { EscPosRenderer } = await import('../services/printer/render/escpos');
@@ -154,13 +150,14 @@ export default function CardDetailScreen() {
 
         if (settings.printer?.printArt && imageUrl) {
           try {
-            await nativePrinter.printImage(btAddress, imageUrl, 'url', widthPx, 1, true, 25000);
+            await adapter.sendImage(imageUrl, widthPx, 0);
           } catch {
             // Image failed — continue with text
           }
         }
 
-        await nativePrinter.printRaw(btAddress, allBytes, false, 15000);
+        const text = String.fromCharCode(...allBytes);
+        await adapter.sendText(text);
       }
     } catch {
       // Auto-print failure is silent — user can print manually from preview

@@ -2,12 +2,11 @@
 
 ## Overview
 
-The printer subsystem adds real thermal printer discovery, registry storage, queue persistence, document rendering, and native transport support to the Expo app. It is built around `react-native-thermal-pos-printer`, `expo-sqlite`, and a shared receipt document model.
+The printer subsystem adds real thermal printer discovery, registry storage, document rendering, and native transport support to the Expo app. It is built around `react-native-thermal-pos-printer`, `expo-sqlite`, and a shared receipt document model.
 
 Main files:
 
 - `services/printer/render/document.ts`
-- `services/printer/queue/engine.ts`
 - `services/printer/registry/service.ts`
 - `services/printer/adapters/native.ts`
 - `services/printer/adapters/fake.ts`
@@ -17,7 +16,7 @@ Main files:
 
 Conceptually, the flow is:
 
-`PrintDocument -> PrintQueue -> PrinterRegistry -> TransportAdapters`
+`PrintDocument -> PrinterRegistry -> TransportAdapters`
 
 In this codebase that maps to:
 
@@ -27,21 +26,16 @@ In this codebase that maps to:
    - File: `services/printer/render/document.ts`
    - Responsibility: turn app data into receipt-friendly ESC/POS content
 
-2. **PrintQueue**
-   - `QueueEngine`
-   - File: `services/printer/queue/engine.ts`
-   - Responsibility: claim jobs, dispatch them, retry safe failures, stop on uncertain writes
-
-3. **PrinterRegistry**
+2. **PrinterRegistry**
    - `registryService`
    - File: `services/printer/registry/service.ts`
    - Responsibility: discover printers, upsert them into SQLite, save the preferred printer ID, filter unsupported transports on iOS
 
-4. **TransportAdapters**
+3. **TransportAdapters**
    - `NativeThermalPrinterAdapter`
    - `FakePrinterAdapter`
    - Files: `services/printer/adapters/native.ts`, `services/printer/adapters/fake.ts`
-   - Responsibility: talk to the real native module, or provide deterministic web and test behavior
+   - Responsibility: talk to the real native module, execute direct prints, or provide deterministic web and test behavior
 
 ## Supported printers and transports
 

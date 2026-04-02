@@ -125,14 +125,13 @@ The printer subsystem is intentionally layered.
 - upserts discovered printers into SQLite
 - stores preferred printer ID back into settings
 
-### Queue
+### Direct printing
 
-`services/printer/queue/engine.ts`
+Printing runs directly through the selected adapter after registry lookup and document rendering.
 
-- claims one active job per printer
+- connects to the preferred printer
 - dispatches rendered bytes
-- retries safe failures with bounded backoff
-- marks uncertain writes as manual failures
+- reports success or failure immediately
 
 ### Rendering
 

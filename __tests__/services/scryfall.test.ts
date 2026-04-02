@@ -45,8 +45,10 @@ function createFakeScryfallCard(overrides: Partial<ScryfallCard> = {}): Scryfall
 describe('Scryfall Service', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    mockFetch.mockClear();
     jest.clearAllMocks();
   });
+
 
   describe('fetchRandomCard', () => {
     it('fetches a random card successfully', async () => {
@@ -145,7 +147,8 @@ describe('Scryfall Service', () => {
         'No creature found at CMC 3'
       );
 
-      expect(mockFetch).toHaveBeenCalledTimes(3);
+      // CMC fallback: tries 3, 2, 1, 0 = 4 CMCs × 3 retries each = 12 fetch calls
+      expect(mockFetch).toHaveBeenCalledTimes(12);
     });
 
     it('retries on 429 rate limit', async () => {

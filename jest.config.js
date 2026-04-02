@@ -22,5 +22,5 @@ module.exports = {
     'types/**/*.{ts,tsx}',
     '!**/*.d.ts',
   ],
-  testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/', '/e2e/'],
+  testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/', '/e2e/', '/expo/'],
 };

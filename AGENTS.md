@@ -116,8 +116,6 @@ momir-basic/
 │       ├── capability/         # Device capabilities
 │       │   ├── service.ts      # Capability detection
 │       │   └── index.ts        # Exports
-│       ├── queue/              # Print job queue
-│       │   └── engine.ts       # Queue state machine
 │       └── diagnostics/        # Debugging tools
 │           ├── logger.ts       # Structured logging
 │           └── index.ts        # Exports
@@ -315,8 +313,7 @@ The printer service is a layered system:
 3. **Render** (`render/`) — ESC/POS command generation & document layout
 4. **Registry** (`registry/`) — Device discovery & pairing
 5. **Storage** (`storage/`) — Persist printer state to SQLite
-6. **Queue** (`queue/engine.ts`) — Print job state machine
-7. **Diagnostics** (`diagnostics/`) — Debug logging & error collection
+6. **Diagnostics** (`diagnostics/`) — Debug logging & error collection
 
 ### Key Files
 
@@ -326,7 +323,6 @@ The printer service is a layered system:
 | `adapters/native.ts` | react-native-thermal-printer-driver wrapper | ~200 lines |
 | `render/escpos.ts` | ESC/POS command generation | ~300 lines |
 | `registry/service.ts` | Device discovery & state | ~250 lines |
-| `queue/engine.ts` | Print job queue state machine | ~200 lines |
 | `storage/database.ts` | SQLite persistence layer | ~180 lines |
 
 ### Usage Flow
@@ -342,7 +338,7 @@ Port.print(document) → Render generates ESC/POS bytes
   ↓
 Native module sends to device
   ↓
-Queue tracks job state (pending → printing → complete/failed)
+Native adapter sends rendered bytes directly and reports success or failure
   ↓
 Toast notification to user
 ```

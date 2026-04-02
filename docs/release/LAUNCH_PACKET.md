@@ -22,28 +22,27 @@ This launch packet is COMPLETE but the following blockers remain before publishi
 ### Completed Artifacts
 | Artifact | Status | Location |
 |----------|--------|----------|
-| Release Policy | ✅ Complete | `expo/docs/release/RELEASE_POLICY.md` |
-| Privacy Policy | ✅ Complete | `expo/docs/release/PRIVACY_POLICY.md` |
-| Terms of Service | ✅ Complete | `expo/docs/release/TERMS.md` |
-| Legal Inputs | ✅ Complete | `expo/docs/release/LEGAL_INPUTS.md` |
-| Store Compliance | ✅ Complete | `expo/docs/release/STORE_COMPLIANCE.md` |
-| Store Metadata | ✅ Complete | `expo/docs/release/STORE_METADATA.md` |
-| Store Assets Manifest | ✅ Complete | `expo/docs/release/STORE_ASSETS_MANIFEST.md` |
-| Build Rehearsal Docs | ✅ Complete | `expo/docs/release/BUILD_REHEARSAL.md` |
-| CI/CD Workflows | ✅ Complete | `.github/workflows/ci.yml`, `release-build.yml` |
-| Observability Docs | ✅ Complete | `expo/docs/release/OBSERVABILITY.md` |
-| Environment Separation | ✅ Complete | `expo/docs/release/ENVIRONMENT.md` |
-| OTA Rollback Docs | ✅ Complete | `expo/docs/release/ROLLBACK.md` |
-| Credentials Runbook | ✅ Complete | `expo/docs/release/RELEASE_CREDENTIALS.md` |
-| Hardware Validation Docs | ⚠️ Blocked | `expo/docs/release/HARDWARE_VALIDATION.md` |
+| Release Policy | ✅ Complete | `docs/release/RELEASE_POLICY.md` |
+| Privacy Policy | ✅ Complete | `docs/release/PRIVACY_POLICY.md` |
+| Terms of Service | ✅ Complete | `docs/release/TERMS.md` |
+| Legal Inputs | ✅ Complete | `docs/release/LEGAL_INPUTS.md` |
+| Store Compliance | ✅ Complete | `docs/release/STORE_COMPLIANCE.md` |
+| Store Metadata | ✅ Complete | `docs/release/STORE_METADATA.md` |
+| Store Assets Manifest | ✅ Complete | `docs/release/STORE_ASSETS_MANIFEST.md` |
+| Build Rehearsal Docs | ✅ Complete | `docs/release/BUILD_REHEARSAL.md` |
+| CI/CD Workflows | ✅ Complete | `.github/workflows/` |
+| Observability Docs | ✅ Complete | `docs/release/OBSERVABILITY.md` |
+| Environment Separation | ✅ Complete | `docs/release/ENVIRONMENT.md` |
+| OTA Rollback Docs | ✅ Complete | `docs/release/ROLLBACK.md` |
+| Credentials Runbook | ✅ Complete | `docs/release/RELEASE_CREDENTIALS.md` |
+| Hardware Validation Docs | ⚠️ Blocked | `docs/release/HARDWARE_VALIDATION.md` |
 
 ### Verification Results
-- TypeScript: PASS (`bunx tsc --noEmit`)
-- Lint: PASS (`bun run lint` — 0 errors)
-- Unit Tests: PASS (`bun run test -- --runInBand`)
-- E2E Tests: PASS (9/9 passed, 1 skipped)
+- Unit Tests: ✅ PASS (`bun run test -- --runInBand` — 139 printer tests pass)
 - CI Workflow: Valid YAML
 - Release Build Workflow: Valid YAML
+- TypeScript/Lint: ⚠️ See individual CI runs for current status
+- E2E Tests: ⚠️ Require physical device (printer hardware) to run
 
 ## Pre-Submission Checklist
 
@@ -172,13 +171,12 @@ Adding new printers to the matrix requires: physical validation evidence, firmwa
 - **Rationale**: Address alone is insufficient across transports; transport disambiguates Bluetooth MAC vs TCP endpoint
 - **Evidence**: `types/index.ts` defines `PrinterRecord` with explicit `{ address, transport }` identity
 
-#### Queue State Machine
+#### Direct Print Execution
 
-- **Decision**: 6 explicit queue states replace ambiguous success/failure
-- **States**: `queued` → `printing` → `printed_confirmed` | `failed_retryable` | `failed_terminal` | `sent_unknown`
-- **Retry policy**: 15s, 60s, 300s backoff; max 3 automatic retries
-- **Rationale**: `sent_unknown` prevents duplicate receipts when write confirmation is uncertain
-- **Evidence**: `services/printer/queue/engine.ts` implements bounded retries and explicit state transitions
+- **Decision**: Print jobs are executed directly against the selected transport without a queue engine
+- **Behavior**: connect to the preferred printer, send rendered bytes, then surface success or failure immediately
+- **Rationale**: direct execution matches the current printer flow and avoids documenting removed retry logic
+- **Evidence**: the active printer flow is implemented through the registry, render, and adapter services
 
 #### Transport-Specific Error Codes
 
@@ -328,4 +326,4 @@ log stream --predicate 'subsystem == "com.bloodf.momirbasic.PrinterSession"' --l
 
 ---
 
-*Generated: 2026-03-29 | Source: `expo/docs/PRINTER.md`, `expo/docs/release/HARDWARE_VALIDATION.md`, `expo/docs/release/OBSERVABILITY.md`, evidence files in `.sisyphus/evidence/`*
+*Generated: 2026-03-29 | Source: `docs/PRINTER.md`, `docs/release/HARDWARE_VALIDATION.md`, `docs/release/OBSERVABILITY.md`, evidence files in `.sisyphus/evidence/`*

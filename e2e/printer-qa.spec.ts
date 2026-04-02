@@ -30,7 +30,7 @@ test.describe('Print Preview Screen - Non-Printer UI Coverage', () => {
 
     const errorBadge = page.locator('[data-testid="queue-status-badge"]');
     await expect(errorBadge).toBeVisible();
-    await expect(errorBadge).toContainText(/select a printer/i);
+    await expect(errorBadge).toContainText(/No printer selected/i);
   });
 
   test('confirm-print button is present and clickable', async ({ page }) => {

@@ -16,8 +16,8 @@
 ### Metadata Fields
 | Field | Value |
 |-------|-------|
-| Privacy Policy URL | [DECISION NEEDED: URL to hosted privacy policy] |
-| Support URL | [DECISION NEEDED] |
+| Privacy Policy URL | `docs/privacy-policy.md` |
+| Support URL | `docs/support.md` |
 | Marketing URL | [DECISION NEEDED or leave blank] |
 | Version | 1.0.0 |
 
@@ -71,10 +71,10 @@ magic, mtg, card, scryfall, printer, receipt, gatherer, randomizer
 
 ### Data Safety
 - **Collects data**: YES — stores card history and print queue locally
-- **Data is encrypted**: YES — stored on device only
+- **Data is encrypted**: NO — stored locally via AsyncStorage/SQLite without encryption at rest
 - **Can be deleted**: YES — clear app data
 - **Shares data**: NO — no third-party data sharing
-- **Required permissions**: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN
+- **Required permissions**: BLUETOOTH, BLUETOOTH_ADMIN, BLUETOOTH_CONNECT, BLUETOOTH_SCAN, ACCESS_FINE_LOCATION (Android 10+ for Bluetooth scanning)
 
 ### Content Rating Questionnaire
 - **Violence**: No realistic blood or violence in card art
@@ -92,4 +92,20 @@ Both reviewers should be informed:
 "The app does not require user login or account creation. All data is stored locally on the device."
 
 ### Hardware Dependency Note
-"The thermal printing feature requires a compatible ESC/POS Bluetooth thermal printer. In our testing we used [DECISION NEEDED: specific printer model, or 'various compatible printers']. Without a printer, the print feature cannot be fully tested."
+"The thermal printing feature requires a compatible ESC/POS Bluetooth thermal printer. Without a printer, the print feature cannot be fully tested. See `docs/release/HARDWARE_VALIDATION.md` for the certified printer matrix."
+
+## External Blockers
+
+The following values CANNOT be determined from code and require external input:
+
+| Value | Document | Blocker Type |
+|-------|----------|--------------|
+| Privacy policy file path | STORE_METADATA.md | Internal — points to `docs/privacy-policy.md` |
+| Support file path | STORE_METADATA.md | Internal — points to `docs/support.md` |
+| Support email | STORE_METADATA.md, LEGAL_INPUTS.md | External — must be configured |
+| Legal entity name | LEGAL_INPUTS.md | External — legal decision |
+| Apple Team ID | RELEASE_CREDENTIALS.md | External — Apple Developer account |
+| Google Play account | RELEASE_CREDENTIALS.md | External — Google Play account |
+| Printer model for validation | HARDWARE_VALIDATION.md | External — hardware procurement |
+| iOS test device | HARDWARE_VALIDATION.md | External — hardware access |
+| Android test device | HARDWARE_VALIDATION.md | External — hardware access |
