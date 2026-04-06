@@ -54,6 +54,10 @@ const zhs: Translations = {
     number: '编号',
     artist: '画师',
     manaValue: '法术力费用',
+    face: {
+      front: '正面',
+      back: '背面',
+    },
     cardNotFound: '未找到卡牌数据',
     noCardData: '没有卡牌数据',
     powerToughness: '力量/防御',
@@ -259,6 +263,7 @@ const zhs: Translations = {
     printMode: '打印模式',
     printQRCode: '打印二维码',
     printFlavorText: '打印背景文字',
+    printBothFaces: '双面打印',
     noPrinterSelected: '未选择打印机。请在设置中选择。',
     verificationFailed: '无法验证打印机连接。',
     moduleUnavailableTitle: '打印机模块不可用',

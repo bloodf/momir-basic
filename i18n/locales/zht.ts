@@ -54,6 +54,10 @@ const zht: Translations = {
     number: '編號',
     artist: '畫師',
     manaValue: '魔法力費用',
+    face: {
+      front: '正面',
+      back: '背面',
+    },
     cardNotFound: '未找到卡牌資料',
     noCardData: '沒有卡牌資料',
     powerToughness: '力量/防禦',
@@ -259,6 +263,7 @@ const zht: Translations = {
     printMode: '列印模式',
     printQRCode: '列印二維碼',
     printFlavorText: '列印背景文字',
+    printBothFaces: '雙面列印',
     noPrinterSelected: '未選擇印表機。請在設定中選擇。',
     verificationFailed: '無法驗證印表機連接。',
     moduleUnavailableTitle: '印表機模組不可用',

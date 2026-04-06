@@ -54,6 +54,10 @@ const es: Translations = {
     number: 'Número',
     artist: 'Artista',
     manaValue: 'Valor de Maná',
+    face: {
+      front: 'Frente',
+      back: 'Reverso',
+    },
     cardNotFound: 'Datos de carta no encontrados',
     noCardData: 'Sin datos de carta',
     powerToughness: 'F/R',
@@ -259,6 +263,7 @@ const es: Translations = {
     printMode: 'Modo de Impresión',
     printQRCode: 'Código QR de Impresión',
     printFlavorText: 'Texto de Sabor de Impresión',
+    printBothFaces: 'Imprimir Ambas Caras',
     noPrinterSelected: 'Ninguna impresora seleccionada. Ve a Ajustes para seleccionar una impresora.',
     verificationFailed: 'No se pudo verificar la conexión de la impresora.',
     moduleUnavailableTitle: 'Módulo de Impresora No Disponible',

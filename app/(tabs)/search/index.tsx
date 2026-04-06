@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Search, X, LayoutList, LayoutGrid } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
-import { searchCards, autocompleteCardName, parseAdvancedSyntax } from '@/services/scryfall';
+import { searchCards, autocompleteCardName } from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
 import { CardGridItem } from '@/components/CardGridItem';
 import { SearchSkeleton, CardGridSkeleton } from '@/components/Skeleton';
@@ -27,7 +27,7 @@ import {
   SearchFilterState,
   EMPTY_FILTERS,
   getActiveFilterCount,
-  buildFilterQuery,
+  buildFullQuery,
 } from '@/components/SearchFilters';
 
 type ViewMode = 'list' | 'grid';
@@ -54,6 +54,16 @@ export default function SearchScreen() {
   const lastSearchQuery = useRef('');
   const pendingInitialQuery = useRef<string | null>(null);
 
+  const clearSearchResults = useCallback(() => {
+    setResults([]);
+    setTotalCount(0);
+    setHasMore(false);
+    setHasSearched(false);
+    setSuggestions([]);
+    setCurrentPage(1);
+    lastSearchQuery.current = '';
+  }, []);
+
   if (searchParams.initialQuery && searchParams.initialQuery !== lastInitialQuery.current) {
     lastInitialQuery.current = searchParams.initialQuery;
     pendingInitialQuery.current = searchParams.initialQuery;
@@ -73,13 +83,6 @@ export default function SearchScreen() {
       useNativeDriver: false,
     }).start();
   }, [viewMode, toggleAnim]);
-
-  const buildFullQuery = useCallback((textQuery: string, currentFilters: SearchFilterState): string => {
-    const parsed = parseAdvancedSyntax(textQuery);
-    const filterStr = buildFilterQuery(currentFilters);
-    const parts = [parsed, filterStr].filter(Boolean);
-    return parts.join(' ');
-  }, []);
 
   const searchMutation = useMutation({
     mutationFn: async ({ q, page }: { q: string; page: number }) => {
@@ -108,9 +111,7 @@ export default function SearchScreen() {
       const q = pendingInitialQuery.current;
       pendingInitialQuery.current = null;
       setQuery(q);
-      setSuggestions([]);
-      setResults([]);
-      setHasSearched(false);
+      clearSearchResults();
       setFilters(EMPTY_FILTERS);
       setFiltersVisible(false);
       const fullQ = buildFullQuery(q, EMPTY_FILTERS);
@@ -120,7 +121,7 @@ export default function SearchScreen() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.initialQuery]);
+  }, [searchParams.initialQuery, clearSearchResults]);
 
   const autocompleteMutation = useMutation({
     mutationFn: async (q: string) => {
@@ -172,18 +173,16 @@ export default function SearchScreen() {
 
   const handleClear = useCallback(() => {
     setQuery('');
-    setResults([]);
-    setTotalCount(0);
-    setHasMore(false);
-    setHasSearched(false);
-    setSuggestions([]);
-    setCurrentPage(1);
+    clearSearchResults();
     inputRef.current?.focus();
-  }, []);
+  }, [clearSearchResults]);
 
   const handleFiltersChange = useCallback((newFilters: SearchFilterState) => {
     setFilters(newFilters);
-  }, []);
+    if (query.trim().length === 0 && getActiveFilterCount(newFilters) === 0) {
+      clearSearchResults();
+    }
+  }, [clearSearchResults, query]);
 
   const handleToggleFilters = useCallback(() => {
     setFiltersVisible(prev => !prev);

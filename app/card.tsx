@@ -41,6 +41,7 @@ import { Card } from '@/types';
 import { ManaCost } from '@/components/ManaCost';
 import { OracleText } from '@/components/OracleText';
 import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/scryfall';
+import { getCardFaceDisplayData, getDisplayFace } from '@/utils/cardFaces';
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
@@ -70,6 +71,7 @@ export default function CardDetailScreen() {
 
   const [cards, setCards] = useState<Card[]>(initialCards);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [activeFaceIndex, setActiveFaceIndex] = useState(0);
   const [showFullCard, setShowFullCard] = useState(false);
   const [showArtView, setShowArtView] = useState(false);
   const [printingsExpanded, setPrintingsExpanded] = useState(false);
@@ -263,24 +265,27 @@ export default function CardDetailScreen() {
 
   const handleShareArt = useCallback(async () => {
     if (!card) return;
+    const displayCard = getCardFaceDisplayData(card, activeFaceIndex);
+    const artist = displayCard.artist ?? t.card.unknownArtist;
     try {
       await Share.share({
-        message: `${card.name} — Art by ${card.artist ?? 'Unknown'}\n${card.scryfallUri}`,
-        url: card.artCropUrl,
+        message: `${displayCard.name} — ${t.card.artBy(artist)}\n${card.scryfallUri}`,
+        url: displayCard.artCropUrl,
       });
     } catch {
       Alert.alert('Share Failed', 'Unable to share card art right now.');
     }
-  }, [card]);
+  }, [activeFaceIndex, card, t.card]);
 
   const handleDownloadArt = useCallback(async () => {
     if (!card) return;
+    const displayCard = getCardFaceDisplayData(card, activeFaceIndex);
     if (Platform.OS === 'web') {
       try {
         const link = document.createElement('a');
-        link.href = card.artCropUrl;
+        link.href = displayCard.artCropUrl;
         link.target = '_blank';
-        link.download = `${card.name.replace(/[^a-zA-Z0-9]/g, '_')}_art.jpg`;
+        link.download = `${displayCard.name.replace(/[^a-zA-Z0-9]/g, '_')}_art.jpg`;
         link.click();
       } catch {
         Alert.alert('Download Failed', 'Unable to open the art download in this browser.');
@@ -288,7 +293,13 @@ export default function CardDetailScreen() {
     } else {
       Alert.alert('Download', 'Art download requires a development build with file system access.\n\nYou can share the art using the share button instead.');
     }
-  }, [card]);
+  }, [activeFaceIndex, card]);
+
+  const handleToggleFace = useCallback(() => {
+    if (!card?.faces || card.faces.length < 2) return;
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+    setActiveFaceIndex((prev) => (prev === 0 ? 1 : 0));
+  }, [card?.faces]);
 
   const togglePrintings = useCallback(async () => {
     if (!card) return;
@@ -321,6 +332,7 @@ export default function CardDetailScreen() {
 
   useEffect(() => {
     if (!card) return;
+    setActiveFaceIndex(0);
     setPrintingsExpanded(false);
     setPrintings([]);
     setPrintingsFetched(false);
@@ -345,9 +357,13 @@ export default function CardDetailScreen() {
     );
   }
 
+  const displayFace = getDisplayFace(card, activeFaceIndex);
+  const displayCard = getCardFaceDisplayData(card, activeFaceIndex);
+  const hasMultipleFaces = (card.faces?.length ?? 0) > 1;
   const rarityColor = Colors.rarity[card.rarity] ?? Colors.textSecondary;
-  const hasStats = card.power !== undefined && card.toughness !== undefined;
+  const hasStats = displayFace.power !== undefined && displayFace.toughness !== undefined;
   const rarityLabel = card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1);
+  const nextFaceLabel = activeFaceIndex === 0 ? t.card.face.back : t.card.face.front;
 
   const bodyTranslateY = cardEntryAnim.interpolate({
     inputRange: [0, 1],
@@ -373,7 +389,7 @@ export default function CardDetailScreen() {
 
           <Animated.View style={[styles.heroImageWrap, { transform: [{ scale: heroScale }] }]}>
             <Image
-              source={{ uri: card.artCropUrl || card.normalImageUrl }}
+              source={{ uri: displayCard.artCropUrl || displayCard.normalImageUrl }}
               style={styles.heroImage}
               contentFit="cover"
               transition={300}
@@ -401,40 +417,40 @@ export default function CardDetailScreen() {
           </View>
 
           <Animated.View style={[styles.heroContent, { opacity: cardEntryAnim }]}>
-            <ManaCost manaCost={card.manaCost} size={22} gap={3} />
-            <Text style={styles.cardName} numberOfLines={2}>{card.printedName ?? card.name}</Text>
+            <ManaCost manaCost={displayCard.manaCost} size={22} gap={3} />
+            <Text style={styles.cardName} numberOfLines={2}>{displayCard.printedName ?? displayCard.name}</Text>
           </Animated.View>
         </Pressable>
 
         <Animated.View style={[styles.body, { opacity: cardEntryAnim, transform: [{ translateY: bodyTranslateY }] }]}>
           <View style={styles.typeAndPtRow}>
             <View style={[styles.typeCard, hasStats ? styles.typeCardWithPt : undefined]}>
-              <Text style={styles.typeCardText}>{card.printedTypeLine ?? card.typeLine}</Text>
+              <Text style={styles.typeCardText}>{displayCard.printedTypeLine ?? displayCard.typeLine}</Text>
             </View>
             {hasStats && (
               <View style={styles.ptCompactCard}>
                 <View style={styles.ptIconRow}>
                   <Sword size={13} color={Colors.gold} />
-                  <Text style={styles.ptCompactValue}>{card.power}</Text>
+                  <Text style={styles.ptCompactValue}>{displayCard.power}</Text>
                 </View>
                 <View style={styles.ptDivider} />
                 <View style={styles.ptIconRow}>
                   <Shield size={13} color={Colors.gold} />
-                  <Text style={styles.ptCompactValue}>{card.toughness}</Text>
+                  <Text style={styles.ptCompactValue}>{displayCard.toughness}</Text>
                 </View>
               </View>
             )}
           </View>
 
-          {(card.printedText ?? card.oracleText) ? (
+          {(displayCard.printedText ?? displayCard.oracleText) ? (
             <View style={styles.oracleSection}>
-              <OracleText text={card.printedText ?? card.oracleText} fontSize={14.5} />
+              <OracleText text={displayCard.printedText ?? displayCard.oracleText ?? ''} fontSize={14.5} />
             </View>
           ) : null}
 
-          {card.flavorText ? (
+          {displayCard.flavorText ? (
             <View style={styles.flavorSection}>
-              <Text style={styles.flavorText}>{card.flavorText}</Text>
+              <Text style={styles.flavorText}>{displayCard.flavorText}</Text>
             </View>
           ) : null}
 
@@ -467,12 +483,12 @@ export default function CardDetailScreen() {
                 </View>
               </View>
 
-              {card.artist ? (
+              {displayCard.artist ? (
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>{t.card.artist}</Text>
                   <View style={styles.detailValueRow}>
                     <Paintbrush size={12} color={Colors.textMuted} />
-                    <Text style={styles.detailValue} numberOfLines={1}>{card.artist}</Text>
+                    <Text style={styles.detailValue} numberOfLines={1}>{displayCard.artist}</Text>
                   </View>
                 </View>
               ) : null}
@@ -561,7 +577,7 @@ export default function CardDetailScreen() {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 16) }]}> 
         <Pressable
           onPress={handlePrint}
           style={({ pressed }) => [styles.actionBtn, styles.actionOutline, pressed && styles.actionPressed]}
@@ -570,6 +586,16 @@ export default function CardDetailScreen() {
           <Printer size={17} color={Colors.gold} />
           <Text style={styles.actionOutlineText}>{t.common.print}</Text>
         </Pressable>
+
+        {hasMultipleFaces && (
+          <Pressable
+            onPress={handleToggleFace}
+            style={({ pressed }) => [styles.actionBtn, styles.actionOutline, pressed && styles.actionPressed]}
+            testID="toggle-card-face"
+          >
+            <Text style={styles.actionOutlineText}>{nextFaceLabel}</Text>
+          </Pressable>
+        )}
 
         <Pressable
           onPress={handleReroll}
@@ -593,7 +619,7 @@ export default function CardDetailScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={closeFullCard} />
           <View style={[styles.modalContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
             <Image
-              source={{ uri: card.normalImageUrl || card.artCropUrl }}
+              source={{ uri: displayCard.normalImageUrl || displayCard.artCropUrl }}
               style={styles.modalImage}
               contentFit="contain"
               transition={200}
@@ -602,8 +628,8 @@ export default function CardDetailScreen() {
               <X size={22} color="#fff" />
             </Pressable>
             <View style={styles.modalFooter}>
-              <Text style={styles.modalName}>{card.printedName ?? card.name}</Text>
-              <Text style={styles.modalMeta}>{card.setName} · #{card.collectorNumber}{card.artist ? ` · Art by ${card.artist}` : ''}</Text>
+              <Text style={styles.modalName}>{displayCard.printedName ?? displayCard.name}</Text>
+              <Text style={styles.modalMeta}>{card.setName} · #{card.collectorNumber}{displayCard.artist ? ` · ${t.card.artBy(displayCard.artist)}` : ''}</Text>
             </View>
           </View>
         </Animated.View>
@@ -614,7 +640,7 @@ export default function CardDetailScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={closeArtView} />
           <View style={[styles.artModalContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
             <Image
-              source={{ uri: card.artCropUrl }}
+              source={{ uri: displayCard.artCropUrl }}
               style={styles.artModalImage}
               contentFit="contain"
               transition={200}
@@ -623,8 +649,8 @@ export default function CardDetailScreen() {
               <X size={22} color="#fff" />
             </Pressable>
             <View style={styles.artModalFooter}>
-              <Text style={styles.artModalTitle}>{card.printedName ?? card.name}</Text>
-              {card.artist && <Text style={styles.artModalArtist}>Art by {card.artist}</Text>}
+              <Text style={styles.artModalTitle}>{displayCard.printedName ?? displayCard.name}</Text>
+              {displayCard.artist && <Text style={styles.artModalArtist}>{t.card.artBy(displayCard.artist)}</Text>}
               <View style={styles.artModalActions}>
                 <Pressable onPress={handleDownloadArt} style={styles.artModalBtn}>
                   <Download size={18} color="#fff" />

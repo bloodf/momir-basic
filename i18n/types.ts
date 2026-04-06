@@ -52,6 +52,10 @@ export interface Translations {
     number: string;
     artist: string;
     manaValue: string;
+    face: {
+      front: string;
+      back: string;
+    };
     cardNotFound: string;
     noCardData: string;
     powerToughness: string;
@@ -257,6 +261,7 @@ export interface Translations {
     printMode: string;
     printQRCode: string;
     printFlavorText: string;
+    printBothFaces: string;
     noPrinterSelected: string;
     verificationFailed: string;
     moduleUnavailableTitle: string;

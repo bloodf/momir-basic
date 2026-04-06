@@ -1,3 +1,22 @@
+export interface CardFace {
+  name: string;
+  manaCost?: string;
+  typeLine: string;
+  oracleText?: string;
+  flavorText?: string;
+  power?: string;
+  toughness?: string;
+  artist?: string;
+  printedName?: string;
+  printedTypeLine?: string;
+  printedText?: string;
+  image_uris?: {
+    art_crop: string;
+    normal: string;
+    small: string;
+  };
+}
+
 export interface Card {
   id: string;
   name: string;
@@ -24,6 +43,8 @@ export interface Card {
   printedTypeLine?: string;
   printedText?: string;
   lang?: string;
+  /** Normalized faces for double-faced/modal cards. Single-face cards have faces: []. */
+  faces?: CardFace[];
 }
 
 export type CardType =
@@ -162,6 +183,17 @@ export interface CardReceiptData {
   setName: string;
   paperWidth: 58 | 80;
   printArt: boolean;
+  /** Optional back face data for double-faced cards */
+  backFaceData?: {
+    name: string;
+    manaCost?: string;
+    typeLine: string;
+    oracleText?: string;
+    flavorText?: string;
+    power?: string;
+    toughness?: string;
+    artCropUrl?: string;
+  };
 }
 
 // Document data for diagnostics/test print

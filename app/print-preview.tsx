@@ -25,11 +25,13 @@ import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
 import { createAdapter } from '../services/printer/adapters/factory';
+import { buildQrUrl } from '../services/printer/render/escpos';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
 const ART_WIDTH = RECEIPT_WIDTH - 32;
 const ART_HEIGHT = ART_WIDTH * 0.85;
+const QR_PREVIEW_SIZE = 144;
 
 type PrinterConnectionState = 'checking' | 'connected' | 'disconnected' | 'no_printer';
 
@@ -58,6 +60,9 @@ export default function PrintPreviewScreen() {
   // Printer connection state
   const [printerConnection, setPrinterConnection] = useState<PrinterConnectionState>('checking');
 
+  // Active face index for dual-faced cards (0 = front, 1 = back)
+  const [activeFaceIndex, setActiveFaceIndex] = useState<number>(0);
+
   const card = useMemo<Card | null>(() => {
     try {
       if (params.cardJson) return JSON.parse(params.cardJson);
@@ -66,6 +71,29 @@ export default function PrintPreviewScreen() {
     }
     return null;
   }, [params.cardJson]);
+
+  // Determine if card is double-faced
+  const isDoubleFaced = (card?.faces?.length ?? 0) > 1;
+
+  // Get the appropriate face data for display
+  const displayFace = useMemo(() => {
+    if (!card) return null;
+    if (!isDoubleFaced) return card;
+    const face = card.faces?.[activeFaceIndex];
+    if (!face) return card;
+    return {
+      ...card,
+      name: face.name ?? card.name,
+      manaCost: face.manaCost ?? card.manaCost,
+      typeLine: face.typeLine ?? card.typeLine,
+      oracleText: face.oracleText ?? card.oracleText,
+      flavorText: face.flavorText ?? card.flavorText,
+      power: face.power ?? card.power,
+      toughness: face.toughness ?? card.toughness,
+      artCropUrl: face.image_uris?.art_crop ?? card.artCropUrl,
+      normalImageUrl: face.image_uris?.normal ?? card.normalImageUrl,
+    };
+  }, [card, activeFaceIndex, isDoubleFaced]);
 
   useEffect(() => {
     Animated.parallel([
@@ -157,6 +185,7 @@ export default function PrintPreviewScreen() {
    */
   const handlePrint = useCallback(async () => {
     if (!card) return;
+    const scryfallUrl = card.scryfallUri || `https://scryfall.com/card/${card.setCode.toLowerCase()}/${card.collectorNumber}`;
 
     Animated.sequence([
       Animated.timing(printBtnScale, { toValue: 0.92, duration: 80, useNativeDriver: true }),
@@ -203,6 +232,16 @@ export default function PrintPreviewScreen() {
       imageUrl: card.normalImageUrl || card.artCropUrl,
       setCode: card.setCode,
       scryfallId: card.id,
+      backFaceData: isDoubleFaced && card.faces?.[1] ? {
+        name: card.faces[1].name ?? card.name,
+        manaCost: card.faces[1].manaCost,
+        type: card.faces[1].typeLine ?? card.typeLine,
+        oracleText: card.faces[1].oracleText,
+        flavorText: card.faces[1].flavorText,
+        power: card.faces[1].power,
+        toughness: card.faces[1].toughness,
+        imageUrl: card.faces[1].image_uris?.normal ?? card.faces[1].image_uris?.art_crop,
+      } : undefined,
     };
 
     try {
@@ -218,12 +257,20 @@ export default function PrintPreviewScreen() {
       const widthPx = paperWidth === 80 ? 576 : 384;
 
       if (printMode === 'image_only') {
-        // FULL CARD MODE: Print the full card face image
-        const fullCardUrl = card.normalImageUrl || card.artCropUrl;
-        if (fullCardUrl) {
-          await adapter.sendImage(fullCardUrl, widthPx, 0);
+        // FULL CARD MODE: Print the full card face image(s)
+        const frontCardUrl = card.normalImageUrl || card.artCropUrl;
+        if (frontCardUrl) {
+          await adapter.sendImage(frontCardUrl, widthPx, 0);
         } else {
           throw new Error('No card image available to print.');
+        }
+        // Print back face if double-faced
+        if (isDoubleFaced && card.faces?.[1]) {
+          const backFace = card.faces[1];
+          const backImageUrl = backFace.image_uris?.normal ?? backFace.image_uris?.art_crop;
+          if (backImageUrl) {
+            await adapter.sendImage(backImageUrl, widthPx, 0);
+          }
         }
       } else {
         // RECEIPT MODE: ESC/POS with split calls matching preview order
@@ -306,10 +353,70 @@ export default function PrintPreviewScreen() {
         // --- PART 4: QR code ---
         if (printQR) {
           try {
-            await adapter.sendImage(qrUrl, 120, 0);
+            await adapter.sendQRCode(scryfallUrl, QR_PREVIEW_SIZE);
           } catch {
             // QR failed — continue
           }
+        }
+
+        // --- BACK FACE: Print back of double-faced card ---
+        if (isDoubleFaced && cardReceiptData.backFaceData) {
+          const back = cardReceiptData.backFaceData;
+          await adapter.sendText('\n' + sep);
+          await adapter.sendText('--- BACK FACE ---\n');
+          await adapter.sendText(sep);
+
+          // Back face header
+          const backManaCost = back.manaCost || '';
+          const backNameLine = backManaCost
+            ? `${back.name} ${backManaCost}`
+            : back.name;
+
+          const backHeaderText = [
+            '\x1B\x40',
+            '\x1B\x61\x01',
+            '\x1B\x45\x01',
+            backNameLine + '\n',
+            '\x1B\x45\x00',
+            sep,
+          ].join('');
+
+          await adapter.sendText(backHeaderText);
+
+          // Back face art
+          if (printArt && back.imageUrl) {
+            try {
+              await adapter.sendImage(back.imageUrl, widthPx, 0);
+            } catch {
+              // Image failed — continue
+            }
+          }
+
+          // Back face body
+          const backBody: string[] = [
+            '\x1B\x61\x01',
+            back.type + '\n',
+            sep,
+          ];
+
+          if (back.oracleText) {
+            backBody.push('\x1B\x61\x00');
+            backBody.push(wrapText(back.oracleText, maxCols));
+          }
+
+          if (printFlavor && back.flavorText) {
+            backBody.push('\n\x1B\x61\x01');
+            backBody.push(`"${back.flavorText}"\n`);
+          }
+
+          if (back.power !== undefined && back.toughness !== undefined) {
+            backBody.push('\n\x1B\x61\x02');
+            backBody.push('\x1B\x45\x01');
+            backBody.push(`${back.power}/${back.toughness}\n`);
+            backBody.push('\x1B\x45\x00');
+          }
+
+          await adapter.sendText(backBody.join(''));
         }
 
         // --- PART 5: Footer ---
@@ -343,9 +450,9 @@ export default function PrintPreviewScreen() {
     );
   }
 
-  const hasStats = card.power !== undefined && card.toughness !== undefined;
+  const hasStats = displayFace?.power !== undefined && displayFace?.toughness !== undefined;
   const scryfallUrl = card.scryfallUri || `https://scryfall.com/card/${card.setCode.toLowerCase()}/${card.collectorNumber}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(scryfallUrl)}&bgcolor=FFFFFF&color=000000&margin=0`;
+  const qrUrl = buildQrUrl(scryfallUrl);
 
   const isDevMode = settings.devMode;
   const printMode = settings.printer?.printMode ?? 'full';
@@ -386,12 +493,33 @@ export default function PrintPreviewScreen() {
               : t.printPreview.thermalReceipt(settings.printer.paperWidth ?? 58)}
         </Text>
 
+        {isDoubleFaced && (
+          <View style={styles.faceToggle}>
+            <Pressable
+              onPress={() => setActiveFaceIndex(0)}
+              style={[styles.faceToggleBtn, activeFaceIndex === 0 && styles.faceToggleBtnActive]}
+            >
+              <Text style={[styles.faceToggleText, activeFaceIndex === 0 && styles.faceToggleTextActive]}>
+                Front
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setActiveFaceIndex(1)}
+              style={[styles.faceToggleBtn, activeFaceIndex === 1 && styles.faceToggleBtnActive]}
+            >
+              <Text style={[styles.faceToggleText, activeFaceIndex === 1 && styles.faceToggleTextActive]}>
+                Back
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         <Animated.View style={{ opacity: receiptOpacity, transform: [{ translateY: receiptSlide }] }}>
           <View ref={receiptRef} collapsable={false} style={styles.receipt}>
             {isImageOnly ? (
               <View style={styles.imageOnlyWrap}>
                 <Image
-                  source={{ uri: card.normalImageUrl || card.artCropUrl }}
+                  source={{ uri: displayFace?.normalImageUrl || displayFace?.artCropUrl }}
                   style={styles.imageOnlyArt}
                   contentFit="contain"
                   transition={200}
@@ -401,15 +529,15 @@ export default function PrintPreviewScreen() {
               <>
                 <View style={styles.receiptHeader}>
                   <Text style={styles.receiptCardName} numberOfLines={2}>
-                    {card.name}
+                    {displayFace?.name}
                   </Text>
-                  <PrintManaCost manaCost={card.manaCost} size={16} gap={2} />
+                  <PrintManaCost manaCost={displayFace?.manaCost ?? ''} size={16} gap={2} />
                 </View>
 
                 {showArt && (
                   <View style={styles.receiptArtWrap}>
                     <Image
-                      source={{ uri: card.artCropUrl || card.normalImageUrl }}
+                      source={{ uri: displayFace?.artCropUrl || displayFace?.normalImageUrl }}
                       style={styles.receiptArt}
                       contentFit="cover"
                       transition={200}
@@ -418,24 +546,24 @@ export default function PrintPreviewScreen() {
                 )}
 
                 <Text style={styles.receiptTypeLine}>
-                  {card.typeLine.replace('—', '\u2014')}
+                  {(displayFace?.typeLine ?? '').replace('—', '\u2014')}
                 </Text>
 
-                {card.oracleText ? (
+                {displayFace?.oracleText ? (
                   <View style={styles.receiptOracleWrap}>
-                    <PrintOracleText text={card.oracleText} fontSize={12} color="#000000" />
+                    <PrintOracleText text={displayFace.oracleText} fontSize={12} color="#000000" />
                   </View>
                 ) : null}
 
-                {showFlavor && card.flavorText ? (
+                {showFlavor && displayFace?.flavorText ? (
                   <Text style={styles.receiptFlavor}>
-                    {card.flavorText}
+                    {displayFace.flavorText}
                   </Text>
                 ) : null}
 
                 {hasStats && (
                   <View style={styles.receiptStatsRow}>
-                    <Text style={styles.receiptStatValue}>{card.power} / {card.toughness}</Text>
+                    <Text style={styles.receiptStatValue}>{displayFace?.power} / {displayFace?.toughness}</Text>
                   </View>
                 )}
 
@@ -677,6 +805,31 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 12,
   },
+  faceToggle: {
+    flexDirection: 'row' as const,
+    marginBottom: 12,
+    gap: 8,
+  },
+  faceToggleBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  faceToggleBtnActive: {
+    backgroundColor: Colors.gold,
+    borderColor: Colors.gold,
+  },
+  faceToggleText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+  },
+  faceToggleTextActive: {
+    color: Colors.background,
+  },
   receipt: {
     width: RECEIPT_WIDTH,
     backgroundColor: '#FFFFFF',
@@ -769,8 +922,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   receiptQr: {
-    width: 100,
-    height: 100,
+    width: QR_PREVIEW_SIZE,
+    height: QR_PREVIEW_SIZE,
   },
   infoSection: {
     marginTop: 16,

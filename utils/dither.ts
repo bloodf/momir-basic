@@ -1,3 +1,61 @@
+export function calculateAverageLuminance(imageData: number[]): number {
+  if (imageData.length < 4) return 1.0;
+  let totalLuminance = 0;
+  const pixelCount = imageData.length / 4;
+  for (let i = 0; i < pixelCount; i++) {
+    const r = imageData[i * 4] / 255;
+    const g = imageData[i * 4 + 1] / 255;
+    const b = imageData[i * 4 + 2] / 255;
+    totalLuminance += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  return totalLuminance / pixelCount;
+}
+
+export function preprocessDarkImage(imageData: number[]): number[] {
+  const result = new Array(imageData.length);
+  for (let i = 0; i < imageData.length; i += 4) {
+    const r = imageData[i];
+    const g = imageData[i + 1];
+    const b = imageData[i + 2];
+    const a = imageData[i + 3];
+
+    const rNorm = r / 255;
+    const gNorm = g / 255;
+    const bNorm = b / 255;
+    const luminance = 0.2126 * rNorm + 0.7152 * gNorm + 0.0722 * bNorm;
+
+    if (luminance < 0.4) {
+      const factor = 1.0 + (0.4 - luminance) * 1.5;
+      result[i] = Math.min(255, Math.round(r * factor));
+      result[i + 1] = Math.min(255, Math.round(g * factor));
+      result[i + 2] = Math.min(255, Math.round(b * factor));
+    } else {
+      result[i] = r;
+      result[i + 1] = g;
+      result[i + 2] = b;
+    }
+    result[i + 3] = a;
+  }
+  return result;
+}
+
+export function isDarkImage(imageData: number[]): boolean {
+  return calculateAverageLuminance(imageData) < 0.4;
+}
+
+export function preprocessAndDither(
+  imageData: number[],
+  width: number,
+  height: number,
+  algorithm: DitherAlgorithm = 'floyd-steinberg'
+): number[] {
+  if (isDarkImage(imageData)) {
+    const preprocessed = preprocessDarkImage(imageData);
+    return ditherImage(preprocessed, width, height, algorithm);
+  }
+  return ditherImage(imageData, width, height, algorithm);
+}
+
 export function floydSteinbergDither(
   imageData: number[],
   width: number,

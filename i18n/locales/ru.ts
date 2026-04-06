@@ -54,6 +54,10 @@ const ru: Translations = {
     number: 'Номер',
     artist: 'Художник',
     manaValue: 'Мана-стоимость',
+    face: {
+      front: 'Лицевая',
+      back: 'Обратная',
+    },
     cardNotFound: 'Данные карты не найдены',
     noCardData: 'Нет данных карты',
     powerToughness: 'С/В',
@@ -259,6 +263,7 @@ const ru: Translations = {
     printMode: 'Режим печати',
     printQRCode: 'QR-код печати',
     printFlavorText: 'Текст вкуса печати',
+    printBothFaces: 'Печатать обе стороны',
     noPrinterSelected: 'Принтер не выбран. Выберите в Настройках.',
     verificationFailed: 'Не удалось проверить подключение принтера.',
     moduleUnavailableTitle: 'Модуль Принтера Недоступен',

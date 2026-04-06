@@ -69,6 +69,16 @@
           "origin": "https://momir-basic.app/"
         }
       ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          }
+        }
+      ],
       "expo-font",
       "expo-web-browser",
       "expo-dev-client",

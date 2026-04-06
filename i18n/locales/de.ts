@@ -54,6 +54,10 @@ const de: Translations = {
     number: 'Nummer',
     artist: 'Künstler',
     manaValue: 'Manawert',
+    face: {
+      front: 'Vorderseite',
+      back: 'Rückseite',
+    },
     cardNotFound: 'Kartendaten nicht gefunden',
     noCardData: 'Keine Kartendaten',
     powerToughness: 'S/W',
@@ -259,6 +263,7 @@ const de: Translations = {
     printMode: 'Druckmodus',
     printQRCode: 'Druck-QR-Code',
     printFlavorText: 'Druck-Flavourtext',
+    printBothFaces: 'Beide Seiten Drucken',
     noPrinterSelected: 'Kein Drucker ausgewählt. Gehen Sie zu Einstellungen, um einen Drucker auszuwählen.',
     verificationFailed: 'Druckerverbindung konnte nicht überprüft werden.',
     moduleUnavailableTitle: 'Druckermodul Nicht Verfügbar',

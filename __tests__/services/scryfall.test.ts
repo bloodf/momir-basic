@@ -13,6 +13,7 @@ import {
   parseAdvancedSyntax,
   fetchRandomBgCardForType,
 } from '../../services/scryfall';
+import { buildFullQuery, EMPTY_FILTERS } from '../../components/SearchFilters.shared';
 
 function createFakeScryfallCard(overrides: Partial<ScryfallCard> = {}): ScryfallCard {
   return {
@@ -47,6 +48,21 @@ describe('Scryfall Service', () => {
     mockFetch.mockReset();
     mockFetch.mockClear();
     jest.clearAllMocks();
+  });
+
+  describe('filter-only query helpers', () => {
+    it('builds a valid filter-only query from empty text', () => {
+      const query = buildFullQuery('', {
+        ...EMPTY_FILTERS,
+        colors: ['W'],
+        rarity: 'rare',
+      });
+
+      expect(query).toBeTruthy();
+      expect(query).toContain('c:W');
+      expect(query).toContain('r:rare');
+      expect(query).not.toContain('t:');
+    });
   });
 
 
@@ -226,6 +242,95 @@ describe('Scryfall Service', () => {
       const result = await fetchRandomCard('creature', 3);
 
       expect(result.rarity).toBe('common');
+    });
+
+    it('preserves both faces for double-faced cards', async () => {
+      const dfcCard = createFakeScryfallCard({
+        name: 'Garruk, the Veil-Hunter // Garruk, the Hooded Hunter',
+        mana_cost: undefined,
+        oracle_text: undefined,
+        card_faces: [
+          {
+            name: 'Garruk, the Veil-Hunter',
+            mana_cost: '{2}{G}{G}',
+            type_line: 'Legendary Planeswalker — Garruk',
+            oracle_text: 'Creatures you control get +1/+1.',
+            flavor_text: 'He hunted the wild.',
+            power: undefined,
+            toughness: undefined,
+            artist: 'Jason Chan',
+            printed_name: undefined,
+            printed_type_line: undefined,
+            printed_text: undefined,
+            image_uris: {
+              art_crop: 'https://cards.scryfall.io/art_crop/front/a/b/abc1.jpg',
+              normal: 'https://cards.scryfall.io/normal/front/a/b/abc1.jpg',
+              small: 'https://cards.scryfall.io/small/front/a/b/abc1.jpg',
+            },
+          },
+          {
+            name: 'Garruk, the Hooded Hunter',
+            mana_cost: '{1}{G}',
+            type_line: 'Legendary Planeswalker — Garruk',
+            oracle_text: 'Flip a coin. Create a 1/1 green creature token.',
+            flavor_text: 'The hunt continues.',
+            power: undefined,
+            toughness: undefined,
+            artist: 'Jason Chan',
+            printed_name: undefined,
+            printed_type_line: undefined,
+            printed_text: undefined,
+            image_uris: {
+              art_crop: 'https://cards.scryfall.io/art_crop/back/a/b/abc1.jpg',
+              normal: 'https://cards.scryfall.io/normal/back/a/b/abc1.jpg',
+              small: 'https://cards.scryfall.io/small/back/a/b/abc1.jpg',
+            },
+          },
+        ],
+        image_uris: undefined,
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => dfcCard,
+      });
+
+      const result = await fetchRandomCard('creature', 3);
+
+      expect(result.faces).toBeDefined();
+      expect(result.faces).toHaveLength(2);
+      expect(result.faces![0].name).toBe('Garruk, the Veil-Hunter');
+      expect(result.faces![0].manaCost).toBe('{2}{G}{G}');
+      expect(result.faces![0].oracleText).toBe('Creatures you control get +1/+1.');
+      expect(result.faces![0].flavorText).toBe('He hunted the wild.');
+      expect(result.faces![0].artist).toBe('Jason Chan');
+      expect(result.faces![0].image_uris?.art_crop).toBe('https://cards.scryfall.io/art_crop/front/a/b/abc1.jpg');
+      expect(result.faces![1].name).toBe('Garruk, the Hooded Hunter');
+      expect(result.faces![1].manaCost).toBe('{1}{G}');
+      expect(result.faces![1].oracleText).toBe('Flip a coin. Create a 1/1 green creature token.');
+      expect(result.faces![1].flavorText).toBe('The hunt continues.');
+      expect(result.faces![1].image_uris?.art_crop).toBe('https://cards.scryfall.io/art_crop/back/a/b/abc1.jpg');
+      expect(result.name).toBe('Garruk, the Veil-Hunter // Garruk, the Hooded Hunter');
+      expect(result.manaCost).toBe('{2}{G}{G}');
+      expect(result.oracleText).toBe('Creatures you control get +1/+1.');
+    });
+
+    it('single-face card maps to faces: []', async () => {
+      const singleFaceCard = createFakeScryfallCard({});
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => singleFaceCard,
+      });
+
+      const result = await fetchRandomCard('creature', 3);
+
+      expect(result.faces).toBeDefined();
+      expect(result.faces).toHaveLength(0);
+      expect(result.name).toBe('Test Card');
+      expect(result.manaCost).toBe('{2}{G}');
     });
   });
 
@@ -674,6 +779,7 @@ describe('Scryfall Service', () => {
         card_faces: [
           {
             name: 'Left',
+            type_line: 'Creature — Elf',
             image_uris: {
               art_crop: 'https://cards.scryfall.io/art_crop/left.jpg',
               normal: 'https://cards.scryfall.io/normal/left.jpg',

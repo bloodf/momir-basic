@@ -4,7 +4,6 @@ import {
   PrintDocument,
   parseManaCost,
   buildScryfallUrl,
-  buildQrUrl,
   MAX_COLUMN_58MM,
   MAX_COLUMN_80MM,
 } from './escpos';
@@ -27,6 +26,16 @@ export interface CardReceiptCardData {
   imageUrl: string;
   setCode: string;
   scryfallId: string;
+  backFaceData?: {
+    name: string;
+    manaCost?: string;
+    type: string;
+    oracleText?: string;
+    flavorText?: string;
+    power?: string;
+    toughness?: string;
+    imageUrl?: string;
+  };
 }
 
 export class CardReceiptDocument implements PrintDocument {
@@ -51,68 +60,16 @@ export class CardReceiptDocument implements PrintDocument {
       ? MAX_COLUMN_80MM
       : MAX_COLUMN_58MM;
 
-    renderer.setAlignment('center');
-    renderer.setBold(true);
-    renderer.addText(this.card.name);
-    renderer.feedLine();
+    await this.renderCardFace(renderer, capabilities, maxWidth, this.card, false);
 
-    const manaTokens = parseManaCost(this.card.manaCost);
-    if (manaTokens) {
-      renderer.setBold(false);
-      renderer.addText(`[${manaTokens}]`);
+    if (this.card.backFaceData) {
       renderer.feedLine();
-    }
-
-    renderer.setBold(false);
-    renderer.printSeparator('-', maxWidth);
-
-    renderer.setAlignment('center');
-    renderer.addText(this.card.type);
-    renderer.feedLine();
-
-    renderer.printSeparator('-', maxWidth);
-
-    if (this.card.oracleText) {
-      renderer.setAlignment('left');
-      renderer.printText(this.card.oracleText, maxWidth);
-    }
-
-    if (this.card.flavorText) {
-      renderer.feedLine();
+      renderer.printSeparator('=', maxWidth);
       renderer.setAlignment('center');
-      renderer.addText(`"${this.card.flavorText}"`);
+      renderer.addText('--- BACK FACE ---');
       renderer.feedLine();
-    }
-
-    if (this.card.power !== undefined && this.card.toughness !== undefined) {
-      renderer.feedLine();
-      renderer.setAlignment('right');
-      renderer.setBold(true);
-      renderer.addText(`${this.card.power}/${this.card.toughness}`);
-      renderer.feedLine();
-      renderer.setBold(false);
-    }
-
-    if (this.options.printArt && capabilities.supportImage) {
-      renderer.feedLine();
-      renderer.printImage(this.card.imageUrl, 200, 170);
-    } else if (this.options.printArt && !capabilities.supportImage) {
-      renderer.feedLine();
-      renderer.setAlignment('center');
-      renderer.addText('[Art: unavailable]');
-      renderer.feedLine();
-    }
-
-    if (this.options.printQR && capabilities.supportQR) {
-      renderer.feedLine();
-      renderer.setAlignment('center');
-      const scryfallUrl = buildScryfallUrl(
-        undefined,
-        this.card.setCode,
-        this.card.scryfallId
-      );
-      const qrUrl = buildQrUrl(scryfallUrl);
-      renderer.printQRCode(qrUrl, 8);
+      renderer.printSeparator('=', maxWidth);
+      await this.renderCardFace(renderer, capabilities, maxWidth, this.card.backFaceData, true);
     }
 
     renderer.feedLine();
@@ -124,6 +81,87 @@ export class CardReceiptDocument implements PrintDocument {
 
     if (this.options.cut && capabilities.supportCut) {
       renderer.cutPaper(true);
+    }
+  }
+
+  private async renderCardFace(
+    renderer: EscPosRenderer,
+    capabilities: PrinterCapabilities,
+    maxWidth: number,
+    faceData: CardReceiptCardData | CardReceiptCardData['backFaceData'],
+    isBackFace: boolean
+  ): Promise<void> {
+    const face = faceData as CardReceiptCardData;
+    const backFace = isBackFace ? faceData as CardReceiptCardData['backFaceData'] : undefined;
+
+    renderer.setAlignment('center');
+    renderer.setBold(true);
+    renderer.addText(backFace?.name ?? face.name);
+    renderer.feedLine();
+
+    const manaCost = backFace?.manaCost ?? face.manaCost;
+    const manaTokens = parseManaCost(manaCost);
+    if (manaTokens) {
+      renderer.setBold(false);
+      renderer.addText(`[${manaTokens}]`);
+      renderer.feedLine();
+    }
+
+    renderer.setBold(false);
+    renderer.printSeparator('-', maxWidth);
+
+    renderer.setAlignment('center');
+    const typeLine = backFace?.type ?? face.type;
+    renderer.addText(typeLine);
+    renderer.feedLine();
+
+    renderer.printSeparator('-', maxWidth);
+
+    const oracleText = backFace?.oracleText ?? face.oracleText;
+    if (oracleText) {
+      renderer.setAlignment('left');
+      renderer.printText(oracleText, maxWidth);
+    }
+
+    const flavorText = backFace?.flavorText ?? face.flavorText;
+    if (flavorText) {
+      renderer.feedLine();
+      renderer.setAlignment('center');
+      renderer.addText(`"${flavorText}"`);
+      renderer.feedLine();
+    }
+
+    const power = backFace?.power ?? face.power;
+    const toughness = backFace?.toughness ?? face.toughness;
+    if (power !== undefined && toughness !== undefined) {
+      renderer.feedLine();
+      renderer.setAlignment('right');
+      renderer.setBold(true);
+      renderer.addText(`${power}/${toughness}`);
+      renderer.feedLine();
+      renderer.setBold(false);
+    }
+
+    const imageUrl = isBackFace ? (backFace?.imageUrl ?? face.imageUrl) : face.imageUrl;
+    if (this.options.printArt && capabilities.supportImage && imageUrl) {
+      renderer.feedLine();
+      renderer.printImage(imageUrl, 200, 170);
+    } else if (this.options.printArt && !capabilities.supportImage) {
+      renderer.feedLine();
+      renderer.setAlignment('center');
+      renderer.addText('[Art: unavailable]');
+      renderer.feedLine();
+    }
+
+    if (!isBackFace && this.options.printQR && capabilities.supportQR) {
+      renderer.feedLine();
+      renderer.setAlignment('center');
+      const scryfallUrl = buildScryfallUrl(
+        undefined,
+        this.card.setCode,
+        this.card.scryfallId
+      );
+      renderer.printQRCode(scryfallUrl, 8);
     }
   }
 
@@ -223,8 +261,7 @@ export class DiagnosticsDocument implements PrintDocument {
     if (capabilities.supportQR) {
       renderer.feedLine();
       renderer.setAlignment('center');
-      const testQrUrl = buildQrUrl('https://github.com/bloodf/momir-basic');
-      renderer.printQRCode(testQrUrl, 6);
+      renderer.printQRCode('https://github.com/bloodf/momir-basic', 6);
     }
 
     renderer.feedLine();

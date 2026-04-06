@@ -54,6 +54,10 @@ const ko: Translations = {
     number: '번호',
     artist: '아티스트',
     manaValue: '마나 비용',
+    face: {
+      front: '앞면',
+      back: '뒷면',
+    },
     cardNotFound: '카드 데이터를 찾을 수 없습니다',
     noCardData: '카드 데이터 없음',
     powerToughness: '공/방',
@@ -259,6 +263,7 @@ const ko: Translations = {
     printMode: '인쇄 모드',
     printQRCode: 'QR 코드 인쇄',
     printFlavorText: '풍미 텍스트 인쇄',
+    printBothFaces: '양면 인쇄',
     noPrinterSelected: '프린터가 선택되지 않았습니다. 설정에서 선택하세요.',
     verificationFailed: '프린터 연결을 확인할 수 없습니다.',
     moduleUnavailableTitle: '프린터 모듈 사용 불가',

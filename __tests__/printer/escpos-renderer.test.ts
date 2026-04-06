@@ -269,6 +269,7 @@ describe('buildQrUrl', () => {
   it('builds QR code API URL', () => {
     const qrUrl = buildQrUrl('https://example.com/card');
     expect(qrUrl).toContain('https://api.qrserver.com/v1/create-qr-code/');
+    expect(qrUrl).toContain('size=144x144');
     expect(qrUrl).toContain('data=https%3A%2F%2Fexample.com%2Fcard');
   });
 

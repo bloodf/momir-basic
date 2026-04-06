@@ -9,8 +9,9 @@ import {
   Platform,
   ImageBackground,
   PanResponder,
+  AppState,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -28,11 +29,14 @@ import { TypePicker } from '@/components/TypePicker';
 import { HistorySheet } from '@/components/HistorySheet';
 import { showToast } from '@/components/Toast';
 import { useNetwork } from '@/providers/NetworkProvider';
+import { startHeroArtRotationInterval } from './heroRotation';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
 const MIN_MULTI_COUNT = 1;
 const MAX_MULTI_COUNT = 10;
+const EMPTY_BG_DATA: BgCardData = { artUrl: '', colors: [] };
+const MAX_BG_ROTATION_FETCH_ATTEMPTS = 3;
 
 function getDominantColor(colors: string[]): string {
   if (colors.length === 0) return Colors.background;
@@ -75,7 +79,18 @@ export default function HomeScreen() {
     : t.cardTypes[currentTypeConfig.id as keyof typeof t.cardTypes];
   const typeDesc = t.cardTypeDescriptions[currentTypeConfig.id as keyof typeof t.cardTypeDescriptions];
 
-  const bgCache = useRef<Record<string, BgCardData>>({});
+  const bgCache = useRef<Partial<Record<CardType, BgCardData>>>({});
+  const bgPrefetchCache = useRef<Partial<Record<CardType, BgCardData>>>({});
+  const rotationCleanupRef = useRef<(() => void) | null>(null);
+  const currentCardTypeRef = useRef<CardType>(cardType);
+  const isHomeFocusedRef = useRef(false);
+  const appStateStatusRef = useRef(AppState.currentState);
+  const currentBgDataRef = useRef<BgCardData>(EMPTY_BG_DATA);
+  const initializedBgTypeRef = useRef<CardType | null>(null);
+  const [currentBgData, setCurrentBgData] = useState<BgCardData>(EMPTY_BG_DATA);
+  const [currentBgType, setCurrentBgType] = useState<CardType>(cardType);
+  const [isHomeFocused, setIsHomeFocused] = useState(false);
+  const [appStateStatus, setAppStateStatus] = useState(AppState.currentState);
 
   const bgQuery = useQuery({
     queryKey: ['bgArt', cardType],
@@ -91,8 +106,94 @@ export default function HomeScreen() {
     gcTime: Infinity,
   });
 
-  const bgData = bgQuery.data ?? { artUrl: '', colors: [] };
-  const dominantColor = useMemo(() => getDominantColor(bgData.colors), [bgData.colors]);
+  const dominantColor = useMemo(() => getDominantColor(currentBgData.colors), [currentBgData.colors]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsHomeFocused(true);
+
+      return () => {
+        setIsHomeFocused(false);
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppStateStatus);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    currentCardTypeRef.current = cardType;
+  }, [cardType]);
+
+  useEffect(() => {
+    isHomeFocusedRef.current = isHomeFocused;
+  }, [isHomeFocused]);
+
+  useEffect(() => {
+    appStateStatusRef.current = appStateStatus;
+  }, [appStateStatus]);
+
+  useEffect(() => {
+    currentBgDataRef.current = currentBgData;
+  }, [currentBgData]);
+
+  const stopHeroRotation = useCallback(() => {
+    rotationCleanupRef.current?.();
+    rotationCleanupRef.current = null;
+  }, []);
+
+  const fetchDistinctBgCardForType = useCallback(async (type: CardType, currentArtUrl: string) => {
+    for (let attempt = 0; attempt < MAX_BG_ROTATION_FETCH_ATTEMPTS; attempt += 1) {
+      const nextBg = await fetchRandomBgCardForType(type);
+      if (nextBg.artUrl && nextBg.artUrl !== currentArtUrl) {
+        return nextBg;
+      }
+    }
+
+    return EMPTY_BG_DATA;
+  }, []);
+
+  const prefetchNextBgCardForType = useCallback(async (type: CardType, currentArtUrl: string) => {
+    const prefetched = bgPrefetchCache.current[type];
+
+    if (prefetched?.artUrl && prefetched.artUrl !== currentArtUrl) {
+      return prefetched;
+    }
+
+    const nextBg = await fetchDistinctBgCardForType(type, currentArtUrl);
+    if (nextBg.artUrl) {
+      bgPrefetchCache.current[type] = nextBg;
+    }
+
+    return nextBg;
+  }, [fetchDistinctBgCardForType]);
+
+  const getNextBgCardForType = useCallback(async (type: CardType, currentArtUrl: string) => {
+    const prefetched = bgPrefetchCache.current[type];
+    delete bgPrefetchCache.current[type];
+
+    if (prefetched?.artUrl && prefetched.artUrl !== currentArtUrl) {
+      return prefetched;
+    }
+
+    return fetchDistinctBgCardForType(type, currentArtUrl);
+  }, [fetchDistinctBgCardForType]);
+
+  const applyBgData = useCallback((type: CardType, nextBg: BgCardData) => {
+    if (!nextBg.artUrl) {
+      return;
+    }
+
+    bgCache.current[type] = nextBg;
+    queryClient.setQueryData(['bgArt', type], nextBg);
+    setCurrentBgType(type);
+    setCurrentBgData(nextBg);
+  }, [queryClient]);
 
   useEffect(() => {
     CARD_TYPES.forEach((ct, idx) => {
@@ -110,6 +211,20 @@ export default function HomeScreen() {
       }
     });
   }, [queryClient, typeIndex]);
+
+  useEffect(() => {
+    if (!bgQuery.data?.artUrl) {
+      return;
+    }
+
+    if (initializedBgTypeRef.current === cardType) {
+      return;
+    }
+
+    initializedBgTypeRef.current = cardType;
+    applyBgData(cardType, bgQuery.data);
+    void prefetchNextBgCardForType(cardType, bgQuery.data.artUrl);
+  }, [applyBgData, bgQuery.data, cardType, prefetchNextBgCardForType]);
 
   const bgFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -135,7 +250,7 @@ export default function HomeScreen() {
   }, [fadeIn, heroImageScale]);
 
   useEffect(() => {
-    if (bgData.artUrl) {
+    if (currentBgData.artUrl) {
       bgFadeAnim.setValue(0);
       heroImageScale.setValue(1.05);
       Animated.parallel([
@@ -151,7 +266,46 @@ export default function HomeScreen() {
         }),
       ]).start();
     }
-  }, [bgData.artUrl, bgFadeAnim, heroImageScale]);
+  }, [currentBgData.artUrl, bgFadeAnim, heroImageScale]);
+
+  const rotateHeroArt = useCallback(async (type: CardType) => {
+    const activeArtUrl = currentBgDataRef.current.artUrl;
+
+    if (!activeArtUrl) {
+      return;
+    }
+
+    const nextBg = await getNextBgCardForType(type, activeArtUrl);
+
+    if (
+      !nextBg.artUrl ||
+      nextBg.artUrl === activeArtUrl ||
+      !isHomeFocusedRef.current ||
+      appStateStatusRef.current !== 'active' ||
+      currentCardTypeRef.current !== type
+    ) {
+      return;
+    }
+
+    applyBgData(type, nextBg);
+    void prefetchNextBgCardForType(type, nextBg.artUrl);
+  }, [applyBgData, getNextBgCardForType, prefetchNextBgCardForType]);
+
+  const isHeroRotationActive = isHomeFocused && appStateStatus === 'active' && currentBgType === cardType && Boolean(currentBgData.artUrl);
+
+  useEffect(() => {
+    stopHeroRotation();
+
+    if (!isHeroRotationActive) {
+      return;
+    }
+
+    rotationCleanupRef.current = startHeroArtRotationInterval(() => {
+      void rotateHeroArt(cardType);
+    });
+
+    return stopHeroRotation;
+  }, [cardType, isHeroRotationActive, rotateHeroArt, stopHeroRotation]);
 
   const animateCmcChange = useCallback(() => {
     Animated.sequence([
@@ -336,13 +490,15 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {bgData.artUrl ? (
-        <Animated.View style={[styles.bgWrap, { opacity: bgFadeAnim }]}>
-          <Animated.View style={[styles.bgImageWrap, { transform: [{ scale: heroImageScale }] }]}>
+      {currentBgData.artUrl ? (
+        <Animated.View style={[styles.bgWrap, { opacity: bgFadeAnim }]}> 
+          <Animated.View style={[styles.bgImageWrap, { transform: [{ scale: heroImageScale }] }]}> 
             <ImageBackground
-              source={{ uri: bgData.artUrl }}
+              source={{ uri: currentBgData.artUrl }}
               style={styles.bgImage}
               resizeMode="cover"
+              testID="hero-art"
+              accessibilityLabel={currentBgData.artUrl}
             />
           </Animated.View>
 

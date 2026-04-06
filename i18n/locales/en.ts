@@ -54,6 +54,10 @@ const en: Translations = {
     number: 'Number',
     artist: 'Artist',
     manaValue: 'Mana Value',
+    face: {
+      front: 'Front',
+      back: 'Back',
+    },
     cardNotFound: 'Card data not found',
     noCardData: 'No card data',
     powerToughness: 'P/T',
@@ -259,6 +263,7 @@ const en: Translations = {
     printMode: 'Print Mode',
     printQRCode: 'Print QR Code',
     printFlavorText: 'Print Flavor Text',
+    printBothFaces: 'Print Both Faces',
     noPrinterSelected: 'No printer selected. Go to Settings to select a printer.',
     verificationFailed: 'Unable to verify printer connection.',
     moduleUnavailableTitle: 'Printer Module Unavailable',

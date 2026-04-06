@@ -380,10 +380,7 @@ export function buildScryfallUrl(
   return `https://scryfall.com/card/${setCode.toLowerCase()}/${collectorNumber}`;
 }
 
-/**
- * Build QR API URL for Scryfall URL
- */
 export function buildQrUrl(scryfallUrl: string): string {
   const encoded = encodeURIComponent(scryfallUrl);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encoded}&bgcolor=FFFFFF&color=000000&margin=0`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=144x144&data=${encoded}&bgcolor=FFFFFF&color=000000&margin=0`;
 }

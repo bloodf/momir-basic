@@ -54,6 +54,10 @@ const fr: Translations = {
     number: 'Numéro',
     artist: 'Artiste',
     manaValue: 'Valeur de Mana',
+    face: {
+      front: 'Avant',
+      back: 'Arrière',
+    },
     cardNotFound: 'Données de carte introuvables',
     noCardData: 'Aucune donnée',
     powerToughness: 'F/E',
@@ -259,6 +263,7 @@ const fr: Translations = {
     printMode: "Mode d'Impression",
     printQRCode: "Code QR d'Impression",
     printFlavorText: "Texte de Saveur d'Impression",
+    printBothFaces: 'Imprimer les Deux Côtés',
     noPrinterSelected: "Aucune imprimante sélectionnée. Allez dans Paramètres pour sélectionner une imprimante.",
     verificationFailed: "Impossible de vérifier la connexion de l'imprimante.",
     moduleUnavailableTitle: 'Module Imprimante Indisponible',

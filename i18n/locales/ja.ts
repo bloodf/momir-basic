@@ -54,6 +54,10 @@ const ja: Translations = {
     number: '番号',
     artist: 'アーティスト',
     manaValue: 'マナ総量',
+    face: {
+      front: '表',
+      back: '裏',
+    },
     cardNotFound: 'カードデータが見つかりません',
     noCardData: 'カードデータなし',
     powerToughness: 'P/T',
@@ -259,6 +263,7 @@ const ja: Translations = {
     printMode: '印刷モード',
     printQRCode: 'QRコード印刷',
     printFlavorText: 'フレーバーテキスト印刷',
+    printBothFaces: '両面印刷',
     noPrinterSelected: 'プリンターが選択されていません。設定で選択してください。',
     verificationFailed: 'プリンターの接続を検証できません。',
     moduleUnavailableTitle: 'プリンターモジュールが利用不可',

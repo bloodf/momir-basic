@@ -8,6 +8,7 @@ import {
   Animated,
   Platform,
   TextInput,
+  useWindowDimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, HelpCircle, Search } from 'lucide-react-native';
@@ -16,28 +17,21 @@ import { useI18n } from '@/i18n';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { fetchSets } from '@/services/scryfall';
 import { useQuery } from '@tanstack/react-query';
+import {
+  EMPTY_FILTERS,
+  getActiveFilterCount,
+  type SearchFilterState,
+} from './SearchFilters.shared';
 
-export interface SearchFilterState {
-  colors: string[];
-  type: string;
-  cmcValue: string;
-  cmcOperator: '=' | '<=' | '>=';
-  rarity: string;
-  format: string;
-  set: string;
-  artist: string;
-}
+export {
+  EMPTY_FILTERS,
+  getActiveFilterCount,
+  buildFilterQuery,
+  buildFullQuery,
+} from './SearchFilters.shared';
+export type { SearchFilterState } from './SearchFilters.shared';
 
-export const EMPTY_FILTERS: SearchFilterState = {
-  colors: [],
-  type: '',
-  cmcValue: '',
-  cmcOperator: '=',
-  rarity: '',
-  format: '',
-  set: '',
-  artist: '',
-};
+const FILTER_PANEL_MAX_HEIGHT = 520;
 
 interface ColorOption {
   id: string;
@@ -58,54 +52,6 @@ interface Props {
   onToggleVisible: () => void;
 }
 
-export function getActiveFilterCount(filters: SearchFilterState): number {
-  let count = 0;
-  if (filters.colors.length > 0) count++;
-  if (filters.type) count++;
-  if (filters.cmcValue) count++;
-  if (filters.rarity) count++;
-  if (filters.format) count++;
-  if (filters.set) count++;
-  if (filters.artist) count++;
-  return count;
-}
-
-export function buildFilterQuery(filters: SearchFilterState): string {
-  const parts: string[] = [];
-
-  if (filters.colors.length > 0) {
-    const colorStr = filters.colors.join('');
-    parts.push(`c:${colorStr}`);
-  }
-
-  if (filters.type) {
-    parts.push(`t:${filters.type}`);
-  }
-
-  if (filters.cmcValue) {
-    const op = filters.cmcOperator === '=' ? '=' : filters.cmcOperator;
-    parts.push(`mv${op}${filters.cmcValue}`);
-  }
-
-  if (filters.rarity) {
-    parts.push(`r:${filters.rarity}`);
-  }
-
-  if (filters.format) {
-    parts.push(`f:${filters.format}`);
-  }
-
-  if (filters.set) {
-    parts.push(`s:${filters.set.toLowerCase()}`);
-  }
-
-  if (filters.artist) {
-    parts.push(`a:"${filters.artist}"`);
-  }
-
-  return parts.join(' ');
-}
-
 const COLOR_OPTIONS: ColorOption[] = [
   { id: 'W', scryfallCode: 'W', color: Colors.mana.W, borderColor: '#d4c98a' },
   { id: 'U', scryfallCode: 'U', color: Colors.mana.U, borderColor: '#7ab8d4' },
@@ -122,9 +68,14 @@ export const SearchFilters = React.memo(function SearchFilters({
   onToggleVisible,
 }: Props) {
   const { t } = useI18n();
+  const { height: windowHeight } = useWindowDimensions();
   const animValue = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [setSearch, setSetSearch] = useState('');
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
+  const expandedPanelHeight = useMemo(
+    () => Math.min(windowHeight * 0.58, FILTER_PANEL_MAX_HEIGHT),
+    [windowHeight],
+  );
 
   const setsQuery = useQuery({
     queryKey: ['scryfall-sets'],
@@ -265,7 +216,7 @@ export const SearchFilters = React.memo(function SearchFilters({
 
   const containerHeight = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 2000],
+    outputRange: [0, expandedPanelHeight],
   });
 
   const containerOpacity = animValue.interpolate({
@@ -300,12 +251,19 @@ export const SearchFilters = React.memo(function SearchFilters({
         </Pressable>
       </View>
 
-      <Animated.View style={[styles.filtersContainer, { maxHeight: containerHeight, opacity: containerOpacity }]}>
+      <Animated.View
+        pointerEvents={visible ? 'auto' : 'none'}
+        style={[styles.filtersContainer, { height: containerHeight, opacity: containerOpacity }]}
+        testID="filters-panel"
+      >
         <ScrollView
           showsVerticalScrollIndicator={true}
           bounces={true}
           nestedScrollEnabled
-          style={{ maxHeight: 500 }}
+          keyboardShouldPersistTaps="handled"
+          style={styles.filtersScrollView}
+          contentContainerStyle={styles.filtersScrollContent}
+          testID="filters-scroll-view"
         >
           <View style={styles.filterSection}>
             <Text style={styles.filterLabel}>{t.search.color}</Text>
@@ -627,6 +585,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginHorizontal: 16,
     paddingTop: 8,
+  },
+  filtersScrollView: {
+    flex: 1,
+  },
+  filtersScrollContent: {
+    paddingBottom: 4,
   },
   filterSection: {
     marginBottom: 16,

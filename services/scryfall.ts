@@ -70,6 +70,21 @@ function mapScryfallCard(data: ScryfallCard): Card {
   const imageUris = data.image_uris ?? face?.image_uris;
   const prefersFaceData = data.card_faces != null && data.card_faces.length > 0;
 
+  const faces: Card['faces'] = data.card_faces?.map(f => ({
+    name: f.name,
+    manaCost: f.mana_cost,
+    typeLine: f.type_line,
+    oracleText: f.oracle_text,
+    flavorText: f.flavor_text,
+    power: f.power,
+    toughness: f.toughness,
+    artist: f.artist,
+    printedName: f.printed_name,
+    printedTypeLine: f.printed_type_line,
+    printedText: f.printed_text,
+    image_uris: f.image_uris ?? data.image_uris,
+  })) ?? [];
+
   return {
     id: data.id,
     name: data.name,
@@ -97,6 +112,7 @@ function mapScryfallCard(data: ScryfallCard): Card {
     printedTypeLine: (prefersFaceData ? face?.printed_type_line : data.printed_type_line) ?? data.printed_type_line ?? face?.printed_type_line,
     printedText: (prefersFaceData ? face?.printed_text : data.printed_text) ?? data.printed_text ?? face?.printed_text,
     lang: data.lang,
+    faces,
   };
 }
 
@@ -282,6 +298,7 @@ async function fetchLocalizedCardsViaCollection(
       const localizedCard = mapScryfallCard(localized);
       return {
         ...localizedCard,
+        faces: localizedCard.faces ?? card.faces,
         artCropUrl: localizedCard.artCropUrl || card.artCropUrl,
         normalImageUrl: localizedCard.normalImageUrl || card.normalImageUrl,
         smallImageUrl: localizedCard.smallImageUrl || card.smallImageUrl,
