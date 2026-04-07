@@ -144,6 +144,49 @@ export function orderedDither(
 
 export type DitherAlgorithm = 'floyd-steinberg' | 'ordered' | 'threshold';
 
+export interface DitherAdvancedOptions {
+  algorithm: DitherAlgorithm;
+  brightness?: number;  // default 1.0
+  contrast?: number;    // default 1.0
+  threshold?: number;   // default 128
+}
+
+function clampByte(v: number): number {
+  return Math.max(0, Math.min(255, Math.round(v)));
+}
+
+/**
+ * Applies brightness/contrast adjustments then dithers.
+ * Leaves `preprocessAndDither` unchanged for backward compatibility.
+ */
+export function preprocessAndDitherAdvanced(
+  imageData: number[],
+  width: number,
+  height: number,
+  opts: DitherAdvancedOptions,
+): number[] {
+  const brightness = opts.brightness ?? 1.0;
+  const contrast = opts.contrast ?? 1.0;
+
+  let adjusted: number[];
+  if (brightness === 1.0 && contrast === 1.0) {
+    adjusted = imageData;
+  } else {
+    adjusted = new Array(imageData.length);
+    for (let i = 0; i < imageData.length; i += 4) {
+      adjusted[i] = clampByte((clampByte((imageData[i] - 128) * contrast + 128)) * brightness);
+      adjusted[i + 1] = clampByte((clampByte((imageData[i + 1] - 128) * contrast + 128)) * brightness);
+      adjusted[i + 2] = clampByte((clampByte((imageData[i + 2] - 128) * contrast + 128)) * brightness);
+      adjusted[i + 3] = imageData[i + 3];
+    }
+  }
+
+  if (opts.algorithm === 'threshold') {
+    return thresholdDither(adjusted, width, height, opts.threshold ?? 128);
+  }
+  return ditherImage(adjusted, width, height, opts.algorithm);
+}
+
 export function ditherImage(
   imageData: number[],
   width: number,

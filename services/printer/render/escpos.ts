@@ -1,3 +1,5 @@
+import type { QrErrorCorrection } from '../../../types';
+
 // ESC/POS command constants
 const ESC = 0x1b;
 const GS = 0x1d;
@@ -191,31 +193,38 @@ export class EscPosRenderer {
    * Print QR code using ESC/POS QR commands.
    * Requires QR capability to be supported by the printer.
    */
-  printQRCode(data: string, size: number = 8): void {
+  printQRCode(data: string, size: number = 8, errorCorrection: QrErrorCorrection = 'L'): void {
     this.requireCapability('qr');
 
     const qrSize = Math.min(Math.max(size, 1), 16);
+    const ecMap: Record<QrErrorCorrection, number> = {
+      L: 0x30,
+      M: 0x31,
+      Q: 0x32,
+      H: 0x33,
+    };
+    const ecByte = ecMap[errorCorrection] ?? 0x30;
 
     const bytes: number[] = [];
-    
+
     // Model 2
     bytes.push(...QR_MODEL);
-    
+
     // Size
     bytes.push(...[GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, qrSize]);
-    
-    // Error correction level L
-    bytes.push(...[GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x30]);
-    
+
+    // Error correction level
+    bytes.push(...[GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, ecByte]);
+
     // Store data
     const dataBytes = new TextEncoder().encode(data);
     const dataLen = dataBytes.length + 3;
-    bytes.push(...[GS, 0x28, 0x6b, (dataLen + 3) % 256, Math.floor((dataLen + 3) / 256), 0x31, 0x50, 0x30]);
+    bytes.push(...[GS, 0x28, 0x6b, dataLen % 256, Math.floor(dataLen / 256), 0x31, 0x50, 0x30]);
     bytes.push(...dataBytes);
-    
+
     // Print
     bytes.push(...[GS, 0x28, 0x6b, 0x02, 0x00, 0x31, 0x51, 0x00]);
-    
+
     this.addBytes(bytes);
   }
 

@@ -189,6 +189,27 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     }
   }
 
+  async sendRaw(bytes: Uint8Array): Promise<void> {
+    if (!this._connectedAddress) {
+      throw new PrinterAdapterError(
+        PrinterErrorCode.NOT_CONNECTED,
+        'No printer connected — cannot send raw bytes'
+      );
+    }
+
+    try {
+      const btAddress = toBtAddress(this._connectedAddress);
+      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, Array.from(bytes), true, 10000);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new PrinterAdapterError(
+        PrinterErrorCode.SEND_FAILED,
+        `sendRaw failed: ${msg}`,
+        'classic'
+      );
+    }
+  }
+
   async sendQRCode(data: string, size: number): Promise<void> {
     if (!this._connectedAddress) {
       throw new PrinterAdapterError(

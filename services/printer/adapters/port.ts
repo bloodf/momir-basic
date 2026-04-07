@@ -128,6 +128,13 @@ export interface PrinterPort {
   sendQRCode(data: string, size: number): Promise<void>;
 
   /**
+   * Send raw bytes directly to the connected printer.
+   * Used for full ESC/POS documents that must not go through String.fromCharCode encoding.
+   * @param bytes - Raw byte array to transmit
+   */
+  sendRaw(bytes: Uint8Array): Promise<void>;
+
+  /**
    * Cut paper (if cutter is available).
    */
   cutPaper(): Promise<void>;

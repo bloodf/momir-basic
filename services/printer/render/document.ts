@@ -1,4 +1,4 @@
-import type { PrinterCapabilities, PrinterTransport } from '../../../types';
+import type { PrinterCapabilities, PrinterTransport, QrErrorCorrection } from '../../../types';
 import {
   EscPosRenderer,
   PrintDocument,
@@ -13,6 +13,8 @@ export interface CardReceiptOptions {
   printQR: boolean;
   cut: boolean;
   paperWidth: 58 | 80;
+  qrSize?: number;                    // 1..16, default 8
+  qrErrorCorrection?: QrErrorCorrection; // default 'L'
 }
 
 export interface CardReceiptCardData {
@@ -26,6 +28,10 @@ export interface CardReceiptCardData {
   imageUrl: string;
   setCode: string;
   scryfallId: string;
+  /** Pre-rasterized 1-bit ESC/POS bitmap for art (base64). If present, used instead of imageUrl. */
+  artBitmapBase64?: string;
+  artWidthPx?: number;
+  artHeightPx?: number;
   backFaceData?: {
     name: string;
     manaCost?: string;
@@ -35,6 +41,10 @@ export interface CardReceiptCardData {
     power?: string;
     toughness?: string;
     imageUrl?: string;
+    /** Pre-rasterized 1-bit ESC/POS bitmap for back face art (base64). */
+    artBitmapBase64?: string;
+    artWidthPx?: number;
+    artHeightPx?: number;
   };
 }
 
@@ -49,6 +59,8 @@ export class CardReceiptDocument implements PrintDocument {
       printQR: options?.printQR ?? true,
       cut: options?.cut ?? false,
       paperWidth: options?.paperWidth ?? 58,
+      qrSize: options?.qrSize ?? 8,
+      qrErrorCorrection: options?.qrErrorCorrection ?? 'L',
     };
   }
 
@@ -64,11 +76,12 @@ export class CardReceiptDocument implements PrintDocument {
 
     if (this.card.backFaceData) {
       renderer.feedLine();
-      renderer.printSeparator('=', maxWidth);
       renderer.setAlignment('center');
-      renderer.addText('--- BACK FACE ---');
+      renderer.setBold(true);
+      renderer.addText('BACK FACE');
       renderer.feedLine();
-      renderer.printSeparator('=', maxWidth);
+      renderer.setBold(false);
+      renderer.feedLine();
       await this.renderCardFace(renderer, capabilities, maxWidth, this.card.backFaceData, true);
     }
 
@@ -143,7 +156,13 @@ export class CardReceiptDocument implements PrintDocument {
     }
 
     const imageUrl = isBackFace ? (backFace?.imageUrl ?? face.imageUrl) : face.imageUrl;
-    if (this.options.printArt && capabilities.supportImage && imageUrl) {
+    const artBitmap = isBackFace ? (backFace?.artBitmapBase64 ?? face.artBitmapBase64) : face.artBitmapBase64;
+    const artW = isBackFace ? (backFace?.artWidthPx ?? face.artWidthPx) : face.artWidthPx;
+    const artH = isBackFace ? (backFace?.artHeightPx ?? face.artHeightPx) : face.artHeightPx;
+    if (this.options.printArt && capabilities.supportImage && artBitmap && artW && artH) {
+      renderer.feedLine();
+      renderer.printImage(artBitmap, artW, artH);
+    } else if (this.options.printArt && capabilities.supportImage && imageUrl) {
       renderer.feedLine();
       renderer.printImage(imageUrl, 200, 170);
     } else if (this.options.printArt && !capabilities.supportImage) {
@@ -161,7 +180,11 @@ export class CardReceiptDocument implements PrintDocument {
         this.card.setCode,
         this.card.scryfallId
       );
-      renderer.printQRCode(scryfallUrl, 8);
+      renderer.printQRCode(
+        scryfallUrl,
+        this.options.qrSize ?? 8,
+        this.options.qrErrorCorrection ?? 'L'
+      );
     }
   }
 

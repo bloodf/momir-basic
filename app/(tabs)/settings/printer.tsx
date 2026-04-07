@@ -40,7 +40,8 @@ import {
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
-import type { PrinterRecord, PrinterTransport, PrinterCapabilities } from '@/types';
+import type { PrinterRecord, PrinterTransport, PrinterCapabilities, DitherAlgorithm, QrErrorCorrection } from '@/types';
+import { DitheredImage } from '@/components/DitheredImage';
 import { useI18n } from '@/i18n';
 import { registryService } from '@/services/printer/registry/service';
 import { createAdapter } from '@/services/printer/adapters/factory';
@@ -94,7 +95,7 @@ function getTransportIcon(transport: PrinterTransport) {
 export default function PrinterSetupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { settings, updateSettings, savePreferredPrinter } = useSettings();
+  const { settings, updateSettings, updatePrinter, savePreferredPrinter } = useSettings();
   const { t } = useI18n();
 
   // --- Core UI state ---
@@ -687,6 +688,227 @@ export default function PrinterSetupScreen() {
     );
   };
 
+  const SAMPLE_ART_URL = 'https://cards.scryfall.io/art_crop/front/1/5/15a73851-3b95-4cb5-a3d9-c0dd0e15d5c8.jpg';
+
+  const ditherOptions: { label: string; value: DitherAlgorithm }[] = [
+    { label: 'Floyd-Steinberg', value: 'floyd' },
+    { label: 'Bayer', value: 'bayer' },
+    { label: 'Threshold', value: 'threshold' },
+    { label: 'None', value: 'none' },
+  ];
+
+  const qrEcOptions: { label: string; value: QrErrorCorrection }[] = [
+    { label: 'Low (L)', value: 'L' },
+    { label: 'Medium (M)', value: 'M' },
+    { label: 'Quartile (Q)', value: 'Q' },
+    { label: 'High (H)', value: 'H' },
+  ];
+
+  const renderImagePreprocessingSection = () => (
+    <View style={styles.settingsSection}>
+      <Text style={styles.settingsSectionTitle}>Image Pre-processing</Text>
+
+      {/* Live preview */}
+      <View style={styles.previewFrame}>
+        <DitheredImage
+          imageUrl={SAMPLE_ART_URL}
+          widthPx={192}
+          algorithm={settings.printer.imageDither}
+          brightness={settings.printer.imageBrightness}
+          contrast={settings.printer.imageContrast}
+          threshold={settings.printer.imageThreshold}
+          maxHeightPx={240}
+        />
+      </View>
+
+      {/* Algorithm chips */}
+      <View style={styles.settingsRow}>
+        <Text style={styles.settingsLabel}>Algorithm</Text>
+        <View style={styles.chipGroup}>
+          {ditherOptions.map(({ label, value }) => (
+            <Pressable
+              key={value}
+              onPress={() => updatePrinter({ imageDither: value })}
+              style={({ pressed }) => [
+                styles.chip,
+                settings.printer.imageDither === value && styles.chipActive,
+                pressed && styles.chipPressed,
+              ]}
+            >
+              <Text style={[
+                styles.chipText,
+                settings.printer.imageDither === value && styles.chipTextActive,
+              ]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Brightness slider */}
+      <View style={styles.settingsRow}>
+        <View style={styles.sliderLabelRow}>
+          <Text style={styles.settingsLabel}>Brightness</Text>
+          <Text style={styles.sliderValue}>{settings.printer.imageBrightness.toFixed(2)}x</Text>
+        </View>
+        <View style={styles.stepperRow}>
+          <Pressable
+            onPress={() => updatePrinter({ imageBrightness: Math.max(0.5, parseFloat((settings.printer.imageBrightness - 0.05).toFixed(2))) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>−</Text>
+          </Pressable>
+          <View style={styles.stepperTrack}>
+            <View style={[styles.stepperFill, { width: `${((settings.printer.imageBrightness - 0.5) / 1.0) * 100}%` }]} />
+          </View>
+          <Pressable
+            onPress={() => updatePrinter({ imageBrightness: Math.min(1.5, parseFloat((settings.printer.imageBrightness + 0.05).toFixed(2))) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Contrast slider */}
+      <View style={styles.settingsRow}>
+        <View style={styles.sliderLabelRow}>
+          <Text style={styles.settingsLabel}>Contrast</Text>
+          <Text style={styles.sliderValue}>{settings.printer.imageContrast.toFixed(2)}x</Text>
+        </View>
+        <View style={styles.stepperRow}>
+          <Pressable
+            onPress={() => updatePrinter({ imageContrast: Math.max(0.5, parseFloat((settings.printer.imageContrast - 0.05).toFixed(2))) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>−</Text>
+          </Pressable>
+          <View style={styles.stepperTrack}>
+            <View style={[styles.stepperFill, { width: `${((settings.printer.imageContrast - 0.5) / 1.0) * 100}%` }]} />
+          </View>
+          <Pressable
+            onPress={() => updatePrinter({ imageContrast: Math.min(1.5, parseFloat((settings.printer.imageContrast + 0.05).toFixed(2))) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Threshold stepper */}
+      <View style={styles.settingsRow}>
+        <View style={styles.sliderLabelRow}>
+          <Text style={[
+            styles.settingsLabel,
+            (settings.printer.imageDither === 'floyd' || settings.printer.imageDither === 'bayer') && styles.settingsLabelDimmed,
+          ]}>
+            Threshold
+          </Text>
+          <Text style={styles.sliderValue}>{settings.printer.imageThreshold}</Text>
+        </View>
+        <View style={styles.stepperRow}>
+          <Pressable
+            onPress={() => updatePrinter({ imageThreshold: Math.max(0, settings.printer.imageThreshold - 1) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>−</Text>
+          </Pressable>
+          <View style={styles.stepperTrack}>
+            <View style={[styles.stepperFill, { width: `${(settings.printer.imageThreshold / 255) * 100}%` }]} />
+          </View>
+          <Pressable
+            onPress={() => updatePrinter({ imageThreshold: Math.min(255, settings.printer.imageThreshold + 1) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Max Art Height stepper */}
+      <View style={styles.settingsRow}>
+        <View style={styles.sliderLabelRow}>
+          <Text style={styles.settingsLabel}>Max Art Height</Text>
+          <Text style={styles.sliderValue}>{settings.printer.imageMaxHeightPx}px</Text>
+        </View>
+        <View style={styles.stepperRow}>
+          <Pressable
+            onPress={() => updatePrinter({ imageMaxHeightPx: Math.max(200, settings.printer.imageMaxHeightPx - 20) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>−</Text>
+          </Pressable>
+          <View style={styles.stepperTrack}>
+            <View style={[styles.stepperFill, { width: `${((settings.printer.imageMaxHeightPx - 200) / 440) * 100}%` }]} />
+          </View>
+          <Pressable
+            onPress={() => updatePrinter({ imageMaxHeightPx: Math.min(640, settings.printer.imageMaxHeightPx + 20) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderQrSection = () => (
+    <View style={styles.settingsSection}>
+      <Text style={styles.settingsSectionTitle}>QR Code</Text>
+
+      {/* Module size stepper */}
+      <View style={styles.settingsRow}>
+        <View style={styles.sliderLabelRow}>
+          <Text style={styles.settingsLabel}>Module Size</Text>
+          <Text style={styles.sliderValue}>{settings.printer.qrSize}</Text>
+        </View>
+        <View style={styles.stepperRow}>
+          <Pressable
+            onPress={() => updatePrinter({ qrSize: Math.max(1, settings.printer.qrSize - 1) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>−</Text>
+          </Pressable>
+          <View style={styles.stepperTrack}>
+            <View style={[styles.stepperFill, { width: `${((settings.printer.qrSize - 1) / 15) * 100}%` }]} />
+          </View>
+          <Pressable
+            onPress={() => updatePrinter({ qrSize: Math.min(16, settings.printer.qrSize + 1) })}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperButtonPressed]}
+          >
+            <Text style={styles.stepperButtonText}>+</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Error correction chips */}
+      <View style={styles.settingsRow}>
+        <Text style={styles.settingsLabel}>Error Correction</Text>
+        <View style={styles.chipGroup}>
+          {qrEcOptions.map(({ label, value }) => (
+            <Pressable
+              key={value}
+              onPress={() => updatePrinter({ qrErrorCorrection: value })}
+              style={({ pressed }) => [
+                styles.chip,
+                settings.printer.qrErrorCorrection === value && styles.chipActive,
+                pressed && styles.chipPressed,
+              ]}
+            >
+              <Text style={[
+                styles.chipText,
+                settings.printer.qrErrorCorrection === value && styles.chipTextActive,
+              ]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
   const renderErrorCard = (message: string) => (
     <View style={styles.errorCard}>
       <AlertTriangle size={16} color={Colors.error} />
@@ -1077,6 +1299,12 @@ export default function PrinterSetupScreen() {
 
         {/* Platform info */}
         {uiState !== 'connected' && renderPlatformInfoCard()}
+
+        {/* Image Pre-processing section */}
+        {renderImagePreprocessingSection()}
+
+        {/* QR Code section */}
+        {renderQrSection()}
 
         {/* Scan section */}
         <View style={styles.scanSection}>
@@ -1662,6 +1890,120 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.textSecondary,
   },
+  // --- Image Pre-processing & QR sections ---
+  settingsSection: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 16,
+    gap: 14,
+  },
+  settingsSectionTitle: {
+    color: Colors.gold,
+    fontSize: 12,
+    fontWeight: '700' as const,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase' as const,
+    marginBottom: 2,
+  },
+  settingsRow: {
+    gap: 8,
+  },
+  settingsLabel: {
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  settingsLabelDimmed: {
+    color: Colors.textMuted,
+  },
+  sliderLabelRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  sliderValue: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600' as const,
+    minWidth: 44,
+    textAlign: 'right' as const,
+  },
+  stepperRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  stepperButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.cardBackgroundLight,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  stepperButtonPressed: {
+    opacity: 0.7,
+  },
+  stepperButtonText: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: '500' as const,
+  },
+  stepperTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.cardBackgroundLight,
+    overflow: 'hidden' as const,
+  },
+  stepperFill: {
+    height: '100%' as const,
+    borderRadius: 3,
+    backgroundColor: Colors.gold,
+  },
+  chipGroup: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: Colors.cardBackgroundLight,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  chipActive: {
+    backgroundColor: 'rgba(232,105,45,0.15)',
+    borderColor: Colors.gold,
+  },
+  chipPressed: {
+    opacity: 0.75,
+  },
+  chipText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  chipTextActive: {
+    color: Colors.gold,
+  },
+  previewFrame: {
+    alignSelf: 'center' as const,
+    borderRadius: 10,
+    overflow: 'hidden' as const,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: '#000',
+  },
+  // ---
   iosFlowCard: {
     backgroundColor: Colors.cardBackground,
     borderRadius: 16,

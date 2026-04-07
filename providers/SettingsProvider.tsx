@@ -41,7 +41,13 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     queryFn: async () => {
       const stored = await AsyncStorage.getItem(SETTINGS_KEY);
       const parsed = stored ? JSON.parse(stored) : {};
-      const merged = { ...DEFAULT_SETTINGS, ...parsed };
+      const merged: AppSettings = {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        // Deep-merge printer prefs so new fields added in later versions
+        // pick up their defaults instead of being undefined.
+        printer: { ...DEFAULT_PRINTER_PREFERENCES, ...(parsed.printer ?? {}) },
+      };
 
       if (parsed.printer && typeof parsed.printer === 'object') {
         const printer = parsed.printer as Record<string, unknown>;
@@ -58,7 +64,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
         }
       }
 
-      return merged as AppSettings;
+      return merged;
     },
   });
 
@@ -117,7 +123,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
 export async function getPrinterPreferencesFromSettings(): Promise<PrinterPreferences> {
   const stored = await AsyncStorage.getItem(SETTINGS_KEY);
   const parsed = stored ? JSON.parse(stored) : {};
-  return (parsed.printer as PrinterPreferences) ?? DEFAULT_PRINTER_PREFERENCES;
+  return { ...DEFAULT_PRINTER_PREFERENCES, ...(parsed.printer ?? {}) };
 }
 
 export async function savePrinterPreferencesToSettings(prefs: Partial<PrinterPreferences>): Promise<void> {

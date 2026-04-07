@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   Pressable,
   FlatList,
   Keyboard,
@@ -14,7 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { Search, X, LayoutList, LayoutGrid } from 'lucide-react-native';
+import { SlidersHorizontal, Search, LayoutList, LayoutGrid } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { searchCards, autocompleteCardName } from '@/services/scryfall';
@@ -23,12 +22,13 @@ import { CardGridItem } from '@/components/CardGridItem';
 import { SearchSkeleton, CardGridSkeleton } from '@/components/Skeleton';
 import { useI18n } from '@/i18n';
 import {
-  SearchFilters,
   SearchFilterState,
   EMPTY_FILTERS,
   getActiveFilterCount,
   buildFullQuery,
 } from '@/components/SearchFilters';
+import { ChipSearchInput } from '@/components/ChipSearchInput';
+import { SearchFiltersDialog } from '@/components/SearchFiltersDialog';
 
 type ViewMode = 'list' | 'grid';
 const CARDS_PER_PAGE = 175;
@@ -36,7 +36,6 @@ const CARDS_PER_PAGE = 175;
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const inputRef = useRef<TextInput>(null);
   const { locale, t } = useI18n();
 
   const searchParams = useLocalSearchParams<{ initialQuery?: string }>();
@@ -49,7 +48,7 @@ export default function SearchScreen() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
-  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [filterDialogVisible, setFilterDialogVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const lastSearchQuery = useRef('');
   const pendingInitialQuery = useRef<string | null>(null);
@@ -113,7 +112,7 @@ export default function SearchScreen() {
       setQuery(q);
       clearSearchResults();
       setFilters(EMPTY_FILTERS);
-      setFiltersVisible(false);
+      setFilterDialogVisible(false);
       const fullQ = buildFullQuery(q, EMPTY_FILTERS);
       if (fullQ) {
         lastSearchQuery.current = fullQ;
@@ -174,7 +173,6 @@ export default function SearchScreen() {
   const handleClear = useCallback(() => {
     setQuery('');
     clearSearchResults();
-    inputRef.current?.focus();
   }, [clearSearchResults]);
 
   const handleFiltersChange = useCallback((newFilters: SearchFilterState) => {
@@ -183,10 +181,6 @@ export default function SearchScreen() {
       clearSearchResults();
     }
   }, [clearSearchResults, query]);
-
-  const handleToggleFilters = useCallback(() => {
-    setFiltersVisible(prev => !prev);
-  }, []);
 
   const activeFilterCount = useMemo(() => getActiveFilterCount(filters), [filters]);
 
@@ -212,27 +206,29 @@ export default function SearchScreen() {
       </View>
 
       <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Search size={16} color={Colors.textMuted} />
-          <TextInput
-            ref={inputRef}
-            style={styles.searchInput}
-            placeholder={t.search.placeholder}
-            placeholderTextColor={Colors.textMuted}
-            value={query}
-            onChangeText={handleQueryChange}
-            onSubmitEditing={() => handleSearch()}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-            testID="search-input"
-          />
-          {query.length > 0 && (
-            <Pressable onPress={handleClear} hitSlop={8}>
-              <X size={16} color={Colors.textMuted} />
-            </Pressable>
+        <ChipSearchInput
+          value={query}
+          onChangeText={handleQueryChange}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          placeholder={t.search.placeholder}
+        />
+        <Pressable
+          onPress={() => setFilterDialogVisible(true)}
+          style={({ pressed }) => [
+            styles.filterIconBtn,
+            pressed && styles.filterIconBtnPressed,
+            activeFilterCount > 0 && styles.filterIconBtnActive,
+          ]}
+          testID="filter-dialog-open"
+        >
+          <SlidersHorizontal size={18} color={activeFilterCount > 0 ? Colors.background : Colors.textMuted} />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
           )}
-        </View>
+        </Pressable>
         <Pressable
           onPress={() => handleSearch()}
           style={({ pressed }) => [styles.searchBtn, pressed && styles.searchBtnPressed]}
@@ -242,18 +238,12 @@ export default function SearchScreen() {
         </Pressable>
       </View>
 
-      <SearchFilters
+      <SearchFiltersDialog
+        visible={filterDialogVisible}
         filters={filters}
-        onFiltersChange={handleFiltersChange}
-        visible={filtersVisible}
-        onToggleVisible={handleToggleFilters}
+        onChange={handleFiltersChange}
+        onClose={() => setFilterDialogVisible(false)}
       />
-
-      {activeFilterCount > 0 && !filtersVisible && (
-        <Text style={styles.activeFiltersHint}>
-          {t.search.activeFilters(activeFilterCount)}
-        </Text>
-      )}
 
       {showSuggestions && (
         <View style={styles.suggestionsContainer}>
@@ -391,23 +381,39 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 8,
   },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.cardBackground,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  filterIconBtn: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
+    backgroundColor: Colors.cardBackground,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
+  filterIconBtnPressed: {
+    backgroundColor: Colors.cardBackgroundLight,
+  },
+  filterIconBtnActive: {
+    backgroundColor: Colors.gold,
+    borderColor: Colors.gold,
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.error,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
     color: Colors.textPrimary,
-    padding: 0,
   },
   searchBtn: {
     backgroundColor: Colors.gold,
@@ -422,13 +428,6 @@ const styles = StyleSheet.create({
     color: Colors.background,
     fontSize: 14,
     fontWeight: '700' as const,
-  },
-  activeFiltersHint: {
-    fontSize: 11,
-    color: Colors.gold,
-    fontWeight: '600' as const,
-    paddingHorizontal: 16,
-    paddingBottom: 6,
   },
   suggestionsContainer: {
     marginHorizontal: 16,

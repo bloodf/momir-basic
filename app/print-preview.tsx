@@ -26,6 +26,8 @@ import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
 import { createAdapter } from '../services/printer/adapters/factory';
 import { buildQrUrl } from '../services/printer/render/escpos';
+import { DitheredImage } from '@/components/DitheredImage';
+import { rasterizeCardArtForPrint } from '@/utils/printerImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RECEIPT_WIDTH = SCREEN_WIDTH - 32;
@@ -257,10 +259,17 @@ export default function PrintPreviewScreen() {
       const widthPx = paperWidth === 80 ? 576 : 384;
 
       if (printMode === 'image_only') {
-        // FULL CARD MODE: Print the full card face image(s)
+        // IMAGE-ONLY MODE: Print rasterized card image(s)
         const frontCardUrl = card.normalImageUrl || card.artCropUrl;
         if (frontCardUrl) {
-          await adapter.sendImage(frontCardUrl, widthPx, 0);
+          const rasterized = await rasterizeCardArtForPrint(frontCardUrl, widthPx, {
+            algorithm: settings.printer?.imageDither ?? 'floyd',
+            brightness: settings.printer?.imageBrightness ?? 1.0,
+            contrast: settings.printer?.imageContrast ?? 1.0,
+            threshold: settings.printer?.imageThreshold ?? 128,
+            maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+          });
+          await adapter.sendImage(rasterized.base64Bitmap, rasterized.widthPx, rasterized.heightPx);
         } else {
           throw new Error('No card image available to print.');
         }
@@ -269,158 +278,114 @@ export default function PrintPreviewScreen() {
           const backFace = card.faces[1];
           const backImageUrl = backFace.image_uris?.normal ?? backFace.image_uris?.art_crop;
           if (backImageUrl) {
-            await adapter.sendImage(backImageUrl, widthPx, 0);
+            const rasterizedBack = await rasterizeCardArtForPrint(backImageUrl, widthPx, {
+              algorithm: settings.printer?.imageDither ?? 'floyd',
+              brightness: settings.printer?.imageBrightness ?? 1.0,
+              contrast: settings.printer?.imageContrast ?? 1.0,
+              threshold: settings.printer?.imageThreshold ?? 128,
+              maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+            });
+            await adapter.sendImage(rasterizedBack.base64Bitmap, rasterizedBack.widthPx, rasterizedBack.heightPx);
           }
         }
       } else {
-        // RECEIPT MODE: ESC/POS with split calls matching preview order
-        // Name+Mana → Art → Type → Oracle → Flavor → Stats → QR
+        // RECEIPT MODE: ESC/POS document via EscPosRenderer + sendRaw
+        const { EscPosRenderer } = await import('../services/printer/render/escpos');
+        const { CardReceiptDocument } = await import('../services/printer/render/document');
+
         const printArt = settings.printer?.printArt ?? true;
         const printQR = settings.printer?.printQR ?? true;
-        const printFlavor = settings.printer?.printFlavorText ?? true;
         const artUrl = card.artCropUrl || card.normalImageUrl;
-        const maxCols = paperWidth === 80 ? 48 : 32;
-        const sep = '='.repeat(maxCols) + '\n';
 
-        // --- PART 1: Header (name + mana on same line) ---
-        const manaCost = cardReceiptData.manaCost || '';
-        const nameLine = manaCost
-          ? `${cardReceiptData.name} ${manaCost}`
-          : cardReceiptData.name;
-
-        const headerText = [
-          '\x1B\x40',          // Init
-          '\x1B\x61\x01',      // Center
-          '\x1B\x45\x01',      // Bold
-          nameLine + '\n',
-          '\x1B\x45\x00',      // Bold off
-          sep,
-        ].join('');
-
-        await adapter.sendText(headerText);
-
-        // --- PART 2: Art crop image ---
+        // Pre-rasterize front art if needed
+        let artBitmapBase64: string | undefined;
+        let artWidthPx: number | undefined;
+        let artHeightPx: number | undefined;
         if (printArt && artUrl) {
           try {
-            await adapter.sendImage(artUrl, widthPx, 0);
+            const rasterized = await rasterizeCardArtForPrint(artUrl, widthPx, {
+              algorithm: settings.printer?.imageDither ?? 'floyd',
+              brightness: settings.printer?.imageBrightness ?? 1.0,
+              contrast: settings.printer?.imageContrast ?? 1.0,
+              threshold: settings.printer?.imageThreshold ?? 128,
+              maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+            });
+            artBitmapBase64 = rasterized.base64Bitmap;
+            artWidthPx = rasterized.widthPx;
+            artHeightPx = rasterized.heightPx;
           } catch {
-            // Image failed — continue
+            // Art rasterization failed — continue without art
           }
         }
 
-        // --- PART 3: Body (type → oracle → flavor → stats) ---
-        const wrapText = (text: string, width: number): string => {
-          const words = text.split(' ');
-          const lines: string[] = [];
-          let line = '';
-          for (const word of words) {
-            if (line.length + word.length + 1 > width) {
-              lines.push(line);
-              line = word;
-            } else {
-              line = line ? `${line} ${word}` : word;
-            }
+        // Pre-rasterize back face art if needed
+        let backArtBitmapBase64: string | undefined;
+        let backArtWidthPx: number | undefined;
+        let backArtHeightPx: number | undefined;
+        if (printArt && isDoubleFaced && cardReceiptData.backFaceData?.imageUrl) {
+          try {
+            const rasterizedBack = await rasterizeCardArtForPrint(
+              cardReceiptData.backFaceData.imageUrl,
+              widthPx,
+              {
+                algorithm: settings.printer?.imageDither ?? 'floyd',
+                brightness: settings.printer?.imageBrightness ?? 1.0,
+                contrast: settings.printer?.imageContrast ?? 1.0,
+                threshold: settings.printer?.imageThreshold ?? 128,
+                maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+              }
+            );
+            backArtBitmapBase64 = rasterizedBack.base64Bitmap;
+            backArtWidthPx = rasterizedBack.widthPx;
+            backArtHeightPx = rasterizedBack.heightPx;
+          } catch {
+            // Back art rasterization failed — continue without it
           }
-          if (line) lines.push(line);
-          return lines.join('\n') + '\n';
+        }
+
+        const enrichedCardData = {
+          ...cardReceiptData,
+          artBitmapBase64,
+          artWidthPx,
+          artHeightPx,
+          backFaceData: cardReceiptData.backFaceData
+            ? {
+                ...cardReceiptData.backFaceData,
+                artBitmapBase64: backArtBitmapBase64,
+                artWidthPx: backArtWidthPx,
+                artHeightPx: backArtHeightPx,
+              }
+            : undefined,
         };
 
-        const body: string[] = [
-          '\x1B\x61\x01',      // Center
-          cardReceiptData.type + '\n',
-          sep,
-        ];
+        const capabilities = {
+          supportImage: true,
+          supportQR: true,
+          supportCut: false,
+          supportText: true,
+          paperWidth,
+        };
+        const renderer = new EscPosRenderer();
+        const doc = new CardReceiptDocument(enrichedCardData, {
+          printArt,
+          printQR,
+          cut: false,
+          paperWidth,
+          qrSize: settings.printer?.qrSize ?? 8,
+          qrErrorCorrection: settings.printer?.qrErrorCorrection ?? 'L',
+        });
+        await doc.render(renderer, capabilities);
 
-        if (cardReceiptData.oracleText) {
-          body.push('\x1B\x61\x00'); // Left
-          body.push(wrapText(cardReceiptData.oracleText, maxCols));
+        const chunks = renderer.getChunks();
+        let totalLen = 0;
+        for (const chunk of chunks) totalLen += chunk.length;
+        const allBytes = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const chunk of chunks) {
+          allBytes.set(chunk, offset);
+          offset += chunk.length;
         }
-
-        if (printFlavor && cardReceiptData.flavorText) {
-          body.push('\n\x1B\x61\x01'); // Center
-          body.push(`"${cardReceiptData.flavorText}"\n`);
-        }
-
-        if (cardReceiptData.power !== undefined && cardReceiptData.toughness !== undefined) {
-          body.push('\n\x1B\x61\x02'); // Right
-          body.push('\x1B\x45\x01');   // Bold
-          body.push(`${cardReceiptData.power}/${cardReceiptData.toughness}\n`);
-          body.push('\x1B\x45\x00');
-        }
-
-        await adapter.sendText(body.join(''));
-
-        // --- PART 4: QR code ---
-        if (printQR) {
-          try {
-            await adapter.sendQRCode(scryfallUrl, QR_PREVIEW_SIZE);
-          } catch {
-            // QR failed — continue
-          }
-        }
-
-        // --- BACK FACE: Print back of double-faced card ---
-        if (isDoubleFaced && cardReceiptData.backFaceData) {
-          const back = cardReceiptData.backFaceData;
-          await adapter.sendText('\n' + sep);
-          await adapter.sendText('--- BACK FACE ---\n');
-          await adapter.sendText(sep);
-
-          // Back face header
-          const backManaCost = back.manaCost || '';
-          const backNameLine = backManaCost
-            ? `${back.name} ${backManaCost}`
-            : back.name;
-
-          const backHeaderText = [
-            '\x1B\x40',
-            '\x1B\x61\x01',
-            '\x1B\x45\x01',
-            backNameLine + '\n',
-            '\x1B\x45\x00',
-            sep,
-          ].join('');
-
-          await adapter.sendText(backHeaderText);
-
-          // Back face art
-          if (printArt && back.imageUrl) {
-            try {
-              await adapter.sendImage(back.imageUrl, widthPx, 0);
-            } catch {
-              // Image failed — continue
-            }
-          }
-
-          // Back face body
-          const backBody: string[] = [
-            '\x1B\x61\x01',
-            back.type + '\n',
-            sep,
-          ];
-
-          if (back.oracleText) {
-            backBody.push('\x1B\x61\x00');
-            backBody.push(wrapText(back.oracleText, maxCols));
-          }
-
-          if (printFlavor && back.flavorText) {
-            backBody.push('\n\x1B\x61\x01');
-            backBody.push(`"${back.flavorText}"\n`);
-          }
-
-          if (back.power !== undefined && back.toughness !== undefined) {
-            backBody.push('\n\x1B\x61\x02');
-            backBody.push('\x1B\x45\x01');
-            backBody.push(`${back.power}/${back.toughness}\n`);
-            backBody.push('\x1B\x45\x00');
-          }
-
-          await adapter.sendText(backBody.join(''));
-        }
-
-        // --- PART 5: Footer ---
-        await adapter.sendText('\n\n\n');
+        await adapter.sendRaw(allBytes);
       }
 
       if (Platform.OS !== 'web') {
@@ -534,13 +499,17 @@ export default function PrintPreviewScreen() {
                   <PrintManaCost manaCost={displayFace?.manaCost ?? ''} size={16} gap={2} />
                 </View>
 
-                {showArt && (
+                {showArt && (displayFace?.artCropUrl || displayFace?.normalImageUrl) && (
                   <View style={styles.receiptArtWrap}>
-                    <Image
-                      source={{ uri: displayFace?.artCropUrl || displayFace?.normalImageUrl }}
+                    <DitheredImage
+                      imageUrl={(displayFace.artCropUrl || displayFace.normalImageUrl) as string}
+                      widthPx={settings.printer?.paperWidth === 80 ? 576 : 384}
+                      algorithm={settings.printer?.imageDither ?? 'floyd'}
+                      brightness={settings.printer?.imageBrightness ?? 1.0}
+                      contrast={settings.printer?.imageContrast ?? 1.0}
+                      threshold={settings.printer?.imageThreshold ?? 128}
+                      maxHeightPx={settings.printer?.imageMaxHeightPx ?? 480}
                       style={styles.receiptArt}
-                      contentFit="cover"
-                      transition={200}
                     />
                   </View>
                 )}

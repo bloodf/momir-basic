@@ -46,6 +46,7 @@ import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
 import { createAdapter } from '../services/printer/adapters/factory';
+import { rasterizeCardArtForPrint } from '@/utils/printerImage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_HEIGHT * 0.48;
@@ -102,6 +103,8 @@ export default function CardDetailScreen() {
     ]).start();
   }, [cardEntryAnim, heroScale]);
 
+  const printedCardIds = useRef(new Set<string>());
+
   const autoPrintCardReceipt = useCallback(async (cardToPrint: Card) => {
     if (!settings.printer.autoPrint) return;
     if (!settings.printer.preferredPrinterId) return;
@@ -110,19 +113,46 @@ export default function CardDetailScreen() {
     const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
     const widthPx = paperWidth === 80 ? 576 : 384;
     const imageUrl = cardToPrint.normalImageUrl || cardToPrint.artCropUrl;
+    const printArt = settings.printer?.printArt ?? true;
 
     try {
       const adapter = createAdapter();
-      // preferredPrinterId is a registry DB key — adapter.connectPrinter handles address lookup
       await adapter.connectPrinter(settings.printer.preferredPrinterId);
 
       if (printMode === 'image_only') {
         if (imageUrl) {
-          await adapter.sendImage(imageUrl, widthPx, 0);
+          const rasterized = await rasterizeCardArtForPrint(imageUrl, widthPx, {
+            algorithm: settings.printer?.imageDither ?? 'floyd',
+            brightness: settings.printer?.imageBrightness ?? 1.0,
+            contrast: settings.printer?.imageContrast ?? 1.0,
+            threshold: settings.printer?.imageThreshold ?? 128,
+            maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+          });
+          await adapter.sendImage(rasterized.base64Bitmap, rasterized.widthPx, rasterized.heightPx);
         }
       } else {
         const { EscPosRenderer } = await import('../services/printer/render/escpos');
         const { CardReceiptDocument } = await import('../services/printer/render/document');
+
+        let artBitmapBase64: string | undefined;
+        let artWidthPx: number | undefined;
+        let artHeightPx: number | undefined;
+        if (printArt && imageUrl) {
+          try {
+            const rasterized = await rasterizeCardArtForPrint(imageUrl, widthPx, {
+              algorithm: settings.printer?.imageDither ?? 'floyd',
+              brightness: settings.printer?.imageBrightness ?? 1.0,
+              contrast: settings.printer?.imageContrast ?? 1.0,
+              threshold: settings.printer?.imageThreshold ?? 128,
+              maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+            });
+            artBitmapBase64 = rasterized.base64Bitmap;
+            artWidthPx = rasterized.widthPx;
+            artHeightPx = rasterized.heightPx;
+          } catch {
+            // Art rasterization failed — continue without art
+          }
+        }
 
         const cardReceiptData = {
           name: cardToPrint.name,
@@ -132,39 +162,55 @@ export default function CardDetailScreen() {
           flavorText: cardToPrint.flavorText,
           power: cardToPrint.power,
           toughness: cardToPrint.toughness,
-          imageUrl,
+          imageUrl: imageUrl ?? '',
           setCode: cardToPrint.setCode,
           scryfallId: cardToPrint.id,
+          artBitmapBase64,
+          artWidthPx,
+          artHeightPx,
         };
 
-        const capabilities = { supportImage: true, supportQR: true, supportCut: true, supportText: true, paperWidth };
+        const capabilities = {
+          supportImage: true,
+          supportQR: true,
+          supportCut: false,
+          supportText: true,
+          paperWidth,
+        };
         const renderer = new EscPosRenderer();
-        const doc = new CardReceiptDocument(cardReceiptData, { printArt: false, printQR: true, cut: false, paperWidth });
+        const doc = new CardReceiptDocument(cardReceiptData, {
+          printArt,
+          printQR: settings.printer?.printQR ?? true,
+          cut: false,
+          paperWidth,
+          qrSize: settings.printer?.qrSize ?? 8,
+          qrErrorCorrection: settings.printer?.qrErrorCorrection ?? 'L',
+        });
         await doc.render(renderer, capabilities);
 
         const chunks = renderer.getChunks();
-        const allBytes: number[] = [];
+        let totalLen = 0;
+        for (const chunk of chunks) totalLen += chunk.length;
+        const allBytes = new Uint8Array(totalLen);
+        let byteOffset = 0;
         for (const chunk of chunks) {
-          for (let i = 0; i < chunk.length; i++) {
-            allBytes.push(chunk[i]);
-          }
+          allBytes.set(chunk, byteOffset);
+          byteOffset += chunk.length;
         }
-
-        if (settings.printer?.printArt && imageUrl) {
-          try {
-            await adapter.sendImage(imageUrl, widthPx, 0);
-          } catch {
-            // Image failed — continue with text
-          }
-        }
-
-        const text = String.fromCharCode(...allBytes);
-        await adapter.sendText(text);
+        await adapter.sendRaw(allBytes);
       }
-    } catch {
-      // Auto-print failure is silent — user can print manually from preview
+    } catch (err) {
+      console.warn('[autoPrint] failed:', err instanceof Error ? err.message : err);
     }
   }, [settings.printer]);
+
+  // Auto-print once per distinct card id (covers initial fetch, history tap, and reroll)
+  useEffect(() => {
+    if (!card?.id) return;
+    if (printedCardIds.current.has(card.id)) return;
+    printedCardIds.current.add(card.id);
+    void autoPrintCardReceipt(card);
+  }, [card?.id, autoPrintCardReceipt]);
 
   const rerollMutation = useMutation({
     mutationFn: async () => {
@@ -189,7 +235,6 @@ export default function CardDetailScreen() {
         Animated.timing(cardEntryAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.timing(heroScale, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]).start();
-      void autoPrintCardReceipt(newCard);
     },
   });
 

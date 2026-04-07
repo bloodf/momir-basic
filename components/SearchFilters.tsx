@@ -61,21 +61,18 @@ const COLOR_OPTIONS: ColorOption[] = [
   { id: 'C', scryfallCode: 'C', color: Colors.mana.C, borderColor: '#9a9490' },
 ];
 
-export const SearchFilters = React.memo(function SearchFilters({
+interface FilterSectionsProps {
+  filters: SearchFilterState;
+  onFiltersChange: (filters: SearchFilterState) => void;
+}
+
+export const FilterSections = React.memo(function FilterSections({
   filters,
   onFiltersChange,
-  visible,
-  onToggleVisible,
-}: Props) {
+}: FilterSectionsProps) {
   const { t } = useI18n();
-  const { height: windowHeight } = useWindowDimensions();
-  const animValue = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [setSearch, setSetSearch] = useState('');
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
-  const expandedPanelHeight = useMemo(
-    () => Math.min(windowHeight * 0.58, FILTER_PANEL_MAX_HEIGHT),
-    [windowHeight],
-  );
 
   const setsQuery = useQuery({
     queryKey: ['scryfall-sets'],
@@ -90,14 +87,6 @@ export const SearchFilters = React.memo(function SearchFilters({
       .filter(s => s.name.toLowerCase().includes(lower) || s.code.toLowerCase().includes(lower))
       .slice(0, 8);
   }, [setsQuery.data, setSearch]);
-
-  useEffect(() => {
-    Animated.timing(animValue, {
-      toValue: visible ? 1 : 0,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [visible, animValue]);
 
   const TYPE_OPTIONS: FilterOption[] = useMemo(() => [
     { id: 'creature', scryfallCode: 'creature' },
@@ -214,6 +203,300 @@ export const SearchFilters = React.memo(function SearchFilters({
     setSetSearch('');
   }, [onFiltersChange]);
 
+  return (
+    <>
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>{t.search.color}</Text>
+        <View style={styles.colorRow}>
+          {COLOR_OPTIONS.map((opt) => {
+            const isSelected = filters.colors.includes(opt.scryfallCode);
+            return (
+              <Pressable
+                key={opt.id}
+                onPress={() => handleColorToggle(opt.scryfallCode)}
+                style={[
+                  styles.colorChip,
+                  { borderColor: isSelected ? Colors.gold : opt.borderColor },
+                  isSelected && styles.colorChipSelected,
+                ]}
+                testID={`filter-color-${opt.id}`}
+              >
+                <ManaSymbol symbol={`{${opt.id}}`} size={26} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>{t.search.type}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.chipRow}>
+            {TYPE_OPTIONS.map((opt) => {
+              const isSelected = filters.type === opt.scryfallCode;
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => handleTypeSelect(opt.scryfallCode)}
+                  style={[styles.chip, isSelected && styles.chipSelected]}
+                  testID={`filter-type-${opt.id}`}
+                >
+                  <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                    {typeLabels[opt.id] ?? opt.id}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+
+      <View style={styles.filterSection}>
+        <View style={styles.cmcHeader}>
+          <Text style={[styles.filterLabel, { marginBottom: 0 }]}>{t.search.cmc}</Text>
+          {filters.cmcValue !== '' && (
+            <Pressable onPress={handleCmcOperatorCycle} style={styles.cmcOperatorBtn}>
+              <Text style={styles.cmcOperatorText}>
+                {filters.cmcOperator === '=' ? t.search.cmcExact :
+                 filters.cmcOperator === '<=' ? t.search.cmcLessOrEqual :
+                 t.search.cmcGreaterOrEqual}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.chipRow}>
+            {CMC_VALUES.map((val) => {
+              const cmcVal = val === '10+' ? '10' : val;
+              const isSelected = filters.cmcValue === cmcVal && (val !== '10+' || filters.cmcOperator === '>=');
+              return (
+                <Pressable
+                  key={val}
+                  onPress={() => handleCmcSelect(val)}
+                  style={[styles.cmcChip, isSelected && styles.chipSelected]}
+                  testID={`filter-cmc-${val}`}
+                >
+                  <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{val}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>{t.search.rarity}</Text>
+        <View style={styles.chipRow}>
+          {RARITY_OPTIONS.map((opt) => {
+            const isSelected = filters.rarity === opt.scryfallCode;
+            const rarityColor = Colors.rarity[opt.id as keyof typeof Colors.rarity] ?? Colors.textMuted;
+            return (
+              <Pressable
+                key={opt.id}
+                onPress={() => handleRaritySelect(opt.scryfallCode)}
+                style={[
+                  styles.chip,
+                  isSelected && { backgroundColor: rarityColor, borderColor: rarityColor },
+                ]}
+                testID={`filter-rarity-${opt.id}`}
+              >
+                <Text style={[
+                  styles.chipText,
+                  !isSelected && { color: rarityColor },
+                  isSelected && styles.chipTextSelected,
+                ]}>
+                  {rarityLabels[opt.id] ?? opt.id}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>{t.search.format}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.chipRow}>
+            {FORMAT_OPTIONS.map((opt) => {
+              const isSelected = filters.format === opt.scryfallCode;
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => handleFormatSelect(opt.scryfallCode)}
+                  style={[styles.chip, isSelected && styles.chipSelected]}
+                  testID={`filter-format-${opt.id}`}
+                >
+                  <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                    {formatLabels[opt.id] ?? opt.id}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>{t.search.set}</Text>
+        {filters.set ? (
+          <View style={styles.selectedSetRow}>
+            <View style={styles.selectedSetChip}>
+              <Text style={styles.selectedSetCode}>{filters.set.toUpperCase()}</Text>
+              <Text style={styles.selectedSetName} numberOfLines={1}>
+                {setsQuery.data?.find(s => s.code === filters.set)?.name ?? filters.set}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => handleSetSelect(filters.set)}
+              hitSlop={8}
+              style={styles.removeSetBtn}
+            >
+              <X size={14} color={Colors.error} />
+            </Pressable>
+          </View>
+        ) : (
+          <View>
+            <View style={styles.textInputContainer}>
+              <Search size={13} color={Colors.textMuted} />
+              <TextInput
+                style={styles.textInput}
+                placeholder={t.search.setPlaceholder}
+                placeholderTextColor={Colors.textMuted}
+                value={setSearch}
+                onChangeText={setSetSearch}
+                autoCorrect={false}
+                autoCapitalize="none"
+                testID="filter-set-input"
+              />
+            </View>
+            {filteredSets.length > 0 && (
+              <View style={styles.setDropdown}>
+                {filteredSets.map((s) => (
+                  <Pressable
+                    key={s.code}
+                    onPress={() => handleSetSelect(s.code)}
+                    style={({ pressed }) => [styles.setDropdownItem, pressed && styles.setDropdownItemPressed]}
+                  >
+                    <Text style={styles.setDropdownCode}>{s.code.toUpperCase()}</Text>
+                    <Text style={styles.setDropdownName} numberOfLines={1}>{s.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>{t.search.artist}</Text>
+        <View style={styles.textInputContainer}>
+          <Search size={13} color={Colors.textMuted} />
+          <TextInput
+            style={styles.textInput}
+            placeholder={t.search.artistPlaceholder}
+            placeholderTextColor={Colors.textMuted}
+            value={filters.artist}
+            onChangeText={handleArtistChange}
+            autoCorrect={false}
+            autoCapitalize="none"
+            testID="filter-artist-input"
+          />
+          {filters.artist.length > 0 && (
+            <Pressable onPress={() => handleArtistChange('')} hitSlop={8}>
+              <X size={14} color={Colors.textMuted} />
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      <Pressable
+        onPress={() => setShowSyntaxHelp(prev => !prev)}
+        style={({ pressed }) => [styles.syntaxHelpToggle, pressed && { opacity: 0.7 }]}
+      >
+        <HelpCircle size={14} color={Colors.gold} />
+        <Text style={styles.syntaxHelpToggleText}>
+          {showSyntaxHelp ? t.search.hideSyntaxHelp : t.search.syntaxHelp}
+        </Text>
+      </Pressable>
+
+      {showSyntaxHelp && (
+        <View style={styles.syntaxHelpBox}>
+          <Text style={styles.syntaxHelpTitle}>{t.search.advancedSearch}</Text>
+          <Text style={styles.syntaxHelpDesc}>{t.search.advancedSearchHint}</Text>
+          <View style={styles.syntaxTable}>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>R:M</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxRarity}</Text>
+            </View>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>T:C</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxType}</Text>
+            </View>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>F:S</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxFormat}</Text>
+            </View>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>S:neo</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxSet}</Text>
+            </View>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>A:Seb</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxArtist}</Text>
+            </View>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>c:WU</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxColor}</Text>
+            </View>
+            <View style={styles.syntaxRow}>
+              <Text style={styles.syntaxCode}>2RW</Text>
+              <Text style={styles.syntaxDesc}>{t.search.syntaxMana}</Text>
+            </View>
+          </View>
+          <Text style={styles.syntaxExamples}>{t.search.syntaxExamples}</Text>
+        </View>
+      )}
+
+      {activeCount > 0 && (
+        <Pressable
+          onPress={handleClearAll}
+          style={({ pressed }) => [styles.clearBtn, pressed && styles.clearBtnPressed]}
+          testID="filter-clear-all"
+        >
+          <X size={13} color={Colors.error} />
+          <Text style={styles.clearBtnText}>{t.search.clearFilters}</Text>
+        </Pressable>
+      )}
+
+      <View style={styles.bottomSpacer} />
+    </>
+  );
+});
+
+export const SearchFilters = React.memo(function SearchFilters({
+  filters,
+  onFiltersChange,
+  visible,
+  onToggleVisible,
+}: Props) {
+  const { t } = useI18n();
+  const { height: windowHeight } = useWindowDimensions();
+  const animValue = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const expandedPanelHeight = useMemo(
+    () => Math.min(windowHeight * 0.58, FILTER_PANEL_MAX_HEIGHT),
+    [windowHeight],
+  );
+
+  useEffect(() => {
+    Animated.timing(animValue, {
+      toValue: visible ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [visible, animValue]);
+
+  const activeCount = getActiveFilterCount(filters);
+
   const containerHeight = animValue.interpolate({
     inputRange: [0, 1],
     outputRange: [0, expandedPanelHeight],
@@ -265,270 +548,7 @@ export const SearchFilters = React.memo(function SearchFilters({
           contentContainerStyle={styles.filtersScrollContent}
           testID="filters-scroll-view"
         >
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>{t.search.color}</Text>
-            <View style={styles.colorRow}>
-              {COLOR_OPTIONS.map((opt) => {
-                const isSelected = filters.colors.includes(opt.scryfallCode);
-                return (
-                  <Pressable
-                    key={opt.id}
-                    onPress={() => handleColorToggle(opt.scryfallCode)}
-                    style={[
-                      styles.colorChip,
-                      { borderColor: isSelected ? Colors.gold : opt.borderColor },
-                      isSelected && styles.colorChipSelected,
-                    ]}
-                    testID={`filter-color-${opt.id}`}
-                  >
-                    <ManaSymbol symbol={`{${opt.id}}`} size={26} />
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>{t.search.type}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {TYPE_OPTIONS.map((opt) => {
-                  const isSelected = filters.type === opt.scryfallCode;
-                  return (
-                    <Pressable
-                      key={opt.id}
-                      onPress={() => handleTypeSelect(opt.scryfallCode)}
-                      style={[styles.chip, isSelected && styles.chipSelected]}
-                      testID={`filter-type-${opt.id}`}
-                    >
-                      <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                        {typeLabels[opt.id] ?? opt.id}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-
-          <View style={styles.filterSection}>
-            <View style={styles.cmcHeader}>
-              <Text style={[styles.filterLabel, { marginBottom: 0 }]}>{t.search.cmc}</Text>
-              {filters.cmcValue !== '' && (
-                <Pressable onPress={handleCmcOperatorCycle} style={styles.cmcOperatorBtn}>
-                  <Text style={styles.cmcOperatorText}>
-                    {filters.cmcOperator === '=' ? t.search.cmcExact :
-                     filters.cmcOperator === '<=' ? t.search.cmcLessOrEqual :
-                     t.search.cmcGreaterOrEqual}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {CMC_VALUES.map((val) => {
-                  const cmcVal = val === '10+' ? '10' : val;
-                  const isSelected = filters.cmcValue === cmcVal && (val !== '10+' || filters.cmcOperator === '>=');
-                  return (
-                    <Pressable
-                      key={val}
-                      onPress={() => handleCmcSelect(val)}
-                      style={[styles.cmcChip, isSelected && styles.chipSelected]}
-                      testID={`filter-cmc-${val}`}
-                    >
-                      <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{val}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>{t.search.rarity}</Text>
-            <View style={styles.chipRow}>
-              {RARITY_OPTIONS.map((opt) => {
-                const isSelected = filters.rarity === opt.scryfallCode;
-                const rarityColor = Colors.rarity[opt.id as keyof typeof Colors.rarity] ?? Colors.textMuted;
-                return (
-                  <Pressable
-                    key={opt.id}
-                    onPress={() => handleRaritySelect(opt.scryfallCode)}
-                    style={[
-                      styles.chip,
-                      isSelected && { backgroundColor: rarityColor, borderColor: rarityColor },
-                    ]}
-                    testID={`filter-rarity-${opt.id}`}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      !isSelected && { color: rarityColor },
-                      isSelected && styles.chipTextSelected,
-                    ]}>
-                      {rarityLabels[opt.id] ?? opt.id}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>{t.search.format}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {FORMAT_OPTIONS.map((opt) => {
-                  const isSelected = filters.format === opt.scryfallCode;
-                  return (
-                    <Pressable
-                      key={opt.id}
-                      onPress={() => handleFormatSelect(opt.scryfallCode)}
-                      style={[styles.chip, isSelected && styles.chipSelected]}
-                      testID={`filter-format-${opt.id}`}
-                    >
-                      <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                        {formatLabels[opt.id] ?? opt.id}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>{t.search.set}</Text>
-            {filters.set ? (
-              <View style={styles.selectedSetRow}>
-                <View style={styles.selectedSetChip}>
-                  <Text style={styles.selectedSetCode}>{filters.set.toUpperCase()}</Text>
-                  <Text style={styles.selectedSetName} numberOfLines={1}>
-                    {setsQuery.data?.find(s => s.code === filters.set)?.name ?? filters.set}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => handleSetSelect(filters.set)}
-                  hitSlop={8}
-                  style={styles.removeSetBtn}
-                >
-                  <X size={14} color={Colors.error} />
-                </Pressable>
-              </View>
-            ) : (
-              <View>
-                <View style={styles.textInputContainer}>
-                  <Search size={13} color={Colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder={t.search.setPlaceholder}
-                    placeholderTextColor={Colors.textMuted}
-                    value={setSearch}
-                    onChangeText={setSetSearch}
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    testID="filter-set-input"
-                  />
-                </View>
-                {filteredSets.length > 0 && (
-                  <View style={styles.setDropdown}>
-                    {filteredSets.map((s) => (
-                      <Pressable
-                        key={s.code}
-                        onPress={() => handleSetSelect(s.code)}
-                        style={({ pressed }) => [styles.setDropdownItem, pressed && styles.setDropdownItemPressed]}
-                      >
-                        <Text style={styles.setDropdownCode}>{s.code.toUpperCase()}</Text>
-                        <Text style={styles.setDropdownName} numberOfLines={1}>{s.name}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>{t.search.artist}</Text>
-            <View style={styles.textInputContainer}>
-              <Search size={13} color={Colors.textMuted} />
-              <TextInput
-                style={styles.textInput}
-                placeholder={t.search.artistPlaceholder}
-                placeholderTextColor={Colors.textMuted}
-                value={filters.artist}
-                onChangeText={handleArtistChange}
-                autoCorrect={false}
-                autoCapitalize="none"
-                testID="filter-artist-input"
-              />
-              {filters.artist.length > 0 && (
-                <Pressable onPress={() => handleArtistChange('')} hitSlop={8}>
-                  <X size={14} color={Colors.textMuted} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() => setShowSyntaxHelp(prev => !prev)}
-            style={({ pressed }) => [styles.syntaxHelpToggle, pressed && { opacity: 0.7 }]}
-          >
-            <HelpCircle size={14} color={Colors.gold} />
-            <Text style={styles.syntaxHelpToggleText}>
-              {showSyntaxHelp ? t.search.hideSyntaxHelp : t.search.syntaxHelp}
-            </Text>
-          </Pressable>
-
-          {showSyntaxHelp && (
-            <View style={styles.syntaxHelpBox}>
-              <Text style={styles.syntaxHelpTitle}>{t.search.advancedSearch}</Text>
-              <Text style={styles.syntaxHelpDesc}>{t.search.advancedSearchHint}</Text>
-              <View style={styles.syntaxTable}>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>R:M</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxRarity}</Text>
-                </View>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>T:C</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxType}</Text>
-                </View>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>F:S</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxFormat}</Text>
-                </View>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>S:neo</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxSet}</Text>
-                </View>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>A:Seb</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxArtist}</Text>
-                </View>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>c:WU</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxColor}</Text>
-                </View>
-                <View style={styles.syntaxRow}>
-                  <Text style={styles.syntaxCode}>2RW</Text>
-                  <Text style={styles.syntaxDesc}>{t.search.syntaxMana}</Text>
-                </View>
-              </View>
-              <Text style={styles.syntaxExamples}>{t.search.syntaxExamples}</Text>
-            </View>
-          )}
-
-          {activeCount > 0 && (
-            <Pressable
-              onPress={handleClearAll}
-              style={({ pressed }) => [styles.clearBtn, pressed && styles.clearBtnPressed]}
-              testID="filter-clear-all"
-            >
-              <X size={13} color={Colors.error} />
-              <Text style={styles.clearBtnText}>{t.search.clearFilters}</Text>
-            </Pressable>
-          )}
-
-          <View style={styles.bottomSpacer} />
+          <FilterSections filters={filters} onFiltersChange={onFiltersChange} />
         </ScrollView>
       </Animated.View>
     </View>

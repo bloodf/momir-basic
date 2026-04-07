@@ -121,6 +121,8 @@ export interface PrinterCapabilities {
 
 // User preferences for printing (lives in SettingsProvider/AsyncStorage)
 export type PrintMode = 'full' | 'image_only';
+export type DitherAlgorithm = 'floyd' | 'bayer' | 'threshold' | 'none';
+export type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
 
 export interface PrinterPreferences {
   preferredPrinterId: string | null;  // null = no printer selected
@@ -130,6 +132,15 @@ export interface PrinterPreferences {
   printFlavorText: boolean;
   autoPrint: boolean;
   printMode: PrintMode;  // 'full' = receipt layout, 'image_only' = full card image
+  // Image pre-processing tuning (applied before sending bitmap to printer)
+  imageDither: DitherAlgorithm;       // default 'floyd'
+  imageBrightness: number;            // 0.5..1.5, default 1.0
+  imageContrast: number;              // 0.5..1.5, default 1.0
+  imageThreshold: number;             // 0..255, default 128
+  imageMaxHeightPx: number;           // default 480
+  // QR code tuning
+  qrSize: number;                     // 1..16 ESC/POS module size, default 8
+  qrErrorCorrection: QrErrorCorrection; // default 'L'
 }
 
 // Legacy printer config (for migration only)
@@ -223,6 +234,13 @@ export function migratePrinterPreferences(
     printFlavorText: true,
     autoPrint: typeof legacy.autoPrint === 'boolean' ? legacy.autoPrint : false,
     printMode: 'full' as const,
+    imageDither: 'floyd',
+    imageBrightness: 1.0,
+    imageContrast: 1.0,
+    imageThreshold: 128,
+    imageMaxHeightPx: 480,
+    qrSize: 8,
+    qrErrorCorrection: 'L',
   };
 }
 
@@ -235,6 +253,13 @@ export const DEFAULT_PRINTER_PREFERENCES: PrinterPreferences = {
   printFlavorText: true,
   autoPrint: false,
   printMode: 'full' as const,
+  imageDither: 'floyd',
+  imageBrightness: 1.0,
+  imageContrast: 1.0,
+  imageThreshold: 128,
+  imageMaxHeightPx: 480,
+  qrSize: 8,
+  qrErrorCorrection: 'L',
 };
 
 export interface AppSettings {

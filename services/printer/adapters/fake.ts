@@ -78,6 +78,17 @@ export class FakePrinterAdapter implements PrinterPort {
     }
   }
 
+  async sendRaw(_bytes: Uint8Array): Promise<void> {
+    if (this.failureMode === 'write-error') {
+      throw new Error('Write error');
+    }
+    if (!this.hasConnectedDevice()) {
+      throw new Error('No printer connected');
+    }
+    // eslint-disable-next-line no-console
+    console.warn('[FakePrinter] sendRaw:', _bytes.length, 'bytes');
+  }
+
   async sendImage(_base64: string, _width?: number, _height?: number): Promise<void> {
     if (this.failureMode === 'write-error') {
       throw new Error('Write error');
