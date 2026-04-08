@@ -269,7 +269,7 @@ export default function PrintPreviewScreen() {
             threshold: settings.printer?.imageThreshold ?? 128,
             maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
           });
-          await adapter.sendImage(rasterized.base64Bitmap, rasterized.widthPx, rasterized.heightPx);
+          await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
         } else {
           throw new Error('No card image available to print.');
         }
@@ -285,7 +285,7 @@ export default function PrintPreviewScreen() {
               threshold: settings.printer?.imageThreshold ?? 128,
               maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
             });
-            await adapter.sendImage(rasterizedBack.base64Bitmap, rasterizedBack.widthPx, rasterizedBack.heightPx);
+            await adapter.sendImage(rasterizedBack.base64Png, rasterizedBack.widthPx, rasterizedBack.heightPx);
           }
         }
       } else {

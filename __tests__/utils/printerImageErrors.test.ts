@@ -21,4 +21,12 @@ describe('printerImageErrors', () => {
     expect(isPrinterImageNativeCompatibilityError(error)).toBe(false);
     expect(formatPrinterImageProcessingError(error)).toBe(error.message);
   });
+
+  it('maps remote image loading failures to a friendly printer message', () => {
+    const error = new Error("Call to function 'Context.renderAsync' has been rejected. -> Caused by: Could not load the image");
+
+    expect(formatPrinterImageProcessingError(error)).toBe(
+      'Unable to load card art for printing. Check your connection and try again.',
+    );
+  });
 });

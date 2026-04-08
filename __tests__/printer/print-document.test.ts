@@ -116,6 +116,26 @@ describe('CardReceiptDocument', () => {
     expect(text).toContain('[Art: unavailable]');
   });
 
+  it('does not try to decode remote image urls as raster base64', async () => {
+    const card = {
+      name: 'Test Card',
+      manaCost: '{1}',
+      type: 'Creature',
+      oracleText: 'Test text.',
+      imageUrl: 'https://example.com/test.jpg',
+      setCode: 'TSET',
+      scryfallId: '99999',
+    };
+
+    const doc = new CardReceiptDocument(card, { printArt: true });
+    await doc.render(renderer, DEFAULT_CAPABILITIES);
+
+    const chunks = renderer.getChunks();
+    const text = chunks.map(c => new TextDecoder().decode(c)).join('');
+
+    expect(text).toContain('[Art: unavailable]');
+  });
+
   it('skips QR when supportQR is false', async () => {
     const card = {
       name: 'Test Card',

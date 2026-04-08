@@ -162,10 +162,7 @@ export class CardReceiptDocument implements PrintDocument {
     if (this.options.printArt && capabilities.supportImage && artBitmap && artW && artH) {
       renderer.feedLine();
       renderer.printImage(artBitmap, artW, artH);
-    } else if (this.options.printArt && capabilities.supportImage && imageUrl) {
-      renderer.feedLine();
-      renderer.printImage(imageUrl, 200, 170);
-    } else if (this.options.printArt && !capabilities.supportImage) {
+    } else if (this.options.printArt && (!capabilities.supportImage || imageUrl)) {
       renderer.feedLine();
       renderer.setAlignment('center');
       renderer.addText('[Art: unavailable]');

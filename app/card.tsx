@@ -134,7 +134,7 @@ export default function CardDetailScreen() {
             threshold: settings.printer?.imageThreshold ?? 128,
             maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
           });
-          await adapter.sendImage(rasterized.base64Bitmap, rasterized.widthPx, rasterized.heightPx);
+          await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
         }
       } else {
         const { EscPosRenderer } = await import('../services/printer/render/escpos');

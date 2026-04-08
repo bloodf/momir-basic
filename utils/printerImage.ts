@@ -1,8 +1,15 @@
+import { Buffer } from 'buffer';
+import { File, Paths } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { PNG } from 'pngjs/browser';
 import { ditherImage, thresholdDither } from './dither';
 import type { DitherAlgorithm as DitherAlgorithmInternal } from './dither';
 import { formatPrinterImageProcessingError } from './printerImageErrors';
+
+const globalWithBuffer = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
+if (!globalWithBuffer.Buffer) {
+  globalWithBuffer.Buffer = Buffer;
+}
 
 export interface RasterizeOptions {
   algorithm?: 'floyd' | 'bayer' | 'threshold' | 'none';
@@ -14,6 +21,7 @@ export interface RasterizeOptions {
 
 export interface RasterizeResult {
   base64Bitmap: string;
+  base64Png: string;
   widthPx: number;
   heightPx: number;
   previewDataUri: string;
@@ -96,7 +104,7 @@ function packBitmap(pixels: number[], width: number, height: number): Uint8Array
  * Re-encode a dithered 1-bit pixel array as a PNG data URI for preview.
  * Uses pngjs to produce a grayscale PNG.
  */
-function ditherPixelsToDataUri(pixels: number[], width: number, height: number): string {
+function ditherPixelsToBase64Png(pixels: number[], width: number, height: number): string {
   const png = new PNG({ width, height, filterType: -1 });
   // pngjs data is a Buffer of RGBA bytes
   const buf = Buffer.alloc(width * height * 4);
@@ -109,8 +117,43 @@ function ditherPixelsToDataUri(pixels: number[], width: number, height: number):
 
   // Synchronous pack
   const packed = PNG.sync.write(png);
-  const base64 = packed.toString('base64');
+  return packed.toString('base64');
+}
+
+function toDataUri(base64: string): string {
   return `data:image/png;base64,${base64}`;
+}
+
+function isLocalImageUri(uri: string): boolean {
+  return (
+    uri.startsWith('file://') ||
+    uri.startsWith('content://') ||
+    uri.startsWith('asset://') ||
+    uri.startsWith('data:')
+  );
+}
+
+function hashString(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+
+  return Math.abs(hash).toString(36);
+}
+
+async function ensureLocalImageUri(imageUrl: string): Promise<string> {
+  if (isLocalImageUri(imageUrl)) {
+    return imageUrl;
+  }
+
+  const localFile = new File(Paths.cache, `printer-art-${hashString(imageUrl)}.img`);
+
+  if (!localFile.exists) {
+    await File.downloadFileAsync(imageUrl, localFile, { idempotent: true });
+  }
+
+  return localFile.uri;
 }
 
 export async function rasterizeCardArtForPrint(
@@ -131,11 +174,12 @@ export async function rasterizeCardArtForPrint(
   let finalBase64: string;
   let finalWidth: number;
   let finalHeight: number;
+  const localImageUri = await ensureLocalImageUri(imageUrl);
 
   try {
     // 1. Resize image to widthPx wide, capped at maxHeightPx tall
     const manipResult = await ImageManipulator.manipulateAsync(
-      imageUrl,
+      localImageUri,
       [{ resize: { width: widthPx } }],
       { compress: 1, format: ImageManipulator.SaveFormat.PNG, base64: true },
     );
@@ -153,7 +197,7 @@ export async function rasterizeCardArtForPrint(
       const scale = maxHeightPx / finalHeight;
       const clampedWidth = Math.round(finalWidth * scale);
       const resized = await ImageManipulator.manipulateAsync(
-        imageUrl,
+        manipResult.uri,
         [{ resize: { width: clampedWidth, height: maxHeightPx } }],
         { compress: 1, format: ImageManipulator.SaveFormat.PNG, base64: true },
       );
@@ -198,10 +242,12 @@ export async function rasterizeCardArtForPrint(
   const base64Bitmap = Buffer.from(bitmapBytes).toString('base64');
 
   // 6. Build preview data URI
-  const previewDataUri = ditherPixelsToDataUri(ditheredPixels, finalWidth, finalHeight);
+  const base64Png = ditherPixelsToBase64Png(ditheredPixels, finalWidth, finalHeight);
+  const previewDataUri = toDataUri(base64Png);
 
   const result: RasterizeResult = {
     base64Bitmap,
+    base64Png,
     widthPx: finalWidth,
     heightPx: finalHeight,
     previewDataUri,

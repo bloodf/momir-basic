@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import type { QrErrorCorrection } from '../../../types';
 
 // ESC/POS command constants
@@ -242,10 +243,9 @@ export class EscPosRenderer {
 
     let imageData: Uint8Array;
     try {
-      const binaryString = atob(base64);
-      imageData = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        imageData[i] = binaryString.charCodeAt(i);
+      imageData = Uint8Array.from(Buffer.from(base64, 'base64'));
+      if (imageData.length === 0) {
+        throw new Error('Empty image data');
       }
     } catch {
       throw new Error('Image printing requires valid base64-encoded raster bitmap; decode failed');

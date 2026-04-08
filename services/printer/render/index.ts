@@ -1,7 +1,5 @@
 export {
   EscPosRenderer,
-  PrintDocument,
-  PrinterCapabilities,
   parseManaCost,
   buildScryfallUrl,
   buildQrUrl,
@@ -11,9 +9,17 @@ export {
   MAX_COLUMN_80MM,
 } from './escpos';
 
+export type {
+  PrintDocument,
+  PrinterCapabilities,
+} from './escpos';
+
 export {
   CardReceiptDocument,
   DiagnosticsDocument,
+} from './document';
+
+export type {
   CardReceiptOptions,
   CardReceiptCardData,
   DiagnosticsDocumentOptions,
