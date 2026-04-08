@@ -12,6 +12,7 @@ import {
   fetchSets,
   parseAdvancedSyntax,
   fetchRandomBgCardForType,
+  isScryfallApiError,
 } from '../../services/scryfall';
 import { buildFullQuery, EMPTY_FILTERS } from '../../components/SearchFilters.shared';
 
@@ -187,11 +188,33 @@ describe('Scryfall Service', () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
+        json: async () => ({ details: 'Service unavailable' }),
       });
 
-      await expect(fetchRandomCard('creature', 3)).rejects.toThrow(
-        'Scryfall API error: 500'
-      );
+      await expect(fetchRandomCard('creature', 3)).rejects.toMatchObject({
+        name: 'ScryfallApiError',
+        status: 500,
+        isTransient: true,
+        reason: 'server',
+      });
+    });
+
+    it('retries transient 503 failures before succeeding', async () => {
+      const fakeCard = createFakeScryfallCard();
+
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ details: 'Service unavailable' }) })
+        .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ details: 'Service unavailable' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => fakeCard,
+        });
+
+      const result = await fetchRandomCard('creature', 3);
+
+      expect(result.id).toBe(fakeCard.id);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
     it('maps card_faces data correctly for split cards', async () => {
@@ -468,14 +491,57 @@ describe('Scryfall Service', () => {
     });
 
     it('throws on non-retryable API errors', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
+        json: async () => ({ details: 'Service unavailable' }),
       });
 
-      await expect(searchCards('t:creature')).rejects.toThrow(
-        'Scryfall search error: 500'
-      );
+      await expect(searchCards('t:creature')).rejects.toMatchObject({
+        name: 'ScryfallApiError',
+        status: 500,
+        isTransient: true,
+        reason: 'server',
+      });
+    });
+
+    it('retries transient 503 search failures before succeeding', async () => {
+      const data = {
+        data: [createFakeScryfallCard({ id: 'result-503' })],
+        total_cards: 1,
+        has_more: false,
+      };
+
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ details: 'Service unavailable' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => data,
+        });
+
+      const result = await searchCards('t:creature');
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0]?.id).toBe('result-503');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('ScryfallApiError typing', () => {
+    it('identifies typed Scryfall API errors', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ details: 'Service unavailable' }),
+      });
+
+      try {
+        await searchCards('t:creature');
+        throw new Error('Expected searchCards to throw');
+      } catch (error) {
+        expect(isScryfallApiError(error)).toBe(true);
+      }
     });
   });
 

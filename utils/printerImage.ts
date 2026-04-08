@@ -2,6 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { PNG } from 'pngjs/browser';
 import { ditherImage, thresholdDither } from './dither';
 import type { DitherAlgorithm as DitherAlgorithmInternal } from './dither';
+import { formatPrinterImageProcessingError } from './printerImageErrors';
 
 export interface RasterizeOptions {
   algorithm?: 'floyd' | 'bayer' | 'threshold' | 'none';
@@ -127,33 +128,41 @@ export async function rasterizeCardArtForPrint(
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
-  // 1. Resize image to widthPx wide, capped at maxHeightPx tall
-  const manipResult = await ImageManipulator.manipulateAsync(
-    imageUrl,
-    [{ resize: { width: widthPx } }],
-    { compress: 1, format: ImageManipulator.SaveFormat.PNG, base64: true },
-  );
+  let finalBase64: string;
+  let finalWidth: number;
+  let finalHeight: number;
 
-  if (!manipResult.base64) {
-    throw new Error('expo-image-manipulator did not return base64 output');
-  }
-
-  // Check height and re-resize if needed
-  let finalBase64 = manipResult.base64;
-  let finalWidth = manipResult.width;
-  let finalHeight = manipResult.height;
-
-  if (finalHeight > maxHeightPx) {
-    const scale = maxHeightPx / finalHeight;
-    const clampedWidth = Math.round(finalWidth * scale);
-    const resized = await ImageManipulator.manipulateAsync(
+  try {
+    // 1. Resize image to widthPx wide, capped at maxHeightPx tall
+    const manipResult = await ImageManipulator.manipulateAsync(
       imageUrl,
-      [{ resize: { width: clampedWidth, height: maxHeightPx } }],
+      [{ resize: { width: widthPx } }],
       { compress: 1, format: ImageManipulator.SaveFormat.PNG, base64: true },
     );
-    finalBase64 = resized.base64 ?? finalBase64;
-    finalWidth = resized.width;
-    finalHeight = resized.height;
+
+    if (!manipResult.base64) {
+      throw new Error('expo-image-manipulator did not return base64 output');
+    }
+
+    // Check height and re-resize if needed
+    finalBase64 = manipResult.base64;
+    finalWidth = manipResult.width;
+    finalHeight = manipResult.height;
+
+    if (finalHeight > maxHeightPx) {
+      const scale = maxHeightPx / finalHeight;
+      const clampedWidth = Math.round(finalWidth * scale);
+      const resized = await ImageManipulator.manipulateAsync(
+        imageUrl,
+        [{ resize: { width: clampedWidth, height: maxHeightPx } }],
+        { compress: 1, format: ImageManipulator.SaveFormat.PNG, base64: true },
+      );
+      finalBase64 = resized.base64 ?? finalBase64;
+      finalWidth = resized.width;
+      finalHeight = resized.height;
+    }
+  } catch (error) {
+    throw new Error(formatPrinterImageProcessingError(error));
   }
 
   // 2. Decode PNG pixels using pngjs

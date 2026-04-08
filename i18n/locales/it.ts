@@ -18,6 +18,7 @@ const it: Translations = {
     done: 'Fatto',
     close: 'Chiudi',
     go: 'Vai',
+    retry: 'Riprova',
   },
   home: {
     fetchingCards: (count: number) => `Cercando ${count} carte casuali`,
@@ -293,6 +294,8 @@ const it: Translations = {
   errors: {
     fetchFailed: 'Ricerca carta fallita',
     noCardFound: (type: string, cmc: number) => `Nessun ${type} trovato a CMC ${cmc}`,
+    scryfallUnavailable: 'Scryfall è temporaneamente non disponibile. Riprova tra poco.',
+    networkUnavailable: 'Impossibile raggiungere Scryfall. Controlla la connessione e riprova.',
   },
   toast: {
     offline: 'Sei offline',

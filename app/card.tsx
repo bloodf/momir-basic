@@ -40,8 +40,14 @@ import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { ManaCost } from '@/components/ManaCost';
 import { OracleText } from '@/components/OracleText';
-import { fetchRandomCard, fetchCardPrintings, CardPrinting } from '@/services/scryfall';
+import {
+  fetchRandomCard,
+  fetchCardPrintings,
+  CardPrinting,
+  getLocalizedScryfallErrorMessage,
+} from '@/services/scryfall';
 import { getCardFaceDisplayData, getDisplayFace } from '@/utils/cardFaces';
+import { showToast } from '@/components/Toast';
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
@@ -235,6 +241,13 @@ export default function CardDetailScreen() {
         Animated.timing(cardEntryAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.timing(heroScale, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]).start();
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        title: t.errors.fetchFailed,
+        message: getLocalizedScryfallErrorMessage(error, t.errors),
+      });
     },
   });
 

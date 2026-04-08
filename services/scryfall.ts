@@ -7,7 +7,105 @@ const HEADERS = {
 };
 
 const RATE_LIMIT_MS = 100;
+const DEFAULT_RETRY_COUNT = 3;
+const TRANSIENT_RETRY_BASE_MS = 300;
 let lastRequestTime = 0;
+
+type ScryfallErrorReason = 'network' | 'server' | 'request';
+
+type ScryfallErrorMessages = {
+  fetchFailed: string;
+  networkUnavailable: string;
+  scryfallUnavailable: string;
+};
+
+export class ScryfallApiError extends Error {
+  status: number;
+  isTransient: boolean;
+  reason: ScryfallErrorReason;
+
+  constructor(message: string, status: number, isTransient: boolean, reason: ScryfallErrorReason) {
+    super(message);
+    this.name = 'ScryfallApiError';
+    this.status = status;
+    this.isTransient = isTransient;
+    this.reason = reason;
+  }
+}
+
+export function isScryfallApiError(error: unknown): error is ScryfallApiError {
+  return error instanceof ScryfallApiError;
+}
+
+export function getLocalizedScryfallErrorMessage(error: unknown, messages: ScryfallErrorMessages): string {
+  if (isScryfallApiError(error)) {
+    if (error.reason === 'network') {
+      return messages.networkUnavailable;
+    }
+
+    if (error.reason === 'server') {
+      return messages.scryfallUnavailable;
+    }
+
+    return error.message || messages.fetchFailed;
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return messages.fetchFailed;
+}
+
+function isTransientStatus(status: number): boolean {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function getScryfallErrorReason(status: number): ScryfallErrorReason {
+  if (status === 0) {
+    return 'network';
+  }
+
+  if (status === 429 || status >= 500) {
+    return 'server';
+  }
+
+  return 'request';
+}
+
+async function waitForTransientRetry(attempt: number): Promise<void> {
+  const delayMs = Math.min(TRANSIENT_RETRY_BASE_MS * (2 ** attempt), 1500);
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function readScryfallErrorMessage(response: Response): Promise<string | null> {
+  try {
+    const payload = await response.json() as { details?: string };
+    return typeof payload.details === 'string' && payload.details.trim().length > 0
+      ? payload.details.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function createScryfallApiError(response: Response, fallbackMessage: string): Promise<ScryfallApiError> {
+  const message = await readScryfallErrorMessage(response) ?? `${fallbackMessage}: ${response.status}`;
+  const status = response.status;
+  return new ScryfallApiError(message, status, isTransientStatus(status), getScryfallErrorReason(status));
+}
+
+function normalizeScryfallError(error: unknown): ScryfallApiError {
+  if (isScryfallApiError(error)) {
+    return error;
+  }
+
+  const message = error instanceof Error && error.message
+    ? error.message
+    : 'Scryfall request failed';
+
+  return new ScryfallApiError(message, 0, true, 'network');
+}
 
 async function rateLimit(): Promise<void> {
   const now = Date.now();
@@ -156,7 +254,7 @@ export async function fetchRandomCard(
   cardType: CardType,
   cmc: number,
   excludeFunny: boolean = true,
-  retries: number = 3,
+  retries: number = DEFAULT_RETRY_COUNT,
   lang?: string,
 ): Promise<Card> {
   // Try the requested CMC, then fall back to lower CMCs until we find a card
@@ -200,7 +298,13 @@ async function fetchRandomCardAtCmc(
       }
 
       if (!response.ok) {
-        throw new Error(`Scryfall API error: ${response.status}`);
+        const scryfallError = await createScryfallApiError(response, 'Scryfall API error');
+        if (scryfallError.isTransient && attempt < retries - 1) {
+          await waitForTransientRetry(attempt);
+          continue;
+        }
+
+        throw scryfallError;
       }
 
       const data: ScryfallCard = await response.json();
@@ -222,8 +326,14 @@ async function fetchRandomCardAtCmc(
 
       return mapScryfallCard(data);
     } catch (error) {
-      if (attempt === retries - 1) throw error;
-      console.log(`[Scryfall] Retry ${attempt + 1}/${retries}:`, error);
+      const scryfallError = normalizeScryfallError(error);
+      if (scryfallError.isTransient && attempt < retries - 1) {
+        console.log(`[Scryfall] Retry ${attempt + 1}/${retries}:`, scryfallError.message);
+        await waitForTransientRetry(attempt);
+        continue;
+      }
+
+      throw scryfallError;
     }
   }
 
@@ -316,40 +426,60 @@ export async function searchCards(
   const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&page=${page}&unique=cards`;
   console.log('[Scryfall] Search:', url, lang ? `(lang: ${lang})` : '');
 
-  const response = await rateLimitedFetch(url);
+  for (let attempt = 0; attempt < DEFAULT_RETRY_COUNT; attempt++) {
+    try {
+      const response = await rateLimitedFetch(url);
 
-  if (response.status === 404) {
-    return { cards: [], totalCards: 0, hasMore: false, nextPageUrl: null };
+      if (response.status === 404) {
+        return { cards: [], totalCards: 0, hasMore: false, nextPageUrl: null };
+      }
+
+      if (response.status === 429) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+
+      if (!response.ok) {
+        const scryfallError = await createScryfallApiError(response, 'Scryfall search error');
+        if (scryfallError.isTransient && attempt < DEFAULT_RETRY_COUNT - 1) {
+          await waitForTransientRetry(attempt);
+          continue;
+        }
+
+        throw scryfallError;
+      }
+
+      const data = await response.json() as {
+        data: ScryfallCard[];
+        total_cards: number;
+        has_more: boolean;
+        next_page?: string;
+      };
+
+      let cards = data.data.map(mapScryfallCard);
+
+      if (lang && lang !== 'en') {
+        cards = await fetchLocalizedCardsViaCollection(cards, lang);
+      }
+
+      return {
+        cards,
+        totalCards: data.total_cards,
+        hasMore: data.has_more,
+        nextPageUrl: data.next_page ?? null,
+      };
+    } catch (error) {
+      const scryfallError = normalizeScryfallError(error);
+      if (scryfallError.isTransient && attempt < DEFAULT_RETRY_COUNT - 1) {
+        await waitForTransientRetry(attempt);
+        continue;
+      }
+
+      throw scryfallError;
+    }
   }
 
-  if (response.status === 429) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return searchCards(query, page, lang);
-  }
-
-  if (!response.ok) {
-    throw new Error(`Scryfall search error: ${response.status}`);
-  }
-
-  const data = await response.json() as {
-    data: ScryfallCard[];
-    total_cards: number;
-    has_more: boolean;
-    next_page?: string;
-  };
-
-  let cards = data.data.map(mapScryfallCard);
-
-  if (lang && lang !== 'en') {
-    cards = await fetchLocalizedCardsViaCollection(cards, lang);
-  }
-
-  return {
-    cards,
-    totalCards: data.total_cards,
-    hasMore: data.has_more,
-    nextPageUrl: data.next_page ?? null,
-  };
+  throw new ScryfallApiError('Scryfall search failed', 503, true, 'server');
 }
 
 export async function autocompleteCardName(query: string): Promise<string[]> {

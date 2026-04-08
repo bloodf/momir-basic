@@ -18,6 +18,7 @@ const ru: Translations = {
     done: 'Готово',
     close: 'Закрыть',
     go: 'Найти',
+    retry: 'Повторить',
   },
   home: {
     fetchingCards: (count: number) => `Поиск ${count} случайных карт`,
@@ -293,6 +294,8 @@ const ru: Translations = {
   errors: {
     fetchFailed: 'Не удалось получить карту',
     noCardFound: (type: string, cmc: number) => `${type} с CMC ${cmc} не найден`,
+    scryfallUnavailable: 'Scryfall временно недоступен. Попробуйте снова чуть позже.',
+    networkUnavailable: 'Не удалось подключиться к Scryfall. Проверьте интернет-соединение и попробуйте снова.',
   },
   toast: {
     offline: 'Нет сети',

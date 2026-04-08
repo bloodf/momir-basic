@@ -18,6 +18,7 @@ const ko: Translations = {
     done: '완료',
     close: '닫기',
     go: '검색',
+    retry: '다시 시도',
   },
   home: {
     fetchingCards: (count: number) => `${count}장의 랜덤 카드 검색 중`,
@@ -293,6 +294,8 @@ const ko: Translations = {
   errors: {
     fetchFailed: '카드 검색 실패',
     noCardFound: (type: string, cmc: number) => `CMC ${cmc}의 ${type}을(를) 찾을 수 없습니다`,
+    scryfallUnavailable: 'Scryfall을 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+    networkUnavailable: 'Scryfall에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.',
   },
   toast: {
     offline: '오프라인',

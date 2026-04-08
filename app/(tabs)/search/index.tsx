@@ -16,7 +16,11 @@ import * as Haptics from 'expo-haptics';
 import { SlidersHorizontal, Search, LayoutList, LayoutGrid } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
-import { searchCards, autocompleteCardName } from '@/services/scryfall';
+import {
+  searchCards,
+  autocompleteCardName,
+  getLocalizedScryfallErrorMessage,
+} from '@/services/scryfall';
 import { CardListItem } from '@/components/CardListItem';
 import { CardGridItem } from '@/components/CardGridItem';
 import { SearchSkeleton, CardGridSkeleton } from '@/components/Skeleton';
@@ -29,6 +33,7 @@ import {
 } from '@/components/SearchFilters';
 import { ChipSearchInput } from '@/components/ChipSearchInput';
 import { SearchFiltersDialog } from '@/components/SearchFiltersDialog';
+import { showToast } from '@/components/Toast';
 
 type ViewMode = 'list' | 'grid';
 const CARDS_PER_PAGE = 175;
@@ -45,6 +50,7 @@ export default function SearchScreen() {
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
@@ -88,6 +94,7 @@ export default function SearchScreen() {
       return searchCards(q, page, locale);
     },
     onSuccess: (data, variables) => {
+      setSearchError(null);
       if (variables.page === 1) {
         setResults(data.cards);
       } else {
@@ -99,8 +106,23 @@ export default function SearchScreen() {
       setHasSearched(true);
       setSuggestions([]);
     },
-    onError: (error) => {
-      console.log('[Search] Error:', error);
+    onError: (error, variables) => {
+      const message = getLocalizedScryfallErrorMessage(error, t.errors);
+
+      if (variables.page === 1) {
+        setResults([]);
+        setTotalCount(0);
+        setHasMore(false);
+        setCurrentPage(1);
+        setSearchError(message);
+      } else {
+        showToast({
+          type: 'error',
+          title: t.errors.fetchFailed,
+          message,
+        });
+      }
+
       setHasSearched(true);
     },
   });
@@ -138,6 +160,7 @@ export default function SearchScreen() {
     Keyboard.dismiss();
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSuggestions([]);
+    setSearchError(null);
     lastSearchQuery.current = fullQ;
     searchMutation.mutate({ q: fullQ, page: 1 });
   }, [query, filters, buildFullQuery, searchMutation]);
@@ -159,6 +182,7 @@ export default function SearchScreen() {
   const handleSuggestionTap = useCallback((suggestion: string) => {
     setQuery(suggestion);
     setSuggestions([]);
+    setSearchError(null);
     Keyboard.dismiss();
     if (Platform.OS !== 'web') void Haptics.selectionAsync();
     const fullQ = buildFullQuery(suggestion, filters);
@@ -262,7 +286,21 @@ export default function SearchScreen() {
 
 
 
-      {hasSearched && results.length === 0 && !searchMutation.isPending && (
+      {hasSearched && results.length === 0 && !searchMutation.isPending && searchError && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>{t.errors.fetchFailed}</Text>
+          <Text style={styles.emptySubtitle}>{searchError}</Text>
+          <Pressable
+            onPress={() => handleSearch()}
+            style={({ pressed }) => [styles.retryBtn, pressed && styles.retryBtnPressed]}
+          >
+            <Text style={styles.retryBtnText}>{t.common.retry}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {hasSearched && results.length === 0 && !searchMutation.isPending && !searchError && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyTitle}>{t.search.noCardsFound}</Text>
@@ -455,6 +493,21 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 14,
     flex: 1,
+  },
+  retryBtn: {
+    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.gold,
+  },
+  retryBtnPressed: {
+    backgroundColor: Colors.goldDark,
+  },
+  retryBtnText: {
+    color: Colors.background,
+    fontSize: 13,
+    fontWeight: '700' as const,
   },
 
   resultBar: {

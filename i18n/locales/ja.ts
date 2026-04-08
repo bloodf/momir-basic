@@ -18,6 +18,7 @@ const ja: Translations = {
     done: '完了',
     close: '閉じる',
     go: '検索',
+    retry: '再試行',
   },
   home: {
     fetchingCards: (count: number) => `${count}枚のランダムカードを検索中`,
@@ -293,6 +294,8 @@ const ja: Translations = {
   errors: {
     fetchFailed: 'カード取得に失敗しました',
     noCardFound: (type: string, cmc: number) => `CMC ${cmc}の${type}が見つかりません`,
+    scryfallUnavailable: 'Scryfall は一時的に利用できません。しばらくしてからもう一度お試しください。',
+    networkUnavailable: 'Scryfall に接続できませんでした。通信環境を確認してもう一度お試しください。',
   },
   toast: {
     offline: 'オフラインです',

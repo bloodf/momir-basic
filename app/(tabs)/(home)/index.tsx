@@ -20,7 +20,13 @@ import { Minus, Plus, ChevronDown, ScrollText } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
-import { fetchRandomCard, fetchMultipleCards, fetchRandomBgCardForType, BgCardData } from '@/services/scryfall';
+import {
+  fetchRandomCard,
+  fetchMultipleCards,
+  fetchRandomBgCardForType,
+  BgCardData,
+  getLocalizedScryfallErrorMessage,
+} from '@/services/scryfall';
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 
@@ -446,11 +452,10 @@ export default function HomeScreen() {
       }
     },
     onError: (error) => {
-      console.log('[Cast] Error:', error);
       showToast({
         type: 'error',
         title: t.errors.fetchFailed,
-        message: error?.message ?? t.errors.fetchFailed,
+        message: getLocalizedScryfallErrorMessage(error, t.errors),
       });
     },
   });

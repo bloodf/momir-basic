@@ -18,6 +18,7 @@ const zht: Translations = {
     done: '完成',
     close: '關閉',
     go: '搜尋',
+    retry: '重試',
   },
   home: {
     fetchingCards: (count: number) => `正在搜尋${count}張隨機卡牌`,
@@ -293,6 +294,8 @@ const zht: Translations = {
   errors: {
     fetchFailed: '取得卡牌失敗',
     noCardFound: (type: string, cmc: number) => `未找到CMC為${cmc}的${type}`,
+    scryfallUnavailable: 'Scryfall 目前暫時無法使用，請稍後再試。',
+    networkUnavailable: '無法連線到 Scryfall。請檢查網路後再試一次。',
   },
   toast: {
     offline: '已離線',

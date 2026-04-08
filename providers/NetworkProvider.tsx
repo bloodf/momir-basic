@@ -16,7 +16,7 @@ async function checkConnectivity(): Promise<boolean> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    return response.ok;
+    return response.status > 0;
   } catch {
     return false;
   }

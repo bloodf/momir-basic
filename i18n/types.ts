@@ -16,6 +16,7 @@ export interface Translations {
     done: string;
     close: string;
     go: string;
+    retry: string;
   };
   home: {
     fetchingCards: (count: number) => string;
@@ -291,6 +292,8 @@ export interface Translations {
   errors: {
     fetchFailed: string;
     noCardFound: (type: string, cmc: number) => string;
+    scryfallUnavailable: string;
+    networkUnavailable: string;
   };
   toast: {
     offline: string;
