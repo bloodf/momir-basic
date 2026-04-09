@@ -209,6 +209,8 @@ const de: Translations = {
     twoHeadedGiantDesc: 'Zweierteams teilen Leben',
     pauper: 'Pauper',
     pauperDesc: 'Nur-Commons-Format',
+    momir: 'Momir',
+    momirDesc: 'Momir Basic mit 24 Leben',
     custom: 'Benutzerdefiniert',
     customDesc: 'Eigene Regeln festlegen',
   },
@@ -223,6 +225,9 @@ const de: Translations = {
     players: 'Spieler',
     startingLife: 'Startleben',
     resetAll: 'Alles zurücksetzen',
+    cast: 'Wirken',
+    momirCastTitle: 'Eine Momir-Kreatur wirken',
+    momirCastSubtitle: 'Wähle einen Manawert',
   },
   printer: {
     title: 'Drucker einrichten',

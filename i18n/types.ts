@@ -207,6 +207,8 @@ export interface Translations {
     twoHeadedGiantDesc: string;
     pauper: string;
     pauperDesc: string;
+    momir: string;
+    momirDesc: string;
     custom: string;
     customDesc: string;
   };
@@ -221,6 +223,9 @@ export interface Translations {
     players: string;
     startingLife: string;
     resetAll: string;
+    cast: string;
+    momirCastTitle: string;
+    momirCastSubtitle: string;
   };
   printer: {
     title: string;

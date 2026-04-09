@@ -18,6 +18,7 @@ import {
   Crown,
   Users,
   Flame,
+  Zap,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useI18n } from '@/i18n';
@@ -91,6 +92,17 @@ function useGameModes(): GameMode[] {
     iconColor: '#fb7185',
     accentColor: '#fb7185',
     bgColor: 'rgba(251,113,133,0.08)',
+  },
+  {
+    id: 'momir',
+    name: t.game.momir,
+    description: t.game.momirDesc,
+    startingLife: 24,
+    defaultPlayers: 2,
+    icon: Zap,
+    iconColor: Colors.goldLight,
+    accentColor: Colors.gold,
+    bgColor: 'rgba(232,105,45,0.08)',
   },
   {
     id: 'custom',
@@ -207,6 +219,7 @@ export default function GameScreen() {
     router.push({
       pathname: '/life-counter',
       params: {
+        modeId: mode.id,
         startingLife: mode.startingLife.toString(),
         playerCount: mode.defaultPlayers.toString(),
         modeName: mode.name,

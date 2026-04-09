@@ -209,6 +209,8 @@ const pt: Translations = {
     twoHeadedGiantDesc: 'Duplas compartilham vida',
     pauper: 'Pauper',
     pauperDesc: 'Formato apenas comuns',
+    momir: 'Momir',
+    momirDesc: 'Momir Basic com 24 de vida',
     custom: 'Personalizado',
     customDesc: 'Defina suas próprias regras',
   },
@@ -223,6 +225,9 @@ const pt: Translations = {
     players: 'Jogadores',
     startingLife: 'Vida Inicial',
     resetAll: 'Resetar Tudo',
+    cast: 'Conjurar',
+    momirCastTitle: 'Conjurar uma criatura de Momir',
+    momirCastSubtitle: 'Escolha um valor de mana',
   },
   printer: {
     title: 'Configurar Impressora',

@@ -209,6 +209,8 @@ const ru: Translations = {
     twoHeadedGiantDesc: 'Команды из двух делят жизнь',
     pauper: 'Паупер',
     pauperDesc: 'Формат только обычных',
+    momir: 'Момир',
+    momirDesc: 'Momir Basic с 24 жизнями',
     custom: 'Пользовательский',
     customDesc: 'Установите свои правила',
   },
@@ -223,6 +225,9 @@ const ru: Translations = {
     players: 'Игроки',
     startingLife: 'Начальная жизнь',
     resetAll: 'Сбросить всё',
+    cast: 'Разыграть',
+    momirCastTitle: 'Разыграть существо Momir',
+    momirCastSubtitle: 'Выберите мановую ценность',
   },
   printer: {
     title: 'Настройка принтера',

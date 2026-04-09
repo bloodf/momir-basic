@@ -8,9 +8,11 @@ import {
   Dimensions,
   Platform,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useMutation } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import {
   X,
@@ -27,8 +29,15 @@ import {
   Droplets,
 } from 'lucide-react-native';
 import { useI18n } from '@/i18n';
+import Colors from '@/constants/colors';
+import { showToast } from '@/components/Toast';
+import { useHistory } from '@/providers/HistoryProvider';
+import { useSettings } from '@/providers/SettingsProvider';
+import { fetchRandomCard, getLocalizedScryfallErrorMessage } from '@/services/scryfall';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MOMIR_MODE_ID = 'momir';
+const MOMIR_CMC_VALUES = Array.from({ length: 21 }, (_, index) => index);
 
 type CounterType = 'life' | 'poison' | 'energy' | 'experience' | 'commander';
 type PlayerCount = 2 | 4;
@@ -291,17 +300,22 @@ const PlayerPanel = React.memo(function PlayerPanel({
 
 export default function LifeCounterScreen() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { addCard } = useHistory();
+  const { settings } = useSettings();
+  const { t, locale } = useI18n();
   const counterConfig = useCounterConfig();
   const params = useLocalSearchParams<{
     startingLife?: string;
     playerCount?: string;
     modeName?: string;
+    modeId?: string;
   }>();
 
   const initialLife = params.startingLife ? parseInt(params.startingLife, 10) : 20;
   const initialPlayers = (params.playerCount === '4' ? 4 : 2) as PlayerCount;
-  const modeName = params.modeName ?? 'Standard';
+  const modeId = params.modeId ?? 'standard';
+  const isMomirMode = modeId === MOMIR_MODE_ID;
+  const modeName = params.modeName ?? (isMomirMode ? t.game.momir : t.game.standard);
 
   const [playerCount, setPlayerCount] = useState<PlayerCount>(initialPlayers);
   const [startingLife, setStartingLife] = useState(initialLife);
@@ -311,8 +325,13 @@ export default function LifeCounterScreen() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [showCounterPicker, setShowCounterPicker] = useState<number | null>(null);
+  const [showMomirCastPicker, setShowMomirCastPicker] = useState(false);
 
   const enterAnim = useRef(new Animated.Value(0)).current;
+  const startingLifeOptions = React.useMemo(
+    () => (isMomirMode ? [20, 24, 25, 30, 40] : [20, 25, 30, 40]),
+    [isMomirMode],
+  );
 
   useEffect(() => {
     Animated.timing(enterAnim, {
@@ -378,6 +397,36 @@ export default function LifeCounterScreen() {
     setShowCounterPicker(null);
   }, []);
 
+  const momirCastMutation = useMutation({
+    mutationFn: async (cmc: number) => fetchRandomCard('creature', cmc, settings.excludeFunnySets, 3, locale),
+    onSuccess: (card) => {
+      addCard(card);
+      router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        title: t.errors.fetchFailed,
+        message: getLocalizedScryfallErrorMessage(error, t.errors),
+      });
+    },
+  });
+
+  const handleOpenMomirCastPicker = useCallback(() => {
+    if (!isMomirMode || momirCastMutation.isPending) {
+      return;
+    }
+
+    hapticTap();
+    setShowMomirCastPicker(true);
+  }, [isMomirMode, momirCastMutation.isPending]);
+
+  const handleSelectMomirCmc = useCallback((cmc: number) => {
+    hapticHeavy();
+    setShowMomirCastPicker(false);
+    momirCastMutation.mutate(cmc);
+  }, [momirCastMutation]);
+
   const panelDimensions = React.useMemo(() => {
     if (playerCount === 2) {
       return {
@@ -420,6 +469,24 @@ export default function LifeCounterScreen() {
             <View style={styles.modeIndicator}>
               <Text style={styles.modeText}>{modeName}</Text>
             </View>
+
+            {isMomirMode && (
+              <Pressable
+                onPress={handleOpenMomirCastPicker}
+                style={[styles.centerButton, styles.castButton, momirCastMutation.isPending && styles.castButtonDisabled]}
+                disabled={momirCastMutation.isPending}
+                testID="life-momir-cast"
+              >
+                {momirCastMutation.isPending ? (
+                  <ActivityIndicator size="small" color={Colors.background} />
+                ) : (
+                  <>
+                    <Zap size={15} color={Colors.background} />
+                    <Text style={styles.castButtonText}>{t.lifeCounter.cast}</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
 
             <Pressable
               onPress={() => resetGame(playerCount, startingLife)}
@@ -485,6 +552,22 @@ export default function LifeCounterScreen() {
             <View style={styles.modeIndicator}>
               <Text style={styles.modeTextSmall}>{modeName}</Text>
             </View>
+            {isMomirMode && (
+              <Pressable
+                onPress={handleOpenMomirCastPicker}
+                style={[styles.centerButton, styles.castButton, styles.castButtonSmall, momirCastMutation.isPending && styles.castButtonDisabled]}
+                disabled={momirCastMutation.isPending}
+              >
+                {momirCastMutation.isPending ? (
+                  <ActivityIndicator size="small" color={Colors.background} />
+                ) : (
+                  <>
+                    <Zap size={13} color={Colors.background} />
+                    <Text style={[styles.castButtonText, styles.castButtonTextSmall]}>{t.lifeCounter.cast}</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
             <Pressable onPress={() => resetGame(playerCount, startingLife)} style={styles.centerButton}>
               <RotateCcw size={13} color="rgba(255,255,255,0.5)" />
             </Pressable>
@@ -522,6 +605,34 @@ export default function LifeCounterScreen() {
           </View>
         </View>
       )}
+
+      <Modal
+        visible={showMomirCastPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMomirCastPicker(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMomirCastPicker(false)}>
+          <Pressable style={styles.counterPickerSheet} onPress={() => {}}>
+            <Text style={styles.pickerTitle}>{t.lifeCounter.momirCastTitle}</Text>
+            <Text style={styles.pickerSubtitle}>{t.lifeCounter.momirCastSubtitle}</Text>
+
+            <View style={styles.cmcGrid}>
+              {MOMIR_CMC_VALUES.map((cmc) => (
+                <Pressable
+                  key={cmc}
+                  style={styles.cmcOption}
+                  onPress={() => handleSelectMomirCmc(cmc)}
+                  disabled={momirCastMutation.isPending}
+                  testID={`momir-cmc-${cmc}`}
+                >
+                  <Text style={styles.cmcOptionText}>{cmc}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={showCounterPicker !== null}
@@ -586,7 +697,7 @@ export default function LifeCounterScreen() {
 
             <Text style={styles.settingLabel}>{t.lifeCounter.startingLife}</Text>
             <View style={styles.optionRow}>
-              {[20, 25, 30, 40].map((life) => (
+              {startingLifeOptions.map((life) => (
                 <Pressable
                   key={life}
                   style={[styles.optionButton, startingLife === life && styles.optionButtonActive]}
@@ -689,6 +800,30 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  castButton: {
+    width: 'auto',
+    minWidth: 38,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    gap: 6,
+    backgroundColor: Colors.gold,
+  },
+  castButtonSmall: {
+    paddingHorizontal: 10,
+  },
+  castButtonDisabled: {
+    backgroundColor: Colors.goldLight,
+  },
+  castButtonText: {
+    color: Colors.background,
+    fontSize: 11,
+    fontWeight: '800' as const,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase' as const,
+  },
+  castButtonTextSmall: {
+    fontSize: 10,
   },
   playerPanel: {
     flex: 1,
@@ -838,7 +973,33 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700' as const,
     textAlign: 'center' as const,
+  },
+  pickerSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center' as const,
     marginBottom: 10,
+  },
+  cmcGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  cmcOption: {
+    width: 52,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.cardBackgroundLight,
+    borderWidth: 1,
+    borderColor: `${Colors.gold}22`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cmcOptionText: {
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700' as const,
   },
   counterOption: {
     flexDirection: 'row',
@@ -895,6 +1056,7 @@ const styles = StyleSheet.create({
   },
   optionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   optionButton: {

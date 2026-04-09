@@ -209,6 +209,8 @@ const ko: Translations = {
     twoHeadedGiantDesc: '2인 팀이 생명점 공유',
     pauper: '파우퍼',
     pauperDesc: '커먼 전용 포맷',
+    momir: '모미르',
+    momirDesc: '생명점 24의 모미르 베이직',
     custom: '커스텀',
     customDesc: '나만의 규칙 설정',
   },
@@ -223,6 +225,9 @@ const ko: Translations = {
     players: '플레이어',
     startingLife: '시작 생명점',
     resetAll: '모두 초기화',
+    cast: '시전',
+    momirCastTitle: '모미르 생물 시전',
+    momirCastSubtitle: '마나 값을 선택하세요',
   },
   printer: {
     title: '프린터 설정',

@@ -5,6 +5,7 @@ import { useFonts } from "expo-font";
 import React, { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { HistoryProvider } from "@/providers/HistoryProvider";
 import { SettingsProvider, useSettings } from "@/providers/SettingsProvider";
 import { NetworkProvider } from "@/providers/NetworkProvider";
@@ -94,19 +95,21 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView>
-        <I18nProvider>
-          <SettingsProvider>
-            <HistoryProvider>
-              <NetworkProvider>
-                <ToastProvider>
-                  <PrinterAutoConnect />
-                  <RootLayoutNav />
-                </ToastProvider>
-              </NetworkProvider>
-            </HistoryProvider>
-          </SettingsProvider>
-        </I18nProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <I18nProvider>
+            <SettingsProvider>
+              <HistoryProvider>
+                <NetworkProvider>
+                  <ToastProvider>
+                    <PrinterAutoConnect />
+                    <RootLayoutNav />
+                  </ToastProvider>
+                </NetworkProvider>
+              </HistoryProvider>
+            </SettingsProvider>
+          </I18nProvider>
+        </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

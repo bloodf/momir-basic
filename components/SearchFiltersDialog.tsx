@@ -13,6 +13,7 @@ import Colors from '@/constants/colors'
 import { useI18n } from '@/i18n'
 import { FilterSections } from '@/components/SearchFilters'
 import { type SearchFilterState, EMPTY_FILTERS } from '@/components/SearchFilters.shared'
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 interface Props {
   visible: boolean
@@ -22,7 +23,29 @@ interface Props {
 }
 
 export function SearchFiltersDialog({ visible, filters, onChange, onClose }: Props) {
+  return (
+    <Modal
+      animationType="slide"
+      presentationStyle="pageSheet"
+      visible={visible}
+      onRequestClose={onClose}
+      statusBarTranslucent={Platform.OS === 'android'}
+    >
+      <SafeAreaProvider>
+        <SearchFiltersDialogContent
+          filters={filters}
+          onChange={onChange}
+          onClose={onClose}
+          visible={visible}
+        />
+      </SafeAreaProvider>
+    </Modal>
+  )
+}
+
+function SearchFiltersDialogContent({ visible, filters, onChange, onClose }: Props) {
   const { t } = useI18n()
+  const insets = useSafeAreaInsets()
   const [localFilters, setLocalFilters] = useState<SearchFilterState>(filters)
 
   // Sync local state when dialog opens with new external filters
@@ -42,14 +65,15 @@ export function SearchFiltersDialog({ visible, filters, onChange, onClose }: Pro
   }, [localFilters, onChange, onClose])
 
   return (
-    <Modal
-      animationType="slide"
-      presentationStyle="pageSheet"
-      visible={visible}
-      onRequestClose={onClose}
-      statusBarTranslucent={Platform.OS === 'android'}
-    >
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Pressable
@@ -92,7 +116,6 @@ export function SearchFiltersDialog({ visible, filters, onChange, onClose }: Pro
           </Pressable>
         </View>
       </View>
-    </Modal>
   )
 }
 

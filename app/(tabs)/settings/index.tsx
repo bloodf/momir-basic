@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
+import Constants from 'expo-constants';
 import {
   View,
   Text,
@@ -21,6 +22,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings, updatePrinter } = useSettings();
   const { t, locale, setLocale } = useI18n();
+  const appVersion = Constants.expoConfig?.version ?? '—';
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const dropdownAnim = useRef(new Animated.Value(0)).current;
 
@@ -271,7 +273,7 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>{t.settings.version}</Text>
-            <Text style={styles.settingValue}>1.0.0</Text>
+            <Text style={styles.settingValue}>{appVersion}</Text>
           </View>
 
           <Pressable onPress={handleOpenGithub} style={styles.settingRow}>

@@ -209,6 +209,8 @@ const zht: Translations = {
     twoHeadedGiantDesc: '兩人組隊共享生命',
     pauper: '純普',
     pauperDesc: '僅普通卡賽制',
+    momir: '莫秘爾',
+    momirDesc: '24點生命的莫秘爾基礎賽制',
     custom: '自訂',
     customDesc: '設定自己的規則',
   },
@@ -223,6 +225,9 @@ const zht: Translations = {
     players: '玩家',
     startingLife: '起始生命',
     resetAll: '全部重置',
+    cast: '施放',
+    momirCastTitle: '施放莫秘爾生物',
+    momirCastSubtitle: '選擇法術力值',
   },
   printer: {
     title: '印表機設定',

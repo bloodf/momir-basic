@@ -209,6 +209,8 @@ const it: Translations = {
     twoHeadedGiantDesc: 'Squadre di due condividono la vita',
     pauper: 'Pauper',
     pauperDesc: 'Formato solo comuni',
+    momir: 'Momir',
+    momirDesc: 'Momir Basic con 24 vite',
     custom: 'Personalizzato',
     customDesc: 'Imposta le tue regole',
   },
@@ -223,6 +225,9 @@ const it: Translations = {
     players: 'Giocatori',
     startingLife: 'Vita Iniziale',
     resetAll: 'Resetta Tutto',
+    cast: 'Lancia',
+    momirCastTitle: 'Lancia una creatura Momir',
+    momirCastSubtitle: 'Scegli un valore di mana',
   },
   printer: {
     title: 'Configurazione Stampante',

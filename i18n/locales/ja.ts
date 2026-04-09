@@ -209,6 +209,8 @@ const ja: Translations = {
     twoHeadedGiantDesc: '2人チームでライフ共有',
     pauper: 'パウパー',
     pauperDesc: 'コモン限定フォーマット',
+    momir: 'モーミル',
+    momirDesc: '24点ライフのモーミル・ベーシック',
     custom: 'カスタム',
     customDesc: '独自のルールを設定',
   },
@@ -223,6 +225,9 @@ const ja: Translations = {
     players: 'プレイヤー',
     startingLife: '初期ライフ',
     resetAll: 'すべてリセット',
+    cast: '唱える',
+    momirCastTitle: 'モーミルのクリーチャーを唱える',
+    momirCastSubtitle: 'マナ総量を選択',
   },
   printer: {
     title: 'プリンター設定',

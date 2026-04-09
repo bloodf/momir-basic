@@ -209,6 +209,8 @@ const en: Translations = {
     twoHeadedGiantDesc: 'Teams of two share life',
     pauper: 'Pauper',
     pauperDesc: 'Commons only format',
+    momir: 'Momir',
+    momirDesc: 'Momir Basic with 24 life',
     custom: 'Custom',
     customDesc: 'Set your own rules',
   },
@@ -223,6 +225,9 @@ const en: Translations = {
     players: 'Players',
     startingLife: 'Starting Life',
     resetAll: 'Reset All',
+    cast: 'Cast',
+    momirCastTitle: 'Cast a Momir creature',
+    momirCastSubtitle: 'Choose a mana value',
   },
   printer: {
     title: 'Printer Setup',

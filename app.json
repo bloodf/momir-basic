@@ -2,7 +2,7 @@
   "expo": {
     "name": "Momir-Basic",
     "slug": "momir-basic",
-    "version": "1.0.0",
+    "version": "1.2.5",
     "extra": {
       "eas": {
         "projectId": "8518e773-8656-4479-92ae-ef47db80efa4"
