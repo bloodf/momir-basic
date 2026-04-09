@@ -7,13 +7,13 @@ import {
   Animated,
   ActivityIndicator,
   Platform,
-  ImageBackground,
   PanResponder,
   AppState,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Minus, Plus, ChevronDown, ScrollText } from 'lucide-react-native';
@@ -36,6 +36,7 @@ import { HistorySheet } from '@/components/HistorySheet';
 import { showToast } from '@/components/Toast';
 import { useNetwork } from '@/providers/NetworkProvider';
 import { startHeroArtRotationInterval } from './heroRotation';
+import { markHeroArtAsWarm } from './heroArtCache';
 
 const MIN_CMC = 0;
 const MAX_CMC = 20;
@@ -87,6 +88,9 @@ export default function HomeScreen() {
 
   const bgCache = useRef<Partial<Record<CardType, BgCardData>>>({});
   const bgPrefetchCache = useRef<Partial<Record<CardType, BgCardData>>>({});
+  const warmedArtUrlsRef = useRef<Record<string, true>>({});
+  const warmedArtUrlOrderRef = useRef<string[]>([]);
+  const warmingArtPromisesRef = useRef<Record<string, Promise<boolean>>>({});
   const rotationCleanupRef = useRef<(() => void) | null>(null);
   const currentCardTypeRef = useRef<CardType>(cardType);
   const isHomeFocusedRef = useRef(false);
@@ -164,20 +168,53 @@ export default function HomeScreen() {
     return EMPTY_BG_DATA;
   }, []);
 
+  const warmHeroArt = useCallback((artUrl: string) => {
+    if (!artUrl) {
+      return Promise.resolve(false);
+    }
+
+    if (warmedArtUrlsRef.current[artUrl]) {
+      markHeroArtAsWarm(warmedArtUrlOrderRef.current, warmedArtUrlsRef.current, artUrl);
+      return Promise.resolve(true);
+    }
+
+    const existingPromise = warmingArtPromisesRef.current[artUrl];
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const warmingPromise = Image.prefetch(artUrl, 'memory-disk')
+      .then((didWarm) => {
+        if (didWarm) {
+          markHeroArtAsWarm(warmedArtUrlOrderRef.current, warmedArtUrlsRef.current, artUrl);
+        }
+
+        return didWarm;
+      })
+      .catch(() => false)
+      .finally(() => {
+        delete warmingArtPromisesRef.current[artUrl];
+      });
+
+    warmingArtPromisesRef.current[artUrl] = warmingPromise;
+    return warmingPromise;
+  }, []);
+
   const prefetchNextBgCardForType = useCallback(async (type: CardType, currentArtUrl: string) => {
     const prefetched = bgPrefetchCache.current[type];
 
     if (prefetched?.artUrl && prefetched.artUrl !== currentArtUrl) {
+      void warmHeroArt(prefetched.artUrl);
       return prefetched;
     }
 
     const nextBg = await fetchDistinctBgCardForType(type, currentArtUrl);
-    if (nextBg.artUrl) {
+    if (nextBg.artUrl && await warmHeroArt(nextBg.artUrl)) {
       bgPrefetchCache.current[type] = nextBg;
     }
 
     return nextBg;
-  }, [fetchDistinctBgCardForType]);
+  }, [fetchDistinctBgCardForType, warmHeroArt]);
 
   const getNextBgCardForType = useCallback(async (type: CardType, currentArtUrl: string) => {
     const prefetched = bgPrefetchCache.current[type];
@@ -187,8 +224,13 @@ export default function HomeScreen() {
       return prefetched;
     }
 
-    return fetchDistinctBgCardForType(type, currentArtUrl);
-  }, [fetchDistinctBgCardForType]);
+    const nextBg = await fetchDistinctBgCardForType(type, currentArtUrl);
+    if (nextBg.artUrl) {
+      await warmHeroArt(nextBg.artUrl);
+    }
+
+    return nextBg;
+  }, [fetchDistinctBgCardForType, warmHeroArt]);
 
   const applyBgData = useCallback((type: CardType, nextBg: BgCardData) => {
     if (!nextBg.artUrl) {
@@ -202,21 +244,41 @@ export default function HomeScreen() {
   }, [queryClient]);
 
   useEffect(() => {
-    CARD_TYPES.forEach((ct, idx) => {
-      if (idx !== typeIndex && !bgCache.current[ct.id]) {
-        setTimeout(() => {
-          queryClient.prefetchQuery({
-            queryKey: ['bgArt', ct.id],
-            queryFn: () => fetchRandomBgCardForType(ct.id),
-            staleTime: Infinity,
-          }).then(() => {
-            const cached = queryClient.getQueryData<BgCardData>(['bgArt', ct.id]);
-            if (cached) bgCache.current[ct.id] = cached;
-          }).catch(() => {});
-        }, idx * 300);
+    const timers = CARD_TYPES.map((ct, idx) => {
+      if (idx === typeIndex) {
+        return null;
       }
+
+      if (bgCache.current[ct.id]?.artUrl) {
+        void warmHeroArt(bgCache.current[ct.id]?.artUrl ?? '');
+        return null;
+      }
+
+      return setTimeout(() => {
+        queryClient.prefetchQuery({
+          queryKey: ['bgArt', ct.id],
+          queryFn: () => fetchRandomBgCardForType(ct.id),
+          staleTime: Infinity,
+        }).then(async () => {
+          const cached = queryClient.getQueryData<BgCardData>(['bgArt', ct.id]);
+          if (cached) {
+            bgCache.current[ct.id] = cached;
+            if (cached.artUrl) {
+              await warmHeroArt(cached.artUrl);
+            }
+          }
+        }).catch(() => {});
+      }, idx * 300);
     });
-  }, [queryClient, typeIndex]);
+
+    return () => {
+      timers.forEach((timer) => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+      });
+    };
+  }, [queryClient, typeIndex, warmHeroArt]);
 
   useEffect(() => {
     if (!bgQuery.data?.artUrl) {
@@ -227,10 +289,24 @@ export default function HomeScreen() {
       return;
     }
 
-    initializedBgTypeRef.current = cardType;
-    applyBgData(cardType, bgQuery.data);
-    void prefetchNextBgCardForType(cardType, bgQuery.data.artUrl);
-  }, [applyBgData, bgQuery.data, cardType, prefetchNextBgCardForType]);
+    let cancelled = false;
+
+    void (async () => {
+      await warmHeroArt(bgQuery.data.artUrl);
+
+      if (cancelled) {
+        return;
+      }
+
+      initializedBgTypeRef.current = cardType;
+      applyBgData(cardType, bgQuery.data);
+      void prefetchNextBgCardForType(cardType, bgQuery.data.artUrl);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyBgData, bgQuery.data, cardType, prefetchNextBgCardForType, warmHeroArt]);
 
   const bgFadeAnim = useRef(new Animated.Value(0)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -498,10 +574,11 @@ export default function HomeScreen() {
       {currentBgData.artUrl ? (
         <Animated.View style={[styles.bgWrap, { opacity: bgFadeAnim }]}> 
           <Animated.View style={[styles.bgImageWrap, { transform: [{ scale: heroImageScale }] }]}> 
-            <ImageBackground
+            <Image
               source={{ uri: currentBgData.artUrl }}
               style={styles.bgImage}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
               testID="hero-art"
               accessibilityLabel={currentBgData.artUrl}
             />
