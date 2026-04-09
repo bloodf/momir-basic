@@ -688,7 +688,7 @@ export default function PrinterSetupScreen() {
     );
   };
 
-  const SAMPLE_ART_URL = 'https://cards.scryfall.io/art_crop/front/1/5/15a73851-3b95-4cb5-a3d9-c0dd0e15d5c8.jpg';
+  const SAMPLE_ART_URL = 'https://cards.scryfall.io/art_crop/front/a/b/ab1ef852-b050-4a36-8c28-f23b7ac8bc38.jpg';
 
   const ditherOptions: { label: string; value: DitherAlgorithm }[] = [
     { label: 'Floyd-Steinberg', value: 'floyd' },

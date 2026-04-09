@@ -427,6 +427,31 @@ export default function PrintPreviewScreen() {
   const showFlavor = settings.printer?.printFlavorText ?? true;
 
   const canPrint = printerConnection === 'connected' || isDevMode;
+  const isPrintActionDisabled = isSaving || isQueueing || !canPrint;
+  const footerBanner = !isDevMode
+    ? printerConnection === 'checking'
+      ? (
+        <View style={styles.checkingPrinterBanner}>
+          <Loader size={14} color={Colors.textMuted} />
+          <Text style={styles.checkingPrinterText}>Checking printer connection...</Text>
+        </View>
+      )
+      : printerConnection === 'disconnected'
+        ? (
+          <View style={styles.disconnectedBanner}>
+            <WifiOff size={14} color={Colors.error} />
+            <Text style={styles.disconnectedBannerText}>Printer disconnected — reconnect in Settings</Text>
+          </View>
+        )
+        : printerConnection === 'no_printer'
+          ? (
+            <View style={styles.noPrinterBanner} testID="queue-status-badge">
+              <Printer size={14} color={Colors.gold} />
+              <Text style={styles.noPrinterBannerText}>No printer selected — tap to choose in Settings</Text>
+            </View>
+          )
+          : null
+    : null;
 
   return (
     <View style={styles.container}>
@@ -602,111 +627,44 @@ export default function PrintPreviewScreen() {
         </View>
       )}
 
-      {!isDevMode && printerConnection === 'checking' && (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.checkingPrinterBanner}>
-            <Loader size={14} color={Colors.textMuted} />
-            <Text style={styles.checkingPrinterText}>Checking printer connection...</Text>
-          </View>
-        </View>
-      )}
-
-      {!isDevMode && printerConnection === 'disconnected' && (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.disconnectedBanner}>
-            <WifiOff size={14} color={Colors.error} />
-            <Text style={styles.disconnectedBannerText}>Printer disconnected — reconnect in Settings</Text>
-          </View>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
-          >
-            <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
-          </Pressable>
-          <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
+      {(isDevMode || printerConnection === 'connected' || printerConnection === 'disconnected' || printerConnection === 'no_printer' || printerConnection === 'checking') && (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}> 
+          {footerBanner}
+          <View style={styles.footerActions}>
             <Pressable
-              onPress={handlePrint}
-              disabled={true}
-              style={({ pressed }) => [
-                styles.footerBtn,
-                styles.footerBtnDisabled,
-                pressed && styles.footerPressed,
-              ]}
-              testID="confirm-print"
+              onPress={() => router.back()}
+              style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
             >
-              <Printer size={17} color={Colors.textMuted} />
-              <Text style={styles.footerBtnDisabledText}>Print Card</Text>
+              <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
             </Pressable>
-          </Animated.View>
-        </View>
-      )}
-
-      {!isDevMode && printerConnection === 'no_printer' && (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.noPrinterBanner} testID="queue-status-badge">
-            <Printer size={14} color={Colors.gold} />
-            <Text style={styles.noPrinterBannerText}>No printer selected — tap to choose in Settings</Text>
+            <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}> 
+              <Pressable
+                onPress={handlePrint}
+                disabled={isPrintActionDisabled}
+                style={({ pressed }) => [
+                  styles.footerBtn,
+                  isPrintActionDisabled ? styles.footerBtnDisabled : isDevMode ? styles.footerBtnDev : styles.footerBtnPrimary,
+                  pressed && styles.footerPressed,
+                ]}
+                testID="confirm-print"
+              >
+                {isSaving || isQueueing ? (
+                  <ActivityIndicator size="small" color={Colors.background} />
+                ) : (
+                  <>
+                    {isDevMode ? (
+                      <Download size={17} color={isPrintActionDisabled ? Colors.textMuted : Colors.background} />
+                    ) : (
+                      <Printer size={17} color={isPrintActionDisabled ? Colors.textMuted : Colors.background} />
+                    )}
+                    <Text style={isPrintActionDisabled ? styles.footerBtnDisabledText : styles.footerBtnPrimaryText}>
+                      {isDevMode ? t.printPreview.saveToGallery : t.printPreview.printCard}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </Animated.View>
           </View>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
-          >
-            <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
-          </Pressable>
-          <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
-            <Pressable
-              onPress={handlePrint}
-              disabled={true}
-              style={({ pressed }) => [
-                styles.footerBtn,
-                styles.footerBtnDisabled,
-                pressed && styles.footerPressed,
-              ]}
-              testID="confirm-print"
-            >
-              <Printer size={17} color={Colors.textMuted} />
-              <Text style={styles.footerBtnDisabledText}>Print Card</Text>
-            </Pressable>
-          </Animated.View>
-        </View>
-      )}
-
-      {(isDevMode || printerConnection === 'connected') && (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.footerBtn, styles.footerBtnOutline, pressed && styles.footerPressed]}
-          >
-            <Text style={styles.footerBtnOutlineText}>{t.common.cancel}</Text>
-          </Pressable>
-          <Animated.View style={[styles.footerBtnWrap, { transform: [{ scale: printBtnScale }] }]}>
-            <Pressable
-              onPress={handlePrint}
-              disabled={isSaving || isQueueing}
-              style={({ pressed }) => [
-                styles.footerBtn,
-                isDevMode ? styles.footerBtnDev : styles.footerBtnPrimary,
-                pressed && styles.footerPressed,
-                (isSaving || isQueueing) && styles.footerBtnDisabled,
-              ]}
-              testID="confirm-print"
-            >
-              {isSaving || isQueueing ? (
-                <ActivityIndicator size="small" color={Colors.background} />
-              ) : (
-                <>
-                  {isDevMode ? (
-                    <Download size={17} color={Colors.background} />
-                  ) : (
-                    <Printer size={17} color={Colors.background} />
-                  )}
-                  <Text style={styles.footerBtnPrimaryText}>
-                    {isDevMode ? t.printPreview.saveToGallery : t.printPreview.printCard}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </Animated.View>
         </View>
       )}
     </View>
@@ -990,7 +948,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: 'rgba(91,155,213,0.08)',
     borderRadius: 8,
-    marginBottom: 10,
   },
   checkingPrinterText: {
     color: Colors.textMuted,
@@ -1006,7 +963,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: 'rgba(239,83,80,0.08)',
     borderRadius: 8,
-    marginBottom: 10,
   },
   disconnectedBannerText: {
     color: Colors.error,
@@ -1022,7 +978,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: 'rgba(232,105,45,0.08)',
     borderRadius: 8,
-    marginBottom: 10,
   },
   noPrinterBannerText: {
     color: Colors.gold,
@@ -1030,13 +985,16 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
   },
   footer: {
-    flexDirection: 'row' as const,
     gap: 10,
     paddingHorizontal: 16,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     backgroundColor: Colors.background,
+  },
+  footerActions: {
+    flexDirection: 'row' as const,
+    gap: 10,
   },
   footerBtnWrap: {
     flex: 1,

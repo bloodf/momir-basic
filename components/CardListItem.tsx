@@ -13,11 +13,20 @@ interface CardListItemProps {
   card: Card;
   onPress: (card: Card) => void;
   showPrint?: boolean;
+  thumbnailVariant?: 'card' | 'art';
 }
 
-export const CardListItem = memo(function CardListItem({ card, onPress, showPrint = true }: CardListItemProps) {
+export const CardListItem = memo(function CardListItem({
+  card,
+  onPress,
+  showPrint = true,
+  thumbnailVariant = 'card',
+}: CardListItemProps) {
   const router = useRouter();
   const handlePress = useCallback(() => onPress(card), [card, onPress]);
+  const thumbnailUri = thumbnailVariant === 'art'
+    ? (card.artCropUrl || card.smallImageUrl || card.normalImageUrl)
+    : (card.smallImageUrl || card.artCropUrl || card.normalImageUrl);
 
   const handlePrint = useCallback(() => {
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -41,7 +50,7 @@ export const CardListItem = memo(function CardListItem({ card, onPress, showPrin
       testID={`card-list-item-${card.id}`}
     >
       <Image
-        source={{ uri: card.smallImageUrl || card.artCropUrl }}
+        source={{ uri: thumbnailUri }}
         style={styles.thumbnail}
         contentFit="cover"
         transition={200}

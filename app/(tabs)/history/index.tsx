@@ -41,7 +41,7 @@ export default function HistoryScreen() {
   }, [cards.length, clearHistory, t]);
 
   const renderItem = useCallback(({ item }: { item: Card }) => (
-    <CardListItem card={item} onPress={handleCardPress} />
+    <CardListItem card={item} onPress={handleCardPress} thumbnailVariant="art" />
   ), [handleCardPress]);
 
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
