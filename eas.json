@@ -40,7 +40,7 @@
     "playstoreProduction": {
       "android": {
         "track": "production",
-        "releaseStatus": "draft",
+        "releaseStatus": "completed",
         "serviceAccountKeyPath": "./google-play-service-account.json"
       }
     }
