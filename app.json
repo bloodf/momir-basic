@@ -51,7 +51,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.bloodf.momirbasic",
+      "package": "com.bloodf.momirbasicapp",
       "permissions": [
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
@@ -73,7 +73,7 @@
         "expo-build-properties",
         {
           "android": {
-            "targetSdkVersion": 34,
+            "targetSdkVersion": 35,
             "compileSdkVersion": 36,
             "buildToolsVersion": "36.0.0"
           }

@@ -1,4 +1,4 @@
-name: EAS Update (OTA)
+name: EAS Update + Android Auto Submit
 
 on:
   push:
@@ -11,6 +11,11 @@ on:
       - 'i18n/**'
       - 'types/**'
       - 'constants/**'
+      - 'utils/**'
+      - 'assets/**'
+      - 'app.json'
+      - 'eas.json'
+      - 'package.json'
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -28,3 +33,20 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: eas update --branch production --message "${{ github.event.head_commit.message }}" --non-interactive
+
+  playstore_submit_android:
+    name: Build + Submit Android (Play internal track)
+    runs-on: ubuntu-latest
+    needs: update
+    if: needs.update.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Write Google Play service account key
+        run: echo '${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}' > ./google-play-service-account.json
+      - run: eas build --platform android --profile production --auto-submit --auto-submit-with-profile playstoreProduction --non-interactive

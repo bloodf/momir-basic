@@ -7,6 +7,10 @@ node_modules
 android/
 ios/
 
+# Google Play service account keys (sensitive)
+google-play-service-account.json
+play/
+
 # Build artifacts
 dist/
 test-results/

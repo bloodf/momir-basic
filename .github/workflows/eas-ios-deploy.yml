@@ -1,0 +1,36 @@
+name: EAS iOS Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: "Submit build to App Store Connect (TestFlight)"
+        required: true
+        default: true
+        type: boolean
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-ios:
+    name: Build iOS production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Build + submit to TestFlight
+        if: inputs.submit == true
+        run: eas build --platform ios --profile production --auto-submit --non-interactive
+      - name: Build only (no submit)
+        if: inputs.submit != true
+        run: eas build --platform ios --profile production --non-interactive
