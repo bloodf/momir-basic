@@ -2,7 +2,7 @@
 
 ## Overview
 
-The printer subsystem adds real thermal printer discovery, registry storage, document rendering, and native transport support to the Expo app. It is built around `react-native-thermal-pos-printer`, `expo-sqlite`, and a shared receipt document model.
+The printer subsystem adds real thermal printer discovery, registry storage, document rendering, and native transport support to the Expo app. It is built around `react-native-thermal-printer-driver`, `expo-sqlite`, and a shared receipt document model.
 
 Main files:
 
@@ -61,7 +61,7 @@ In this codebase that maps to:
 - **Transports**: BLE, TCP
 - **Classic Bluetooth**: BLOCKED — requires MFi certification hardware. Non-MFi Classic printers are **not supported** and will not appear in scan results.
 - `registryService` filters out Classic Bluetooth on iOS in `filterTransport()`
-- Requires a custom dev build because Expo Go can't load `react-native-thermal-pos-printer`
+- Requires a custom dev build because Expo Go can't load `react-native-thermal-printer-driver`
 
 ### Adding New Printers to the Matrix
 
@@ -150,8 +150,7 @@ Printing requires a native build.
 Typical setup:
 
 ```bash
-cd expo
-bun i
+bun install
 bun run start --dev-client
 ```
 
@@ -178,4 +177,4 @@ bun run start --dev-client
 ### Testing without hardware
 
 - The app uses `FakePrinterAdapter` for web and tests
-- Jest mocks also cover `react-native-thermal-pos-printer` and `expo-sqlite`
+- Jest mocks also cover `react-native-thermal-printer-driver` and `expo-sqlite`

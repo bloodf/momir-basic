@@ -24,5 +24,5 @@
 
 ## App Identifiers
 - **iOS Bundle ID**: com.bloodf.momirbasic
-- **Android Package**: com.bloodf.momirbasic
-- **App Slug**: khur2ml36fu56vvhu6tre
+- **Android Package**: com.bloodf.momirbasicapp
+- **App Slug**: momir-basic

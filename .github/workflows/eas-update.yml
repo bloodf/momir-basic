@@ -35,7 +35,7 @@ jobs:
       - run: eas update --branch production --message "${{ github.event.head_commit.message }}" --non-interactive
 
   playstore_submit_android:
-    name: Build + Submit Android (Play internal track)
+    name: Build + Submit Android (Play production track)
     runs-on: ubuntu-latest
     needs: update
     if: needs.update.result == 'success'

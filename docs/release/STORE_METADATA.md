@@ -56,7 +56,7 @@ magic, mtg, card, scryfall, printer, receipt, gatherer, randomizer
 
 ### Basic Information
 - **App Name**: Momir-Basic
-- **Package Name**: com.bloodf.momirbasic
+- **Package Name**: com.bloodf.momirbasicapp
 - **Primary Category**: Entertainment > Card
 - **Content Rating**: Everyone
 

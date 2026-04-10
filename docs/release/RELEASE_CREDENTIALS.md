@@ -10,7 +10,7 @@
 ### EAS iOS Credentials
 Managed via EAS. Run:
 ```bash
-cd expo && eas credentials --platform ios --non-interactive
+eas credentials --platform ios --non-interactive
 ```
 This will show existing credentials or guide through creation.
 
@@ -23,13 +23,13 @@ This will show existing credentials or guide through creation.
 
 ### Google Play Publisher
 - **Publisher Account**: [DECISION NEEDED: Who owns the Google Play Publisher account?]
-- **Package Name**: com.bloodf.momirbasic
+- **Package Name**: com.bloodf.momirbasicapp
 - **Recovery**: [How to recover if the owner is unavailable]
 
 ### EAS Android Credentials
 Managed via EAS. Run:
 ```bash
-cd expo && eas credentials --platform android --non-interactive
+eas credentials --platform android --non-interactive
 ```
 
 ### Release Signing Key
@@ -40,8 +40,8 @@ cd expo && eas credentials --platform android --non-interactive
   - Rotation policy: [When to rotate: compromised, lost machine, team member departure]
 
 ## EAS Build Credentials
-- **EAS Project ID**: `khur2ml36fu56vvhu6tre` (from app.json slug)
-- **Link command**: `cd expo && eas project:associate`
+- **EAS Project ID**: `8518e773-8656-4479-92ae-ef47db80efa4` (from `app.json`)
+- **Link command**: `eas project:associate`
 - **EXPO_TOKEN**: GitHub secret for CI — must be created in GitHub Settings → Secrets
 
 ## Credential Ownership Matrix
@@ -63,5 +63,5 @@ cd expo && eas credentials --platform android --non-interactive
 - [ ] Run `eas credentials --platform ios` to set up iOS credentials
 - [ ] Run `eas credentials --platform android` to set up Android credentials
 - [ ] Add `EXPO_TOKEN` to GitHub Secrets
-- [ ] Verify credentials are valid: `cd expo && eas credentials --platform ios --non-interactive`
-- [ ] Verify credentials are valid: `cd expo && eas credentials --platform android --non-interactive`
+- [ ] Verify credentials are valid: `eas credentials --platform ios --non-interactive`
+- [ ] Verify credentials are valid: `eas credentials --platform android --non-interactive`

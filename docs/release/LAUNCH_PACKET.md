@@ -201,7 +201,7 @@ Adding new printers to the matrix requires: physical validation evidence, firmwa
 
 - **Supported transports**: BLE, TCP
 - **Classic Bluetooth**: BLOCKED — requires MFi/External Accessory hardware
-- **Requirements**: Custom dev build required (Expo Go cannot load `react-native-thermal-pos-printer`)
+- **Requirements**: Custom dev build required (Expo Go cannot load `react-native-thermal-printer-driver`)
 - **Capability gating**: `filterTransport()` removes Classic from scan results on iOS
 
 ---

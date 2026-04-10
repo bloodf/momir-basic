@@ -3,10 +3,10 @@
 ## Pre-Release Checklist (Complete Before Any Store Submission)
 
 ### Week Before Release
-- [ ] Run full test suite: `cd expo && bun run test -- --runInBand`
-- [ ] Run E2E tests: `cd expo && bunx playwright test e2e/printer-qa.spec.ts`
-- [ ] Run typecheck: `cd expo && bunx tsc --noEmit`
-- [ ] Run lint: `cd expo && bun run lint`
+- [ ] Run full test suite: `bun run test -- --runInBand`
+- [ ] Run E2E tests: `bunx playwright test e2e/printer-qa.spec.ts`
+- [ ] Run typecheck: `bunx tsc --noEmit`
+- [ ] Run lint: `bun run lint`
 - [ ] Fill in all DECISION NEEDED values in release docs
 - [ ] Confirm privacy policy is hosted and accessible
 - [ ] Capture store screenshots
@@ -30,21 +30,19 @@ git push -u origin release/v1.0.0
 
 ### Step 2: Production Build iOS
 ```bash
-cd expo
 eas build --platform ios --profile production --non-interactive
 ```
 Save the build ID from output.
 
 ### Step 3: Production Build Android
 ```bash
-cd expo
 eas build --platform android --profile production --non-interactive
 ```
 Save the build ID from output.
 
 ### Step 4: Internal Testing (2-3 days)
 - Deploy to TestFlight (automatic with EAS)
-- Deploy to internal testing track on Google Play
+- Deploy production release as draft in Google Play, then proceed through review
 - Run hardware validation
 - Fix any issues found
 
@@ -52,13 +50,11 @@ Save the build ID from output.
 
 #### App Store
 ```bash
-cd expo
 eas submit --platform ios --latest
 ```
 
 #### Google Play
 ```bash
-cd expo
 eas submit --platform android --latest
 ```
 

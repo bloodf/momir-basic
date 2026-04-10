@@ -1,165 +1,127 @@
 # Momir Basic
 
-A Magic: The Gathering card randomizer app with thermal printer support. Inspired by the MTG Online Momir Basic format — tap a mana cost and get a random creature.
+Momir Basic is an open-source Expo app for Magic: The Gathering players.  
+Cast random cards by mana value, search Scryfall, track history, use life counter tools, and print to supported thermal printers.
 
-Built with React Native, Expo, and TypeScript. Supports 11 languages.
+## Highlights
 
-## Features
-
-- **Random Card Generation** — Pick a card type and CMC, get a random card from Scryfall
-- **Multiple Card Types** — Creatures, commanders, artifacts, equipment, enchantments, auras, instants, sorceries, lands
-- **Multi-Card Mode** — Summon multiple random cards at once
-- **Advanced Search** — Full Scryfall syntax with filters for colors, types, formats, rarity, CMC, sets, and artists
-- **Card History** — Track previously summoned cards
-- **Life Counter** — Built-in life counter for 2-8 players with commander damage tracking
-- **Game Modes** — Standard, Commander, Brawl, Two-Headed Giant, Pauper, Custom
-- **Thermal Printing** — Print card receipts or full card images via Bluetooth/BLE/TCP thermal printers
-- **11 Languages** — English, Portuguese, Spanish, French, German, Italian, Japanese, Korean, Russian, Simplified Chinese, Traditional Chinese
-- **Localized Cards** — Card names and text in your language (with English image fallback)
-
-## Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18+ or [Bun](https://bun.sh/)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/)
-- iOS Simulator or Android Emulator (or a physical device)
-
-### Installation
-
-```bash
-# Clone the repo
-git clone https://github.com/bloodf/momir-basic.git
-cd momir-basic
-
-# Install dependencies
-bun install
-# or: npm install
-
-# Start the development server
-npx expo start
-```
-
-### Running on Device
-
-```bash
-# Android
-npx expo run:android
-
-# iOS
-npx expo run:ios
-
-# Web
-npx expo start --web
-```
-
-### Building with EAS
-
-```bash
-# Install EAS CLI
-npm install -g eas-cli
-
-# Login to Expo
-eas login
-
-# Preview build (APK for testing)
-eas build --platform android --profile preview
-
-# Production build (AAB for store)
-eas build --platform android --profile production
-
-# iOS production build
-eas build --platform ios --profile production
-```
-
-## Project Structure
-
-```
-momir-basic/
-├── app/                        # Expo Router screens
-│   ├── (tabs)/                 # Tab navigation
-│   │   ├── (home)/             # Card randomizer (main screen)
-│   │   ├── search/             # Advanced card search
-│   │   ├── history/            # Card history
-│   │   └── settings/           # App & printer settings
-│   ├── card.tsx                # Card detail modal
-│   ├── print-preview.tsx       # Print preview & printing
-│   └── life-counter.tsx        # Life counter
-├── components/                 # Reusable UI components
-├── constants/                  # Colors, theme
-├── i18n/                       # Internationalization (11 languages)
-├── providers/                  # React context providers
-├── services/                   # API & business logic
-│   ├── scryfall.ts             # Scryfall API integration
-│   └── printer/                # Thermal printer services
-├── types/                      # TypeScript type definitions
-├── __tests__/                  # Unit tests
-├── e2e/                        # End-to-end tests
-├── .github/workflows/          # CI/CD pipelines
-├── app.json                    # Expo configuration
-├── eas.json                    # EAS Build profiles
-└── LICENSE
-```
-
-## Thermal Printer Support
-
-Momir Basic can print card receipts on ESC/POS thermal printers via [react-native-thermal-printer-driver](https://github.com/bloodf/expo-thermal-printer-driver).
-
-**Supported connections:**
-- Bluetooth Classic (Android)
-- BLE (Android & iOS)
-- TCP/LAN (Android & iOS)
-
-**Print modes:**
-- **Receipt** — Card name with mana cost, art crop, type line, oracle text, flavor text, power/toughness, QR code (each section configurable)
-- **Full Card** — Prints the entire card face image
-
-> Requires a custom development build. Thermal printing is not available in Expo Go.
+- Random card casting inspired by Momir Basic format
+- Advanced Scryfall search with filters and shortcuts
+- Multi-language support (11 locales)
+- Built-in history, print preview, and game helper tools
+- Thermal printer support via native adapter layer
+- CI/CD with EAS Build, EAS Update, and Play Store submission automation
 
 ## Tech Stack
 
-- **Framework:** [Expo](https://expo.dev/) 54 + [React Native](https://reactnative.dev/) 0.81
-- **Navigation:** [Expo Router](https://docs.expo.dev/router/introduction/) v6
-- **State:** [TanStack React Query](https://tanstack.com/query) + [Zustand](https://zustand-demo.pmnd.rs/)
-- **Language:** [TypeScript](https://www.typescriptlang.org/) 5.9
-- **API:** [Scryfall](https://scryfall.com/docs/api)
-- **Printing:** [react-native-thermal-printer-driver](https://github.com/bloodf/expo-thermal-printer-driver)
-- **Testing:** Jest + Playwright
-- **CI/CD:** GitHub Actions + EAS Build
+- Expo SDK 54 / React Native 0.81
+- Expo Router 6
+- TypeScript
+- TanStack React Query + Zustand
+- Expo SQLite + AsyncStorage
+- `react-native-thermal-printer-driver`
+- Jest + Playwright
 
-## CI/CD
+## Quick Start
 
-| Workflow | Trigger | What it does |
-|----------|---------|-------------|
-| **CI** | Push/PR to main | Lint, typecheck, unit tests |
-| **EAS Build** | Manual dispatch | Build iOS/Android via EAS |
-| **EAS Update** | Push to main | Publish OTA update |
-| **PR Preview** | PR to main | Publish preview update branch |
+### Prerequisites
 
-### Setup Secrets
+- Node.js 18+ and Bun
+- Xcode (for iOS simulator/dev builds)
+- Android Studio (for Android emulator/dev builds)
+- EAS account (for cloud builds/submissions)
 
-To enable EAS workflows, add these secrets in your GitHub repo settings:
+### Install and run
 
-| Secret | Description |
-|--------|-------------|
-| `EXPO_TOKEN` | Expo access token from [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens) |
+```bash
+git clone https://github.com/bloodf/momir-basic.git
+cd momir-basic
+bun install
+bun start
+```
 
-## Contributing
+### Run platforms
 
-Contributions are welcome! Please open an issue first to discuss what you'd like to change.
+```bash
+bun ios
+bun android
+bun run start:web
+```
 
-1. Fork the repo
-2. Create your feature branch (`git checkout -b feat/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feat/amazing-feature`)
-5. Open a Pull Request
+## Common Commands
 
-## Acknowledgements
+```bash
+bun run lint
+bun test
+bun test:ci
+bunx playwright test
+npx expo-doctor
+```
 
-- Card data provided by [Scryfall](https://scryfall.com/) API
-- Mana symbols from [Andrew Gioia's Mana font](https://mana.andrewgioia.com/)
-- Inspired by the [Momir Basic](https://mtg.fandom.com/wiki/Momir_Basic) format from Magic: The Gathering Online
+## Build and Release
+
+### Manual builds
+
+```bash
+# Android preview APK
+npx eas-cli build --platform android --profile preview
+
+# Android production AAB
+npx eas-cli build --platform android --profile production
+
+# iOS production build
+npx eas-cli build --platform ios --profile production
+```
+
+### CI/CD automation
+
+On pushes to `main`, the Android workflow can:
+
+1. Publish an OTA update to the production branch
+2. Build an Android production AAB
+3. Auto-submit to Play Console production track
+
+Required repository secrets:
+
+- `EXPO_TOKEN`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` (JSON content)
+
+See workflow files in `.github/workflows/`.
+
+## Repository Layout
+
+```text
+app/                    Expo Router screens
+components/             Shared UI components
+services/               Scryfall and printer service layers
+providers/              Settings/history providers
+i18n/                   Locales and translation hooks
+types/                  Shared TypeScript models
+__tests__/              Unit and integration tests
+e2e/                    Playwright tests
+docs/                   Architecture, printer, release, support docs
+```
+
+## Open Source Project Docs
+
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security Policy](./SECURITY.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Thermal Printer System](./docs/PRINTER.md)
+- [Support](./docs/support.md)
+
+## Roadmap and Known Constraints
+
+- Thermal printer compatibility follows a certified transport/device matrix process
+- Expo Go is not sufficient for native printer flows (use dev client builds)
+- Store release policy and runbooks live under `docs/release/`
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the MIT License. See [LICENSE](./LICENSE).
+
+## Acknowledgements
+
+- Card data from [Scryfall](https://scryfall.com/docs/api)
+- Inspired by the Momir Basic format in MTG Online

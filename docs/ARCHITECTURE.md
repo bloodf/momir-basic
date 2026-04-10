@@ -3,7 +3,7 @@
 ## Top level structure
 
 ```text
-expo/
+momir-basic/
 ├── app/             Expo Router screens and layouts
 ├── components/      Shared UI building blocks
 ├── constants/       Theme colors, mana symbols, card type config
@@ -144,7 +144,7 @@ Printing runs directly through the selected adapter after registry lookup and do
 
 `services/printer/adapters/`
 
-- `native.ts`, real `react-native-thermal-pos-printer` bridge
+- `native.ts`, real `react-native-thermal-printer-driver` bridge
 - `fake.ts`, deterministic fallback for web and tests
 - `factory.ts`, chooses the adapter based on platform, test mode, and native module presence
 

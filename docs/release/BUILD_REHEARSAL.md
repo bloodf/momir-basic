@@ -27,8 +27,7 @@ The following must be completed before running production builds:
 
 ### Step 1: Validate eas.json
 ```bash
-cd expo
-cat eas.json | jq .
+jq . eas.json
 ```
 Expected: Valid JSON with preview and production profiles.
 
@@ -59,14 +58,12 @@ Once credentials are configured:
 
 ### iOS Production Build
 ```bash
-cd expo
 eas build --platform ios --profile production --non-interactive
 ```
 Expected output: Build ID and status URL
 
 ### Android Production Build
 ```bash
-cd expo
 eas build --platform android --profile production --non-interactive
 ```
 Expected output: Build ID and status URL

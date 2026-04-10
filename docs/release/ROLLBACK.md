@@ -18,7 +18,7 @@ Rollback an EAS Update when:
 EAS Update supports automatic rollback. Use:
 ```bash
 # Rollback the production channel to the previously deployed update
-cd expo && eas update --branch production --roll-back --message "Rolling back due to [reason]"
+eas update --branch production --roll-back --message "Rolling back due to [reason]"
 ```
 
 For manual rollback to a specific update:
