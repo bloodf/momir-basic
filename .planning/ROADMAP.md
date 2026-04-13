@@ -36,12 +36,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. No service account keys or build artifacts exist in the repository
   3. Every catch block in the codebase either handles the error explicitly or logs it with a classified error type
   4. Reassure performance baselines exist for the home screen cast flow
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01: Structured Logger & Error Classification (STAB-04)
+- [ ] 01-02: Crash Safety & Secret Removal (STAB-01, STAB-02, STAB-03)
+- [ ] 01-03: Reassure Performance Baselines (DX-05)
 
 ### Phase 2: State Management
 **Goal**: App state flows through Zustand stores with fast, synchronous persistence and a shallow provider tree
@@ -165,7 +165,7 @@ Phases 6 and 7 can execute in parallel after Phase 5.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Stability & Security | 0/3 | Not started | - |
+| 1. Stability & Security | 0/3 | Planned | - |
 | 2. State Management | 0/3 | Not started | - |
 | 3. Screen Decomposition | 0/3 | Not started | - |
 | 4. Validation & DX | 0/3 | Not started | - |
