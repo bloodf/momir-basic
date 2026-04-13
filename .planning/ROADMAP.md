@@ -53,12 +53,12 @@ Plans:
   3. Provider tree is 4 levels or fewer
   4. Card type filter options come from a single CARD_TYPE_QUERIES map
   5. Screen layout updates immediately on device rotation or resize
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md — MMKV adapter + Settings & History stores (ARCH-01, ARCH-02)
+- [ ] 02-02-PLAN.md — Network & I18n stores + CARD_TYPE_QUERIES + composeProviders (ARCH-03, ARCH-04, ARCH-06)
+- [ ] 02-03-PLAN.md — Provider flattening + consumer migration + Dimensions.get replacement (ARCH-05, ARCH-07)
 
 ### Phase 3: Screen Decomposition
 **Goal**: All screen files are under 400 lines with extracted, testable feature hooks
@@ -166,7 +166,7 @@ Phases 6 and 7 can execute in parallel after Phase 5.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Stability & Security | 0/3 | Planned | - |
-| 2. State Management | 0/3 | Not started | - |
+| 2. State Management | 0/3 | Planned | - |
 | 3. Screen Decomposition | 0/3 | Not started | - |
 | 4. Validation & DX | 0/3 | Not started | - |
 | 5. Testing Infrastructure | 0/3 | Not started | - |
