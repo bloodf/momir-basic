@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01: Structured Logger & Error Classification (STAB-04)
-- [ ] 01-02: Crash Safety & Secret Removal (STAB-01, STAB-02, STAB-03)
+- [x] 01-02: Crash Safety & Secret Removal (STAB-01, STAB-02, STAB-03)
 - [x] 01-03: Reassure Performance Baselines (DX-05)
 
 ### Phase 2: State Management
