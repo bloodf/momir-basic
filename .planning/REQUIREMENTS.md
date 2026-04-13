@@ -42,7 +42,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DX-02**: Add Husky + lint-staged for pre-commit checks (lint, format, type-check)
 - [ ] **DX-03**: Remove 29 console.log calls from production code, replace with structured logger
 - [ ] **DX-04**: Add ESLint rule to prevent console.log in production code
-- [ ] **DX-05**: Add Reassure for React Native performance regression testing (baseline before refactoring)
+- [x] **DX-05**: Add Reassure for React Native performance regression testing (baseline before refactoring)
 
 ### Testing
 
@@ -129,7 +129,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DX-02 | Phase 4 | Pending |
 | DX-03 | Phase 4 | Pending |
 | DX-04 | Phase 4 | Pending |
-| DX-05 | Phase 1 | Pending |
+| DX-05 | Phase 1 | Complete |
 | TEST-01 | Phase 5 | Pending |
 | TEST-02 | Phase 5 | Pending |
 | TEST-03 | Phase 5 | Pending |
