@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import type { PrinterRecord, PrinterCapabilities, PrintJob, PrintJobState, PrinterTransport, CanonicalPrinterIdentity } from '@/types';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 export interface CreatePrinterInput {
   id: string;
@@ -198,7 +199,8 @@ function rowToPrintJob(row: Record<string, unknown>): PrintJob {
   if (canonicalJson) {
     try {
       canonicalIdentity = JSON.parse(canonicalJson) as CanonicalPrinterIdentity;
-    } catch {
+    } catch (error) {
+      logger.debug(ErrorCategory.Storage, 'Failed to parse canonical identity JSON', error);
       canonicalIdentity = undefined;
     }
   }

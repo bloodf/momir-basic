@@ -21,6 +21,7 @@ import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useSettings } from '@/providers/SettingsProvider';
 import { showToast } from '@/components/Toast';
+import { ErrorCategory, logger } from '@/utils/logger';
 import { useI18n } from '@/i18n';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
@@ -68,8 +69,9 @@ export default function PrintPreviewScreen() {
   const card = useMemo<Card | null>(() => {
     try {
       if (params.cardJson) return JSON.parse(params.cardJson);
-    } catch {
+    } catch (error) {
       // Card parse error — handled by null return
+      logger.debug(ErrorCategory.Render, 'Card param parse failed', error);
     }
     return null;
   }, [params.cardJson]);
@@ -119,7 +121,8 @@ export default function PrintPreviewScreen() {
       const adapter = createAdapter();
       const isConnected = await adapter.isConnected(prefId);
       setPrinterConnection(isConnected ? 'connected' : 'disconnected');
-    } catch {
+    } catch (error) {
+      logger.debug(ErrorCategory.Printer, 'Printer connection verification failed', error);
       setPrinterConnection('disconnected');
     }
   }, [settings.printer?.preferredPrinterId]);
@@ -168,7 +171,8 @@ export default function PrintPreviewScreen() {
       }
 
       showSuccessFlash();
-    } catch {
+    } catch (error) {
+      logger.warn(ErrorCategory.Printer, 'Save to gallery failed', error);
       showToast({ type: 'error', title: t.printPreview.saveFailed, message: t.printPreview.saveFailedMsg });
     } finally {
       setIsSaving(false);
@@ -218,7 +222,8 @@ export default function PrintPreviewScreen() {
         showToast({ type: 'error', title: t.toast.printerReconnectTitle, message: t.toast.printerReconnectMessage });
         return;
       }
-    } catch {
+    } catch (error) {
+      logger.warn(ErrorCategory.Printer, 'Print verification failed', error);
       setPrintOutcome({ type: 'failed', message: t.printer.verificationFailed });
       return;
     }
@@ -313,8 +318,9 @@ export default function PrintPreviewScreen() {
             artBitmapBase64 = rasterized.base64Bitmap;
             artWidthPx = rasterized.widthPx;
             artHeightPx = rasterized.heightPx;
-          } catch {
+          } catch (error) {
             // Art rasterization failed — continue without art
+            logger.debug(ErrorCategory.Printer, 'Art rasterization failed', error);
           }
         }
 
@@ -338,8 +344,9 @@ export default function PrintPreviewScreen() {
             backArtBitmapBase64 = rasterizedBack.base64Bitmap;
             backArtWidthPx = rasterizedBack.widthPx;
             backArtHeightPx = rasterizedBack.heightPx;
-          } catch {
+          } catch (error) {
             // Back art rasterization failed — continue without it
+            logger.debug(ErrorCategory.Printer, 'Back art rasterization failed', error);
           }
         }
 

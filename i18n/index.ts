@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
+import { ErrorCategory, logger } from '@/utils/logger';
 import { Translations } from './types';
 import en from './locales/en';
 import pt from './locales/pt';
@@ -64,7 +65,8 @@ function getDeviceLocale(): Locale {
     if (match) return match;
 
     return 'en';
-  } catch {
+  } catch (error) {
+    logger.warn(ErrorCategory.Storage, 'Device locale detection failed, falling back to en', error);
     return 'en';
   }
 }
@@ -115,7 +117,8 @@ export const [I18nProvider, useI18n] = createContextHook(() => {
         setLocaleState(getDeviceLocale());
       }
       setLoaded(true);
-    }).catch(() => {
+    }).catch((error) => {
+      logger.error(ErrorCategory.Storage, 'Failed to read stored locale', error);
       setLocaleState(getDeviceLocale());
       setLoaded(true);
     });
@@ -123,7 +126,9 @@ export const [I18nProvider, useI18n] = createContextHook(() => {
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
-    AsyncStorage.setItem(LOCALE_KEY, newLocale).catch(() => {});
+    AsyncStorage.setItem(LOCALE_KEY, newLocale).catch((error) => {
+      logger.error(ErrorCategory.Storage, 'Failed to persist locale', error);
+    });
   }, []);
 
   const t = useMemo(() => locales[locale], [locale]);

@@ -1,6 +1,7 @@
 import type { PrinterPort, PrinterDiscoveryResult } from './port';
 import { PrinterAdapterError, PrinterErrorCode } from './port';
 import type { PrinterCapabilities } from '../../../types';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 type FailureMode = 'connect-timeout' | 'write-error' | 'discover-empty' | null;
 
@@ -85,8 +86,7 @@ export class FakePrinterAdapter implements PrinterPort {
     if (!this.hasConnectedDevice()) {
       throw new Error('No printer connected');
     }
-    // eslint-disable-next-line no-console
-    console.warn('[FakePrinter] sendRaw:', _bytes.length, 'bytes');
+    logger.debug(ErrorCategory.Printer, `Fake adapter sendRaw: ${_bytes.length} bytes`);
   }
 
   async sendImage(_base64: string, _width?: number, _height?: number): Promise<void> {

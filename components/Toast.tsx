@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WifiOff, AlertTriangle, CheckCircle, Info } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 export type ToastType = 'error' | 'warning' | 'success' | 'info';
 
@@ -148,7 +149,7 @@ export function showToast(toast: Omit<ToastMessage, 'id'>) {
   if (_addToast) {
     _addToast(toast);
   } else {
-    console.log('[Toast] Provider not mounted, queuing toast:', toast.title);
+    logger.debug(ErrorCategory.Render, `Provider not mounted, queuing toast: ${toast.title}`);
   }
 }
 

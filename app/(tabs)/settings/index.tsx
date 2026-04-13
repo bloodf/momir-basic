@@ -16,6 +16,7 @@ import { Printer, ChevronRight, Zap, Info, Globe, ChevronDown, Github, Star, Ext
 import Colors from '@/constants/colors';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/i18n';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -44,7 +45,9 @@ export default function SettingsScreen() {
   }, [setLocale]);
 
   const handleOpenGithub = useCallback(() => {
-    Linking.openURL('https://github.com/bloodf/momir-basic').catch(() => {});
+    Linking.openURL('https://github.com/bloodf/momir-basic').catch((error) => {
+      logger.warn(ErrorCategory.Navigation, 'Failed to open external URL', error);
+    });
   }, []);
 
   const dropdownHeight = dropdownAnim.interpolate({

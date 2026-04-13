@@ -12,6 +12,7 @@ import { NetworkProvider } from "@/providers/NetworkProvider";
 import { I18nProvider, useI18n } from "@/i18n";
 import { ToastProvider, showToast } from "@/components/Toast";
 import { registryService } from "../services/printer/registry/service";
+import { ErrorCategory, logger } from "@/utils/logger";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -41,7 +42,8 @@ function PrinterAutoConnect() {
         // preferredPrinterId is a registry DB key — registryService handles address lookup
         await registryService.connectPrinter(prefId);
         showToast({ type: 'success', title: t.toast.printerConnected, message: t.toast.printerReady });
-      } catch {
+      } catch (error) {
+        logger.warn(ErrorCategory.Printer, 'Auto-connect failed on startup', error);
         showToast({ type: 'warning', title: t.toast.printerReconnectTitle, message: t.toast.printerReconnectMessage });
       }
     })();

@@ -48,6 +48,7 @@ import {
 } from '@/services/scryfall';
 import { getCardFaceDisplayData, getDisplayFace } from '@/utils/cardFaces';
 import { showToast } from '@/components/Toast';
+import { ErrorCategory, logger } from '@/utils/logger';
 import { useHistory } from '@/providers/HistoryProvider';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n } from '@/i18n';
@@ -71,7 +72,8 @@ export default function CardDetailScreen() {
       if (params.cardJson) return [JSON.parse(params.cardJson)];
 
       return [];
-    } catch {
+    } catch (error) {
+      logger.debug(ErrorCategory.Render, 'Card param parse failed', error);
       return [];
     }
   }, [params.cardJson, params.multiCards]);
@@ -155,8 +157,9 @@ export default function CardDetailScreen() {
             artBitmapBase64 = rasterized.base64Bitmap;
             artWidthPx = rasterized.widthPx;
             artHeightPx = rasterized.heightPx;
-          } catch {
+          } catch (error) {
             // Art rasterization failed — continue without art
+            logger.debug(ErrorCategory.Printer, 'Art rasterization failed in autoPrint', error);
           }
         }
 
@@ -206,7 +209,7 @@ export default function CardDetailScreen() {
         await adapter.sendRaw(allBytes);
       }
     } catch (err) {
-      console.warn('[autoPrint] failed:', err instanceof Error ? err.message : err);
+      logger.warn(ErrorCategory.Printer, 'autoPrint failed', err instanceof Error ? err.message : err);
     }
   }, [settings.printer]);
 
@@ -330,7 +333,8 @@ export default function CardDetailScreen() {
         message: `${displayCard.name} — ${t.card.artBy(artist)}\n${card.scryfallUri}`,
         url: displayCard.artCropUrl,
       });
-    } catch {
+    } catch (error) {
+      logger.warn(ErrorCategory.Navigation, 'Share art failed', error);
       Alert.alert('Share Failed', 'Unable to share card art right now.');
     }
   }, [activeFaceIndex, card, t.card]);
@@ -345,7 +349,8 @@ export default function CardDetailScreen() {
         link.target = '_blank';
         link.download = `${displayCard.name.replace(/[^a-zA-Z0-9]/g, '_')}_art.jpg`;
         link.click();
-      } catch {
+      } catch (error) {
+        logger.warn(ErrorCategory.Navigation, 'Web art download failed', error);
         Alert.alert('Download Failed', 'Unable to open the art download in this browser.');
       }
     } else {
@@ -369,7 +374,8 @@ export default function CardDetailScreen() {
         const results = await fetchCardPrintings(card.name);
         setPrintings(results);
         setPrintingsFetched(true);
-      } catch {
+      } catch (error) {
+        logger.debug(ErrorCategory.Network, 'Printings fetch failed', error);
         setPrintings([]);
       } finally {
         setPrintingsLoading(false);

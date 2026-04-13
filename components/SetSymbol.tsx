@@ -2,6 +2,7 @@ import React, { memo, useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { Image } from 'expo-image';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 interface SetSymbolProps {
   setCode: string;
@@ -68,7 +69,7 @@ function useSvgFetch(setCode: string): string | null {
         }
       })
       .catch(err => {
-        console.log(`[SetSymbol] Failed to fetch SVG for ${code}:`, err.message);
+        logger.debug(ErrorCategory.Render, `Failed to fetch SVG for ${code}: ${err.message}`);
       });
 
     return () => { cancelled = true; };

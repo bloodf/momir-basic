@@ -1,4 +1,5 @@
 import { Card, CardType, ScryfallCard } from '@/types';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 const BASE_URL = 'https://api.scryfall.com';
 const HEADERS = {
@@ -235,17 +236,17 @@ async function fetchLocalizedCard(
 ): Promise<ScryfallCard | null> {
   const scryfallLang = LOCALE_TO_SCRYFALL_LANG[lang] ?? lang;
   const url = `${BASE_URL}/cards/${setCode.toLowerCase()}/${collectorNumber}/${scryfallLang}`;
-  console.log('[Scryfall] Fetching localized card:', url);
+  logger.debug(ErrorCategory.Network, `Fetching localized card: ${url}`);
 
   try {
     const response = await rateLimitedFetch(url);
     if (!response.ok) {
-      console.log('[Scryfall] Localized fetch failed:', response.status);
+      logger.debug(ErrorCategory.Network, `Localized fetch failed: ${response.status}`);
       return null;
     }
     return await response.json() as ScryfallCard;
   } catch (e) {
-    console.log('[Scryfall] Localized fetch error:', e);
+    logger.debug(ErrorCategory.Network, 'Localized fetch error', e);
     return null;
   }
 }
@@ -262,7 +263,7 @@ export async function fetchRandomCard(
     const result = await fetchRandomCardAtCmc(cardType, currentCmc, excludeFunny, retries, lang);
     if (result) return result;
     if (currentCmc > 0) {
-      console.log(`[Scryfall] No ${cardType} at CMC ${currentCmc}, trying CMC ${currentCmc - 1}`);
+      logger.debug(ErrorCategory.Network, `No ${cardType} at CMC ${currentCmc}, trying CMC ${currentCmc - 1}`);
     }
   }
 
@@ -279,20 +280,20 @@ async function fetchRandomCardAtCmc(
   const query = buildQuery(cardType, cmc, excludeFunny);
   const url = `${BASE_URL}/cards/random?q=${encodeURIComponent(query)}`;
 
-  console.log('[Scryfall] Fetching:', url, lang ? `(lang: ${lang})` : '');
+  logger.debug(ErrorCategory.Network, `Fetching: ${url}${lang ? ` (lang: ${lang})` : ''}`);
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const response = await rateLimitedFetch(url);
 
       if (response.status === 404) {
-        console.log(`[Scryfall] 404 on attempt ${attempt + 1}/${retries} for CMC ${cmc}`);
+        logger.debug(ErrorCategory.Network, `404 on attempt ${attempt + 1}/${retries} for CMC ${cmc}`);
         if (attempt === retries - 1) return null;
         continue;
       }
 
       if (response.status === 429) {
-        console.log('[Scryfall] Rate limited, waiting 1s...');
+        logger.debug(ErrorCategory.Network, 'Rate limited, waiting 1s...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         continue;
       }
@@ -308,7 +309,7 @@ async function fetchRandomCardAtCmc(
       }
 
       const data: ScryfallCard = await response.json();
-      console.log('[Scryfall] Got card:', data.name, `(CMC ${cmc})`);
+      logger.debug(ErrorCategory.Network, `Got card: ${data.name} (CMC ${cmc})`);
 
       if (lang && lang !== 'en') {
         const localized = await fetchLocalizedCard(data.set, data.collector_number, lang);
@@ -328,7 +329,7 @@ async function fetchRandomCardAtCmc(
     } catch (error) {
       const scryfallError = normalizeScryfallError(error);
       if (scryfallError.isTransient && attempt < retries - 1) {
-        console.log(`[Scryfall] Retry ${attempt + 1}/${retries}:`, scryfallError.message);
+        logger.debug(ErrorCategory.Network, `Retry ${attempt + 1}/${retries}: ${scryfallError.message}`);
         await waitForTransientRetry(attempt);
         continue;
       }
@@ -394,10 +395,10 @@ async function fetchLocalizedCardsViaCollection(
           localizedMap.set(key, sc);
         }
       } else {
-        console.log('[Scryfall] Collection fetch failed:', collectionResponse.status);
+        logger.debug(ErrorCategory.Network, `Collection fetch failed: ${collectionResponse.status}`);
       }
     } catch (e) {
-      console.log('[Scryfall] Collection localize error:', e);
+      logger.debug(ErrorCategory.Network, 'Collection localize error', e);
     }
   }
 
@@ -424,7 +425,7 @@ export async function searchCards(
   lang?: string,
 ): Promise<SearchResult> {
   const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&page=${page}&unique=cards`;
-  console.log('[Scryfall] Search:', url, lang ? `(lang: ${lang})` : '');
+  logger.debug(ErrorCategory.Network, `Search: ${url}${lang ? ` (lang: ${lang})` : ''}`);
 
   for (let attempt = 0; attempt < DEFAULT_RETRY_COUNT; attempt++) {
     try {
@@ -485,7 +486,7 @@ export async function searchCards(
 export async function autocompleteCardName(query: string): Promise<string[]> {
   if (query.length < 2) return [];
   const url = `${BASE_URL}/cards/autocomplete?q=${encodeURIComponent(query)}`;
-  console.log('[Scryfall] Autocomplete:', url);
+  logger.debug(ErrorCategory.Network, `Autocomplete: ${url}`);
 
   const response = await rateLimitedFetch(url);
   if (!response.ok) return [];
@@ -512,12 +513,12 @@ export interface CardPrinting {
 export async function fetchCardPrintings(cardName: string): Promise<CardPrinting[]> {
   const query = `!"${cardName}" unique:prints`;
   const url = `${BASE_URL}/cards/search?q=${encodeURIComponent(query)}&order=released&dir=asc&unique=prints`;
-  console.log('[Scryfall] Fetching printings:', url);
+  logger.debug(ErrorCategory.Network, `Fetching printings: ${url}`);
 
   try {
     const response = await rateLimitedFetch(url);
     if (!response.ok) {
-      console.log('[Scryfall] Printings fetch failed:', response.status);
+      logger.debug(ErrorCategory.Network, `Printings fetch failed: ${response.status}`);
       return [];
     }
 
@@ -544,7 +545,7 @@ export async function fetchCardPrintings(cardName: string): Promise<CardPrinting
       imageUrl: p.image_uris?.small ?? p.card_faces?.[0]?.image_uris?.small ?? '',
     }));
   } catch (e) {
-    console.log('[Scryfall] Printings error:', e);
+    logger.debug(ErrorCategory.Network, 'Printings error', e);
     return [];
   }
 }
@@ -559,7 +560,7 @@ export interface ScryfallSet {
 
 export async function fetchSets(): Promise<ScryfallSet[]> {
   const url = `${BASE_URL}/sets`;
-  console.log('[Scryfall] Fetching sets');
+  logger.debug(ErrorCategory.Network, 'Fetching sets');
 
   try {
     const response = await rateLimitedFetch(url);
@@ -570,7 +571,7 @@ export async function fetchSets(): Promise<ScryfallSet[]> {
       .filter(s => validTypes.includes(s.set_type))
       .sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''));
   } catch (e) {
-    console.log('[Scryfall] Sets fetch error:', e);
+    logger.debug(ErrorCategory.Network, 'Sets fetch error', e);
     return [];
   }
 }
@@ -640,7 +641,7 @@ export async function fetchRandomBgCardForType(cardType: CardType): Promise<BgCa
   const typeFragment = getTypeQueryFragment(cardType);
   const query = `${typeFragment} is:highres game:paper`;
   const url = `${BASE_URL}/cards/random?q=${encodeURIComponent(query)}`;
-  console.log('[Scryfall] BG card for type:', cardType, url);
+  logger.debug(ErrorCategory.Network, `BG card for type: ${cardType} ${url}`);
 
   try {
     const response = await rateLimitedFetch(url);
@@ -654,7 +655,7 @@ export async function fetchRandomBgCardForType(cardType: CardType): Promise<BgCa
       colors: data.colors ?? [],
     };
   } catch (e) {
-    console.log('[Scryfall] BG fetch error:', e);
+    logger.debug(ErrorCategory.Network, 'BG fetch error', e);
     return { artUrl: '', colors: [] };
   }
 }

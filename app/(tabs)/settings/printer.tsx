@@ -39,6 +39,7 @@ import {
   Loader,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { ErrorCategory, logger } from '@/utils/logger';
 import { useSettings } from '@/providers/SettingsProvider';
 import type { PrinterRecord, PrinterTransport, PrinterCapabilities, DitherAlgorithm, QrErrorCorrection } from '@/types';
 import { DitheredImage } from '@/components/DitheredImage';
@@ -201,7 +202,8 @@ export default function PrinterSetupScreen() {
           setUiState('disconnected');
         }
       }
-    } catch {
+    } catch (error) {
+      logger.warn(ErrorCategory.Printer, 'Connection state check failed', error);
       setConnectedPrinter(null);
       if (uiState === 'connected') {
         setUiState('disconnected');
@@ -237,8 +239,9 @@ export default function PrinterSetupScreen() {
             setUiState('permission_denied');
             return;
           }
-        } catch {
+        } catch (error) {
           // Continue — permissions may be granted at runtime
+          logger.debug(ErrorCategory.Printer, 'Permission check failed, continuing', error);
         }
       }
 
@@ -272,13 +275,15 @@ export default function PrinterSetupScreen() {
               await connectAdapter.connectPrinter(prefDevice.address);
               setConnectedPrinter(prefDevice);
               setUiState('connected');
-            } catch {
+            } catch (error) {
               // Connection failed, just show discovered
+              logger.debug(ErrorCategory.Printer, 'Auto-connect failed on init', error);
             }
           }
         }
-      } catch {
+      } catch (error) {
         // Auto-scan failed, fall back to manual
+        logger.warn(ErrorCategory.Printer, 'Auto-scan failed on init', error);
         if (uiState === 'initializing') {
           setUiState('scan_empty');
         }
@@ -340,12 +345,10 @@ export default function PrinterSetupScreen() {
         createdAt: now,
       }));
 
-      // eslint-disable-next-line no-console
-      console.error('[DIAG-UI] records count:', records.length, 'setting discovered');
+      logger.debug(ErrorCategory.Printer, `records count: ${records.length}, setting discovered`);
       setPrinters(records);
       setUiState(records.length === 0 ? 'scan_empty' : 'discovered');
-      // eslint-disable-next-line no-console
-      console.error('[DIAG-UI] state set. printers:', records.length, 'uiState: discovered');
+      logger.debug(ErrorCategory.Printer, `state set. printers: ${records.length}, uiState: discovered`);
     } catch (error) {
       if (error instanceof Error && error.message.includes('[PrinterCapability]')) {
         const state = await printerCapabilityService.getAndroidPermissionState();
@@ -398,7 +401,9 @@ export default function PrinterSetupScreen() {
       await adapter.connectPrinter(printer.address);
 
       // Persist printer to registry in background
-      registryService.mergeDiscoveredWithRegistry([printer]).catch(() => {});
+      registryService.mergeDiscoveredWithRegistry([printer]).catch((error) => {
+        logger.warn(ErrorCategory.Printer, 'Background registry merge failed', error);
+      });
 
       // CRITICAL: Verify the connection is real before declaring connected
       const isReallyConnected = await adapter.isConnected(printer.address);

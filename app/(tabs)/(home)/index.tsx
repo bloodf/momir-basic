@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Minus, Plus, ChevronDown, ScrollText } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { ErrorCategory, logger } from '@/utils/logger';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { Card, CardType } from '@/types';
 import {
@@ -267,7 +268,9 @@ export default function HomeScreen() {
               await warmHeroArt(cached.artUrl);
             }
           }
-        }).catch(() => {});
+        }).catch((error) => {
+          logger.warn(ErrorCategory.Network, 'Hero art prefetch failed', error);
+        });
       }, idx * 300);
     });
 

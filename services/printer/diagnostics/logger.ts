@@ -15,6 +15,7 @@
 import { Platform, NativeModules } from 'react-native';
 import type { PrinterTransport } from '../../../types';
 import { PrinterErrorCode } from '../adapters/port';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 // ---------------------------------------------------------------------------
 // Event Type Taxonomy
@@ -184,7 +185,7 @@ export const consolePrinterLogger: PrinterSessionLogger = {
     const formatted = formatEvent(event);
     // PrinterSession tag allows filtering with: adb logcat -s PrinterSession:*
     // On iOS this appears in Console.app under the device
-    console.log(`[PrinterSession] ${formatted}`);
+    logger.debug(ErrorCategory.Printer, formatted);
   },
 };
 

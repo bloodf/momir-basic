@@ -2,6 +2,7 @@ import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 import type { PrinterPort, PrinterDiscoveryResult, PrinterDevice } from './port';
 import { PrinterAdapterError, PrinterErrorCode } from './port';
 import type { PrinterCapabilities, PrinterTransport } from '../../../types';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 const DEFAULT_CAPABILITIES: PrinterCapabilities = {
   supportImage: true,
@@ -91,7 +92,7 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     if (result.found) addDevices(result.found);
 
     // eslint-disable-next-line no-console
-    console.error('[DIAG] adapter returning', devices.length, 'devices');
+    logger.debug(ErrorCategory.Printer, `adapter returning ${devices.length} devices`);
     return devices;
   }
 
@@ -133,7 +134,8 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
       const btAddress = toBtAddress(address);
       const result = await NativeModules.ThermalPrinterDriver.testConnection(btAddress);
       return result?.success === true;
-    } catch {
+    } catch (error) {
+      logger.debug(ErrorCategory.Printer, 'isConnection check failed', error);
       return false;
     }
   }

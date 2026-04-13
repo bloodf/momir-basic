@@ -25,6 +25,7 @@ import {
   emitNativeError,
 } from '../diagnostics';
 import { PrinterAdapterError, PrinterErrorCode } from '../adapters/port';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 function isIOS(): boolean {
   return Platform.OS === 'ios';
@@ -167,8 +168,9 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       const adapter = getAdapter();
       try {
         await adapter.disconnectPrinter(printer.address);
-      } catch {
+      } catch (error) {
         // Intentionally swallow — forget printer regardless of disconnect outcome
+        logger.debug(ErrorCategory.Printer, 'Disconnect during forget failed', error);
       }
       await repoDeletePrinter(deviceId);
       const prefs = await getPreferences();

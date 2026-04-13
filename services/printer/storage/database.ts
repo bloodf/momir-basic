@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { MIGRATIONS } from './schema';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 type Row = Record<string, unknown>;
 
@@ -265,8 +266,9 @@ export async function initializeDatabase(db: PrinterDatabase): Promise<void> {
         const { table, column, type } = migration.addColumnIfMissing as { table: string; column: string; type: string };
         try {
           await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-        } catch {
+        } catch (error) {
           // Column already exists — safe to ignore
+          logger.debug(ErrorCategory.Storage, 'Column already exists, skipping ALTER TABLE', error);
         }
       }
 

@@ -3,6 +3,7 @@ import { Platform, AppState } from 'react-native';
 import createContextHook from '@nkzw/create-context-hook';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { showToast } from '@/components/Toast';
+import { ErrorCategory, logger } from '@/utils/logger';
 
 async function checkConnectivity(): Promise<boolean> {
   try {
@@ -17,7 +18,9 @@ async function checkConnectivity(): Promise<boolean> {
     });
     clearTimeout(timeout);
     return response.status > 0;
-  } catch {
+  } catch (error) {
+    // Connectivity check failure is non-critical; return offline silently
+    logger.debug(ErrorCategory.Network, 'Connectivity check failed', error);
     return false;
   }
 }
@@ -70,7 +73,7 @@ export const [NetworkProvider, useNetwork] = createContextHook(() => {
         message: 'Connection restored',
         duration: 3000,
       });
-      console.log('[Network] Device back online');
+      logger.info(ErrorCategory.Network, 'Device back online');
     }
   }, [isOnline]);
 
