@@ -12,7 +12,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **STAB-01**: App does not crash on startup when AsyncStorage contains corrupted JSON (add try-catch around all JSON.parse in providers)
 - [ ] **STAB-02**: Service account keys removed from repo and loaded from CI secrets or environment variables
 - [ ] **STAB-03**: Build artifact (.aab) removed from repository root
-- [ ] **STAB-04**: All empty catch blocks classified — either handle explicitly or log with structured error type
+- [x] **STAB-04**: All empty catch blocks classified — either handle explicitly or log with structured error type
 - [ ] **STAB-05**: Unsafe JSON.parse on external Scryfall data replaced with Zod schema validation
 - [ ] **STAB-06**: Scryfall API responses validated against Zod schemas before use
 
@@ -108,7 +108,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STAB-01 | Phase 1 | Pending |
 | STAB-02 | Phase 1 | Pending |
 | STAB-03 | Phase 1 | Pending |
-| STAB-04 | Phase 1 | Pending |
+| STAB-04 | Phase 1 | Complete |
 | STAB-05 | Phase 4 | Pending |
 | STAB-06 | Phase 4 | Pending |
 | ARCH-01 | Phase 2 | Pending |
