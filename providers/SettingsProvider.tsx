@@ -10,6 +10,7 @@ import {
   migratePrinterPreferences,
   DEFAULT_PRINTER_PREFERENCES,
 } from '@/types';
+import { safeJsonParse } from '@/utils/safe-json-parse';
 
 const SETTINGS_KEY = 'momir_settings';
 
@@ -40,7 +41,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     queryKey: ['appSettings'],
     queryFn: async () => {
       const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-      const parsed = stored ? JSON.parse(stored) : {};
+      const parsed = safeJsonParse(stored, {}, SETTINGS_KEY);
       const merged: AppSettings = {
         ...DEFAULT_SETTINGS,
         ...parsed,
@@ -122,13 +123,13 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
 
 export async function getPrinterPreferencesFromSettings(): Promise<PrinterPreferences> {
   const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-  const parsed = stored ? JSON.parse(stored) : {};
+  const parsed = safeJsonParse(stored, {}, SETTINGS_KEY);
   return { ...DEFAULT_PRINTER_PREFERENCES, ...(parsed.printer ?? {}) };
 }
 
 export async function savePrinterPreferencesToSettings(prefs: Partial<PrinterPreferences>): Promise<void> {
   const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-  const parsed = stored ? JSON.parse(stored) : {};
+  const parsed = safeJsonParse(stored, {}, SETTINGS_KEY);
   const updated = {
     ...parsed,
     printer: { ...(parsed.printer || DEFAULT_PRINTER_PREFERENCES), ...prefs },

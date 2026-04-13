@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { Card } from '@/types';
+import { safeJsonParse } from '@/utils/safe-json-parse';
 
 const HISTORY_KEY = 'momir_card_history';
 
@@ -14,7 +15,7 @@ export const [HistoryProvider, useHistory] = createContextHook(() => {
     queryKey: ['cardHistory'],
     queryFn: async () => {
       const stored = await AsyncStorage.getItem(HISTORY_KEY);
-      return stored ? (JSON.parse(stored) as Card[]) : [];
+      return safeJsonParse<Card[]>(stored, [], HISTORY_KEY);
     },
   });
 
