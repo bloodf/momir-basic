@@ -27,7 +27,6 @@ Cast random cards by mana value, search Scryfall, track history, use life counte
 ### Prerequisites
 
 - Node.js 18+ and Bun
-- Xcode (for iOS simulator/dev builds)
 - Android Studio (for Android emulator/dev builds)
 - EAS account (for cloud builds/submissions)
 
@@ -43,7 +42,6 @@ bun start
 ### Run platforms
 
 ```bash
-bun ios
 bun android
 bun run start:web
 ```
@@ -69,8 +67,6 @@ npx eas-cli build --platform android --profile preview
 # Android production AAB
 npx eas-cli build --platform android --profile production
 
-# iOS production build
-npx eas-cli build --platform ios --profile production
 ```
 
 ### CI/CD automation

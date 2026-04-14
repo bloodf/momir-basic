@@ -7,9 +7,6 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "ios": {
-        "resourceClass": "m-medium"
-      },
       "android": {
         "buildType": "apk"
       }
@@ -17,10 +14,6 @@
     "production": {
       "distribution": "store",
       "channel": "production",
-      "ios": {
-        "resourceClass": "m-medium",
-        "autoIncrement": true
-      },
       "android": {
         "buildType": "app-bundle",
         "autoIncrement": true
@@ -32,8 +25,6 @@
       "android": {
         "track": "internal",
         "releaseStatus": "draft"
-      },
-      "ios": {
       }
     },
     "playstoreProduction": {

@@ -21,43 +21,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.bloodf.momirbasic",
-      "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to thermal POS printers for printing receipts and orders.",
-        "NSPhotoLibraryAddUsageDescription": "This app saves card images to your photo library so you can share them."
-      },
-      "privacyManifests": {
-        "NSPrivacyAccessedAPITypes": [
-          {
-            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
-            "NSPrivacyAccessedAPITypeReasons": [
-              "C617.1"
-            ]
-          },
-          {
-            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": [
-              "CA92.1"
-            ]
-          }
-        ]
-      }
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.bloodf.momirbasicapp",
-      "permissions": [
-        "BLUETOOTH",
-        "BLUETOOTH_ADMIN",
-        "BLUETOOTH_CONNECT",
-        "BLUETOOTH_SCAN"
-      ]
+      "permissions": ["BLUETOOTH", "BLUETOOTH_ADMIN", "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN"]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -81,7 +51,6 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-dev-client",
       "react-native-thermal-printer-driver",
       "expo-sqlite"
     ],
