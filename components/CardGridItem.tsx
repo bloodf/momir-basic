@@ -59,14 +59,16 @@ export const CardGridItem = memo(function CardGridItem({ card, onPress }: CardGr
       >
         <View style={styles.imageWrap}>
           <Image
-            source={{ uri: card.normalImageUrl || card.artCropUrl }}
+            source={{ uri: card.artCropUrl || card.normalImageUrl }}
             style={styles.image}
             contentFit="cover"
             transition={200}
           />
           {card.power && card.toughness && (
             <View style={styles.ptBadge}>
-              <Text style={styles.ptText}>{card.power}/{card.toughness}</Text>
+              <Text style={styles.ptText}>
+                {card.power}/{card.toughness}
+              </Text>
             </View>
           )}
           <Pressable
@@ -78,10 +80,14 @@ export const CardGridItem = memo(function CardGridItem({ card, onPress }: CardGr
           </Pressable>
         </View>
         <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>{card.printedName ?? card.name}</Text>
+          <Text style={styles.name} numberOfLines={1}>
+            {card.printedName ?? card.name}
+          </Text>
           <View style={styles.metaRow}>
             <SetSymbol setCode={card.setCode} rarity={card.rarity} size={13} />
-            <Text style={styles.setName} numberOfLines={1}>{card.setName}</Text>
+            <Text style={styles.setName} numberOfLines={1}>
+              {card.setName}
+            </Text>
           </View>
           <ManaCost manaCost={card.manaCost} size={12} gap={1} />
         </View>

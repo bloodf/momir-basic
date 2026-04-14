@@ -78,16 +78,19 @@ export default function SearchScreen() {
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
 
-  const handleViewModeToggle = useCallback((mode: ViewMode) => {
-    if (mode === viewMode) return;
-    if (Platform.OS !== 'web') void Haptics.selectionAsync();
-    setViewMode(mode);
-    Animated.timing(toggleAnim, {
-      toValue: mode === 'grid' ? 1 : 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [viewMode, toggleAnim]);
+  const handleViewModeToggle = useCallback(
+    (mode: ViewMode) => {
+      if (mode === viewMode) return;
+      if (Platform.OS !== 'web') void Haptics.selectionAsync();
+      setViewMode(mode);
+      Animated.timing(toggleAnim, {
+        toValue: mode === 'grid' ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    },
+    [viewMode, toggleAnim]
+  );
 
   const searchMutation = useMutation({
     mutationFn: async ({ q, page }: { q: string; page: number }) => {
@@ -148,73 +151,92 @@ export default function SearchScreen() {
     mutationFn: async (q: string) => {
       return autocompleteCardName(q);
     },
-    onSuccess: (data) => {
+    onSuccess: data => {
       setSuggestions(data.slice(0, 8));
     },
   });
 
-  const handleSearch = useCallback((searchQuery?: string) => {
-    const textQ = searchQuery ?? query;
-    const fullQ = buildFullQuery(textQ.trim(), filters);
-    if (!fullQ) return;
-    Keyboard.dismiss();
-    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSuggestions([]);
-    setSearchError(null);
-    lastSearchQuery.current = fullQ;
-    searchMutation.mutate({ q: fullQ, page: 1 });
-  }, [query, filters, buildFullQuery, searchMutation]);
+  const handleSearch = useCallback(
+    (searchQuery?: string) => {
+      const textQ = searchQuery ?? query;
+      const fullQ = buildFullQuery(textQ.trim(), filters);
+      if (!fullQ) return;
+      Keyboard.dismiss();
+      if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSuggestions([]);
+      setSearchError(null);
+      lastSearchQuery.current = fullQ;
+      searchMutation.mutate({ q: fullQ, page: 1 });
+    },
+    [query, filters, buildFullQuery, searchMutation]
+  );
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || searchMutation.isPending) return;
     searchMutation.mutate({ q: lastSearchQuery.current, page: currentPage + 1 });
   }, [hasMore, searchMutation, currentPage]);
 
-  const handleQueryChange = useCallback((text: string) => {
-    setQuery(text);
-    if (text.length >= 2) {
-      autocompleteMutation.mutate(text);
-    } else {
+  const handleQueryChange = useCallback(
+    (text: string) => {
+      setQuery(text);
+      if (text.length >= 2) {
+        autocompleteMutation.mutate(text);
+      } else {
+        setSuggestions([]);
+      }
+    },
+    [autocompleteMutation]
+  );
+
+  const handleSuggestionTap = useCallback(
+    (suggestion: string) => {
+      setQuery(suggestion);
       setSuggestions([]);
-    }
-  }, [autocompleteMutation]);
+      setSearchError(null);
+      Keyboard.dismiss();
+      if (Platform.OS !== 'web') void Haptics.selectionAsync();
+      const fullQ = buildFullQuery(suggestion, filters);
+      lastSearchQuery.current = fullQ;
+      searchMutation.mutate({ q: fullQ, page: 1 });
+    },
+    [searchMutation, filters, buildFullQuery]
+  );
 
-  const handleSuggestionTap = useCallback((suggestion: string) => {
-    setQuery(suggestion);
-    setSuggestions([]);
-    setSearchError(null);
-    Keyboard.dismiss();
-    if (Platform.OS !== 'web') void Haptics.selectionAsync();
-    const fullQ = buildFullQuery(suggestion, filters);
-    lastSearchQuery.current = fullQ;
-    searchMutation.mutate({ q: fullQ, page: 1 });
-  }, [searchMutation, filters, buildFullQuery]);
-
-  const handleCardPress = useCallback((card: Card) => {
-    router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
-  }, [router]);
+  const handleCardPress = useCallback(
+    (card: Card) => {
+      router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
+    },
+    [router]
+  );
 
   const handleClear = useCallback(() => {
     setQuery('');
     clearSearchResults();
   }, [clearSearchResults]);
 
-  const handleFiltersChange = useCallback((newFilters: SearchFilterState) => {
-    setFilters(newFilters);
-    if (query.trim().length === 0 && getActiveFilterCount(newFilters) === 0) {
-      clearSearchResults();
-    }
-  }, [clearSearchResults, query]);
+  const handleFiltersChange = useCallback(
+    (newFilters: SearchFilterState) => {
+      setFilters(newFilters);
+      if (query.trim().length === 0 && getActiveFilterCount(newFilters) === 0) {
+        clearSearchResults();
+      }
+    },
+    [clearSearchResults, query]
+  );
 
   const activeFilterCount = useMemo(() => getActiveFilterCount(filters), [filters]);
 
-  const renderListItem = useCallback(({ item }: { item: Card }) => (
-    <CardListItem card={item} onPress={handleCardPress} />
-  ), [handleCardPress]);
+  const renderListItem = useCallback(
+    ({ item }: { item: Card }) => (
+      <CardListItem card={item} onPress={handleCardPress} thumbnailVariant="art" />
+    ),
+    [handleCardPress]
+  );
 
-  const renderGridItem = useCallback(({ item }: { item: Card }) => (
-    <CardGridItem card={item} onPress={handleCardPress} />
-  ), [handleCardPress]);
+  const renderGridItem = useCallback(
+    ({ item }: { item: Card }) => <CardGridItem card={item} onPress={handleCardPress} />,
+    [handleCardPress]
+  );
 
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
@@ -246,7 +268,10 @@ export default function SearchScreen() {
           ]}
           testID="filter-dialog-open"
         >
-          <SlidersHorizontal size={18} color={activeFilterCount > 0 ? Colors.background : Colors.textMuted} />
+          <SlidersHorizontal
+            size={18}
+            color={activeFilterCount > 0 ? Colors.background : Colors.textMuted}
+          />
           {activeFilterCount > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
@@ -278,13 +303,13 @@ export default function SearchScreen() {
               style={({ pressed }) => [styles.suggestionItem, pressed && styles.suggestionPressed]}
             >
               <Search size={13} color={Colors.textMuted} />
-              <Text style={styles.suggestionText} numberOfLines={1}>{s}</Text>
+              <Text style={styles.suggestionText} numberOfLines={1}>
+                {s}
+              </Text>
             </Pressable>
           ))}
         </View>
       )}
-
-
 
       {hasSearched && results.length === 0 && !searchMutation.isPending && searchError && (
         <View style={styles.emptyState}>
@@ -310,9 +335,7 @@ export default function SearchScreen() {
 
       {hasSearched && totalCount > 0 && (
         <View style={styles.resultBar}>
-          <Text style={styles.resultCount}>
-            {t.search.cardsFound(totalCount)}
-          </Text>
+          <Text style={styles.resultCount}>{t.search.cardsFound(totalCount)}</Text>
           <View style={styles.viewToggle}>
             <Pressable
               onPress={() => handleViewModeToggle('list')}
@@ -332,9 +355,7 @@ export default function SearchScreen() {
         </View>
       )}
 
-      {isFirstPageLoading && (
-        viewMode === 'list' ? <SearchSkeleton /> : <CardGridSkeleton />
-      )}
+      {isFirstPageLoading && (viewMode === 'list' ? <SearchSkeleton /> : <CardGridSkeleton />)}
 
       {results.length > 0 && viewMode === 'list' && (
         <FlatList
@@ -354,9 +375,7 @@ export default function SearchScreen() {
               )}
               {hasMore && !searchMutation.isPending && (
                 <View style={styles.paginationRow}>
-                  <Text style={styles.pageInfo}>
-                    {t.search.page(currentPage, totalPages)}
-                  </Text>
+                  <Text style={styles.pageInfo}>{t.search.page(currentPage, totalPages)}</Text>
                 </View>
               )}
             </>
@@ -378,14 +397,10 @@ export default function SearchScreen() {
           keyboardDismissMode="on-drag"
           ListFooterComponent={
             <>
-              {isLoadingMore && (
-                <CardGridSkeleton />
-              )}
+              {isLoadingMore && <CardGridSkeleton />}
               {hasMore && !searchMutation.isPending && (
                 <View style={styles.paginationRow}>
-                  <Text style={styles.pageInfo}>
-                    {t.search.page(currentPage, totalPages)}
-                  </Text>
+                  <Text style={styles.pageInfo}>{t.search.page(currentPage, totalPages)}</Text>
                 </View>
               )}
             </>
