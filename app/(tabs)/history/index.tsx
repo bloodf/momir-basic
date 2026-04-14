@@ -1,48 +1,43 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  Pressable,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Trash2, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
-import { useHistory, useFilteredHistory } from '@/providers/HistoryProvider';
+import { useFilteredHistory, useHistoryStore } from '@/stores/historyStore';
 import { CardListItem } from '@/components/CardListItem';
 import { useI18n } from '@/i18n';
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { clearHistory, cards } = useHistory();
+  const cards = useHistoryStore(state => state.cards);
+  const clearHistory = useHistoryStore(state => state.clearHistory);
   const { t } = useI18n();
   const [search, setSearch] = useState('');
   const filteredCards = useFilteredHistory(search);
 
-  const handleCardPress = useCallback((card: Card) => {
-    router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
-  }, [router]);
+  const handleCardPress = useCallback(
+    (card: Card) => {
+      router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
+    },
+    [router]
+  );
 
   const handleClear = useCallback(() => {
-    Alert.alert(
-      t.history.clearHistory,
-      t.history.deleteAll(cards.length),
-      [
-        { text: t.common.cancel, style: 'cancel' },
-        { text: t.history.clearAll, style: 'destructive', onPress: clearHistory },
-      ]
-    );
+    Alert.alert(t.history.clearHistory, t.history.deleteAll(cards.length), [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.history.clearAll, style: 'destructive', onPress: clearHistory },
+    ]);
   }, [cards.length, clearHistory, t]);
 
-  const renderItem = useCallback(({ item }: { item: Card }) => (
-    <CardListItem card={item} onPress={handleCardPress} thumbnailVariant="art" />
-  ), [handleCardPress]);
+  const renderItem = useCallback(
+    ({ item }: { item: Card }) => (
+      <CardListItem card={item} onPress={handleCardPress} thumbnailVariant="art" />
+    ),
+    [handleCardPress]
+  );
 
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
@@ -75,9 +70,7 @@ export default function HistoryScreen() {
         )}
       </View>
 
-      <Text style={styles.countText}>
-        {t.history.cardsCount(filteredCards.length, !search)}
-      </Text>
+      <Text style={styles.countText}>{t.history.cardsCount(filteredCards.length, !search)}</Text>
 
       <FlatList
         data={filteredCards}

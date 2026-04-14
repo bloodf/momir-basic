@@ -18,7 +18,7 @@ import { Search, Trash2, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { Card } from '@/types';
-import { useHistory, useFilteredHistory } from '@/providers/HistoryProvider';
+import { useFilteredHistory, useHistoryStore } from '@/stores/historyStore';
 import { CardListItem } from '@/components/CardListItem';
 import { useI18n } from '@/i18n';
 
@@ -34,7 +34,8 @@ interface HistorySheetProps {
 export function HistorySheet({ visible, onClose }: HistorySheetProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { clearHistory, cards } = useHistory();
+  const cards = useHistoryStore(state => state.cards);
+  const clearHistory = useHistoryStore(state => state.clearHistory);
   const { t } = useI18n();
   const [search, setSearch] = useState('');
   const filteredCards = useFilteredHistory(search);
@@ -108,24 +109,26 @@ export function HistorySheet({ visible, onClose }: HistorySheetProps) {
     onClose();
   }, [onClose]);
 
-  const handleCardPress = useCallback((card: Card) => {
-    router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
-  }, [router]);
+  const handleCardPress = useCallback(
+    (card: Card) => {
+      router.push({ pathname: '/card', params: { cardJson: JSON.stringify(card) } });
+    },
+    [router]
+  );
 
   const handleClear = useCallback(() => {
-    Alert.alert(
-      t.history.clearHistory,
-      t.history.deleteAll(cards.length),
-      [
-        { text: t.common.cancel, style: 'cancel' },
-        { text: t.history.clearAll, style: 'destructive', onPress: clearHistory },
-      ]
-    );
+    Alert.alert(t.history.clearHistory, t.history.deleteAll(cards.length), [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.history.clearAll, style: 'destructive', onPress: clearHistory },
+    ]);
   }, [cards.length, clearHistory, t]);
 
-  const renderItem = useCallback(({ item }: { item: Card }) => (
-    <CardListItem card={item} onPress={handleCardPress} thumbnailVariant="art" />
-  ), [handleCardPress]);
+  const renderItem = useCallback(
+    ({ item }: { item: Card }) => (
+      <CardListItem card={item} onPress={handleCardPress} thumbnailVariant="art" />
+    ),
+    [handleCardPress]
+  );
 
   const keyExtractor = useCallback((item: Card, index: number) => `${item.id}-${index}`, []);
 
@@ -155,11 +158,21 @@ export function HistorySheet({ visible, onClose }: HistorySheetProps) {
           <Text style={styles.title}>{t.history.title}</Text>
           <View style={styles.headerActions}>
             {cards.length > 0 && (
-              <Pressable onPress={handleClear} hitSlop={12} testID="clear-history" style={styles.headerBtn}>
+              <Pressable
+                onPress={handleClear}
+                hitSlop={12}
+                testID="clear-history"
+                style={styles.headerBtn}
+              >
                 <Trash2 size={18} color={Colors.error} />
               </Pressable>
             )}
-            <Pressable onPress={handleClose} hitSlop={12} testID="close-history" style={styles.closeBtn}>
+            <Pressable
+              onPress={handleClose}
+              hitSlop={12}
+              testID="close-history"
+              style={styles.closeBtn}
+            >
               <X size={18} color={Colors.textSecondary} />
             </Pressable>
           </View>
@@ -183,9 +196,7 @@ export function HistorySheet({ visible, onClose }: HistorySheetProps) {
           )}
         </View>
 
-        <Text style={styles.countText}>
-          {t.history.cardsCount(filteredCards.length, !search)}
-        </Text>
+        <Text style={styles.countText}>{t.history.cardsCount(filteredCards.length, !search)}</Text>
 
         <FlatList
           data={filteredCards}
