@@ -41,7 +41,7 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     queryKey: ['appSettings'],
     queryFn: async () => {
       const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-      const parsed = safeJsonParse(stored, {}, SETTINGS_KEY);
+      const parsed = safeJsonParse<Partial<AppSettings>>(stored, {}, SETTINGS_KEY);
       const merged: AppSettings = {
         ...DEFAULT_SETTINGS,
         ...parsed,
@@ -51,15 +51,22 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
       };
 
       if (parsed.printer && typeof parsed.printer === 'object') {
-        const printer = parsed.printer as Record<string, unknown>;
-        if ('address' in printer && !('preferredPrinterId' in printer)) {
+        const printerEntries: Record<string, unknown> = { ...parsed.printer };
+        if ('address' in printerEntries && !('preferredPrinterId' in printerEntries)) {
           const legacyConfig: LegacyPrinterConfig = {
-            name: typeof printer.name === 'string' ? printer.name : '',
-            address: typeof printer.address === 'string' ? printer.address : '',
-            type: printer.type === 'classic' || printer.type === 'ble' ? printer.type : 'ble',
-            paperWidth: printer.paperWidth === 58 || printer.paperWidth === 80 ? printer.paperWidth : 58,
-            printArt: typeof printer.printArt === 'boolean' ? printer.printArt : true,
-            autoPrint: typeof printer.autoPrint === 'boolean' ? printer.autoPrint : false,
+            name: typeof printerEntries.name === 'string' ? printerEntries.name : '',
+            address: typeof printerEntries.address === 'string' ? printerEntries.address : '',
+            type:
+              printerEntries.type === 'classic' || printerEntries.type === 'ble'
+                ? printerEntries.type
+                : 'ble',
+            paperWidth:
+              printerEntries.paperWidth === 58 || printerEntries.paperWidth === 80
+                ? printerEntries.paperWidth
+                : 58,
+            printArt: typeof printerEntries.printArt === 'boolean' ? printerEntries.printArt : true,
+            autoPrint:
+              typeof printerEntries.autoPrint === 'boolean' ? printerEntries.autoPrint : false,
           };
           merged.printer = migratePrinterPreferences(legacyConfig);
         }
@@ -75,7 +82,6 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     }
   }, [settingsQuery.data]);
 
-
   const saveMutation = useMutation({
     mutationFn: async (updated: AppSettings) => {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
@@ -86,50 +92,71 @@ export const [SettingsProvider, useSettings] = createContextHook(() => {
     },
   });
 
-  const updateSettings = useCallback((partial: Partial<AppSettings>) => {
-    setSettings(prev => {
-      const updated = { ...prev, ...partial };
-      saveMutation.mutate(updated);
-      return updated;
-    });
-  }, [saveMutation]);
+  const updateSettings = useCallback(
+    (partial: Partial<AppSettings>) => {
+      setSettings(prev => {
+        const updated = { ...prev, ...partial };
+        saveMutation.mutate(updated);
+        return updated;
+      });
+    },
+    [saveMutation]
+  );
 
-  const updatePrinter = useCallback((partial: Partial<PrinterPreferences>) => {
-    setSettings(prev => {
-      const updated = { ...prev, printer: { ...prev.printer, ...partial } };
-      saveMutation.mutate(updated);
-      return updated;
-    });
-  }, [saveMutation]);
+  const updatePrinter = useCallback(
+    (partial: Partial<PrinterPreferences>) => {
+      setSettings(prev => {
+        const updated = { ...prev, printer: { ...prev.printer, ...partial } };
+        saveMutation.mutate(updated);
+        return updated;
+      });
+    },
+    [saveMutation]
+  );
 
-  const savePreferredPrinter = useCallback(async (deviceId: string) => {
-    await updatePrinter({ preferredPrinterId: deviceId });
-    await savePreferredPrinterToRegistry(deviceId);
-  }, [updatePrinter]);
+  const savePreferredPrinter = useCallback(
+    async (deviceId: string) => {
+      await updatePrinter({ preferredPrinterId: deviceId });
+      await savePreferredPrinterToRegistry(deviceId);
+    },
+    [updatePrinter]
+  );
 
   const getPreferredPrinter = useCallback(async (): Promise<PrinterRecord | null> => {
     return getPreferredPrinterFromRegistry();
   }, []);
 
-  return useMemo(() => ({
-    settings,
-    updateSettings,
-    updatePrinter,
-    savePreferredPrinter,
-    getPreferredPrinter,
-    isLoading: settingsQuery.isLoading,
-  }), [settings, updateSettings, updatePrinter, savePreferredPrinter, getPreferredPrinter, settingsQuery.isLoading]);
+  return useMemo(
+    () => ({
+      settings,
+      updateSettings,
+      updatePrinter,
+      savePreferredPrinter,
+      getPreferredPrinter,
+      isLoading: settingsQuery.isLoading,
+    }),
+    [
+      settings,
+      updateSettings,
+      updatePrinter,
+      savePreferredPrinter,
+      getPreferredPrinter,
+      settingsQuery.isLoading,
+    ]
+  );
 });
 
 export async function getPrinterPreferencesFromSettings(): Promise<PrinterPreferences> {
   const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-  const parsed = safeJsonParse(stored, {}, SETTINGS_KEY);
+  const parsed = safeJsonParse<Partial<AppSettings>>(stored, {}, SETTINGS_KEY);
   return { ...DEFAULT_PRINTER_PREFERENCES, ...(parsed.printer ?? {}) };
 }
 
-export async function savePrinterPreferencesToSettings(prefs: Partial<PrinterPreferences>): Promise<void> {
+export async function savePrinterPreferencesToSettings(
+  prefs: Partial<PrinterPreferences>
+): Promise<void> {
   const stored = await AsyncStorage.getItem(SETTINGS_KEY);
-  const parsed = safeJsonParse(stored, {}, SETTINGS_KEY);
+  const parsed = safeJsonParse<Partial<AppSettings>>(stored, {}, SETTINGS_KEY);
   const updated = {
     ...parsed,
     printer: { ...(parsed.printer || DEFAULT_PRINTER_PREFERENCES), ...prefs },

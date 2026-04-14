@@ -19,7 +19,19 @@ import zht from './locales/zht';
 export type Locale = 'en' | 'pt' | 'es' | 'fr' | 'de' | 'it' | 'ja' | 'ko' | 'ru' | 'zhs' | 'zht';
 export type { Translations };
 
-const locales: Record<Locale, Translations> = { en, pt, es, fr, de, it, ja, ko, ru, zhs, zht };
+export const locales: Record<Locale, Translations> = {
+  en,
+  pt,
+  es,
+  fr,
+  de,
+  it,
+  ja,
+  ko,
+  ru,
+  zhs,
+  zht,
+};
 
 const LOCALE_KEY = 'momir_locale';
 
@@ -37,7 +49,7 @@ export const LOCALE_TO_SCRYFALL_LANG: Record<Locale, string> = {
   zht: 'zht',
 };
 
-function getDeviceLocale(): Locale {
+export function getDeviceLocale(): Locale {
   try {
     let deviceLang = 'en';
     if (Platform.OS === 'ios') {
@@ -99,7 +111,19 @@ export const LOCALE_FLAGS: Record<Locale, string> = {
   zht: '🇹🇼',
 };
 
-export const ALL_LOCALES: Locale[] = ['en', 'pt', 'es', 'fr', 'de', 'it', 'ja', 'ko', 'ru', 'zhs', 'zht'];
+export const ALL_LOCALES: Locale[] = [
+  'en',
+  'pt',
+  'es',
+  'fr',
+  'de',
+  'it',
+  'ja',
+  'ko',
+  'ru',
+  'zhs',
+  'zht',
+];
 
 function isValidLocale(value: string): value is Locale {
   return ALL_LOCALES.includes(value as Locale);
@@ -110,23 +134,25 @@ export const [I18nProvider, useI18n] = createContextHook(() => {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(LOCALE_KEY).then((stored) => {
-      if (stored && isValidLocale(stored)) {
-        setLocaleState(stored);
-      } else {
+    AsyncStorage.getItem(LOCALE_KEY)
+      .then(stored => {
+        if (stored && isValidLocale(stored)) {
+          setLocaleState(stored);
+        } else {
+          setLocaleState(getDeviceLocale());
+        }
+        setLoaded(true);
+      })
+      .catch(error => {
+        logger.error(ErrorCategory.Storage, 'Failed to read stored locale', error);
         setLocaleState(getDeviceLocale());
-      }
-      setLoaded(true);
-    }).catch((error) => {
-      logger.error(ErrorCategory.Storage, 'Failed to read stored locale', error);
-      setLocaleState(getDeviceLocale());
-      setLoaded(true);
-    });
+        setLoaded(true);
+      });
   }, []);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
-    AsyncStorage.setItem(LOCALE_KEY, newLocale).catch((error) => {
+    AsyncStorage.setItem(LOCALE_KEY, newLocale).catch(error => {
       logger.error(ErrorCategory.Storage, 'Failed to persist locale', error);
     });
   }, []);
@@ -135,11 +161,14 @@ export const [I18nProvider, useI18n] = createContextHook(() => {
 
   const scryfallLang = useMemo(() => LOCALE_TO_SCRYFALL_LANG[locale], [locale]);
 
-  return useMemo(() => ({
-    locale,
-    setLocale,
-    t,
-    loaded,
-    scryfallLang,
-  }), [locale, setLocale, t, loaded, scryfallLang]);
+  return useMemo(
+    () => ({
+      locale,
+      setLocale,
+      t,
+      loaded,
+      scryfallLang,
+    }),
+    [locale, setLocale, t, loaded, scryfallLang]
+  );
 });
