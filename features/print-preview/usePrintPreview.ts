@@ -5,9 +5,9 @@ import { showToast } from '@/components/Toast';
 import { ErrorCategory, logger } from '@/utils/logger';
 import { useI18n } from '@/stores/i18nStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
 import type { Card } from '@/types';
+import { registryService } from '@/services/printer/registry/service';
 
 export type PrinterConnectionState = 'checking' | 'connected' | 'disconnected' | 'no_printer';
 
@@ -38,7 +38,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
 
   /**
    * checkPrinterConnection — verifies the preferred printer is physically connected.
-   * Uses adapter.isConnected() to determine real state.
+   * Uses registryService.isPrinterConnected() to determine real state.
    */
   const checkPrinterConnection = useCallback(async () => {
     const prefId = settings.printer?.preferredPrinterId;
@@ -48,8 +48,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
     }
 
     try {
-      const adapter = createAdapter();
-      const isConnected = await adapter.isConnected(prefId);
+      const isConnected = await registryService.isPrinterConnected(prefId);
       setPrinterState(isConnected ? 'connected' : 'disconnected');
     } catch (error) {
       logger.debug(ErrorCategory.Printer, 'Printer connection verification failed', error);
@@ -89,8 +88,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
     }
 
     try {
-      const adapter = createAdapter();
-      const isConnected = await adapter.isConnected(preferredPrinterId);
+      const isConnected = await registryService.isPrinterConnected(preferredPrinterId);
       if (!isConnected) {
         setOutcomeBanner({ type: 'failed', message: t.toast.printerReconnectMessage });
         showToast({ type: 'error', title: t.toast.printerReconnectTitle, message: t.toast.printerReconnectMessage });
@@ -115,6 +113,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
       imageUrl: card.normalImageUrl || card.artCropUrl,
       setCode: card.setCode,
       scryfallId: card.id,
+      scryfallUrl,
       backFaceData: isDoubleFaced && card.faces?.[1] ? {
         name: card.faces[1].name ?? card.name,
         manaCost: card.faces[1].manaCost,
@@ -130,8 +129,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
     try {
       setIsPrinting(true);
 
-      const adapter = createAdapter();
-      await adapter.connectPrinter(preferredPrinterId);
+      const adapter = await registryService.connectPrinter(preferredPrinterId);
 
       const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
       const printMode = settings.printer?.printMode ?? 'full';
@@ -146,7 +144,8 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
             brightness: settings.printer?.imageBrightness ?? 1.0,
             contrast: settings.printer?.imageContrast ?? 1.0,
             threshold: settings.printer?.imageThreshold ?? 128,
-            maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+            // Full card: no height cap ("Max Art Height" is for receipt art), so it fills the width
+            maxHeightPx: Number.POSITIVE_INFINITY,
           });
           await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
         } else {
@@ -162,7 +161,8 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
               brightness: settings.printer?.imageBrightness ?? 1.0,
               contrast: settings.printer?.imageContrast ?? 1.0,
               threshold: settings.printer?.imageThreshold ?? 128,
-              maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+              // Full card: no height cap ("Max Art Height" is for receipt art), so it fills the width
+              maxHeightPx: Number.POSITIVE_INFINITY,
             });
             await adapter.sendImage(rasterizedBack.base64Png, rasterizedBack.widthPx, rasterizedBack.heightPx);
           }

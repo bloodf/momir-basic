@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Card, type PrinterPreferences } from '@/types';
 import { ErrorCategory, logger } from '@/utils/logger';
-import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
+import { registryService } from '@/services/printer/registry/service';
 
 interface UseAutoPrintOptions {
   card: Card | undefined;
@@ -24,8 +24,7 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
       const printArt = printerSettings.printArt ?? true;
 
       try {
-        const adapter = createAdapter();
-        await adapter.connectPrinter(printerSettings.preferredPrinterId);
+        const adapter = await registryService.connectPrinter(printerSettings.preferredPrinterId);
 
         if (printMode === 'image_only') {
           if (imageUrl) {
@@ -34,7 +33,8 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
               brightness: printerSettings.imageBrightness ?? 1.0,
               contrast: printerSettings.imageContrast ?? 1.0,
               threshold: printerSettings.imageThreshold ?? 128,
-              maxHeightPx: printerSettings.imageMaxHeightPx ?? 480,
+              // Full card: no height cap ("Max Art Height" is for receipt art), so it fills the width
+              maxHeightPx: Number.POSITIVE_INFINITY,
             });
             await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
           }
@@ -74,6 +74,9 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
             imageUrl: imageUrl ?? '',
             setCode: cardToPrint.setCode,
             scryfallId: cardToPrint.id,
+            scryfallUrl:
+              cardToPrint.scryfallUri ||
+              `https://scryfall.com/card/${cardToPrint.setCode.toLowerCase()}/${cardToPrint.collectorNumber}`,
             artBitmapBase64,
             artWidthPx,
             artHeightPx,

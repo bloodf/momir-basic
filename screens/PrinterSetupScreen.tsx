@@ -52,6 +52,7 @@ export default function PrinterSetupScreen() {
     scanError,
     permissionState,
     startScan,
+    loadSavedPrinters,
     setDiscoveredPrinters: setPrinters,
     setPermissionState,
     setScanError,
@@ -133,16 +134,19 @@ export default function PrinterSetupScreen() {
         return;
       }
 
+      const savedPrinters = await loadSavedPrinters();
+
       if (!isIOS) {
         try {
           const state = await printerCapabilityService.getAndroidPermissionState();
           setPermissionState(state.overall);
+          // Without Bluetooth permission, still list saved printers (e.g. TCP) when there are any
           if (state.overall === 'never_ask_again') {
-            setUiState('permission_never_ask');
+            setUiState(savedPrinters.length > 0 ? 'discovered' : 'permission_never_ask');
             return;
           }
           if (state.overall === 'denied') {
-            setUiState('permission_denied');
+            setUiState(savedPrinters.length > 0 ? 'discovered' : 'permission_denied');
             return;
           }
         } catch (error) {

@@ -49,8 +49,9 @@ export function useTcpPrinterSetup(): UseTcpPrinterSetupReturn {
     try {
       const tcpPrinter: PrinterRecord = {
         id: `tcp-${host}-${port}`,
-        name: `TCP Printer (${host})`,
-        address: host,
+        name: port === 9100 ? `TCP Printer (${host})` : `TCP Printer (${host}:${port})`,
+        // host:port — the native adapter maps this to the driver's lan:<host>:<port> address
+        address: `${host}:${port}`,
         transport: 'tcp',
         capabilities: {
           supportImage: true,

@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import type { PrinterRecord } from '@/types';
-import { createAdapter } from '@/services/printer/adapters/factory';
 import { showToast } from '@/components/Toast';
 import { ErrorCategory } from '@/utils/logger';
 import { logger } from '@/utils/logger';
+import { createAdapter } from '@/services/printer/adapters/factory';
 
 interface UsePrinterTestPrintReturn {
   testPrintStatus: string | null;
@@ -26,10 +26,9 @@ export function usePrinterTestPrint(): UsePrinterTestPrintReturn {
     setIsTestPrinting(true);
 
     try {
+      // Connect with the record's own address + transport: the printer may not be saved in the registry yet
       const adapter = createAdapter();
-
-      // Connect using registry DB key — adapter.connectPrinter handles address lookup
-      await adapter.connectPrinter(printer.id);
+      await adapter.connectPrinter(printer.address, printer.transport);
 
       // Build ESC/POS test page
       const now = new Date().toISOString();
