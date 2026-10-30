@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
 import { DitheredImage } from '@/components/DitheredImage';
-import type { DitherAlgorithm } from '@/types';
+import type { DitherAlgorithm, PaperPreset } from '@/types';
+import { resolvePaperPreset } from '@/constants/paperPresets';
 import { styles } from './styles';
 
 export interface DisplayFace {
@@ -20,7 +21,8 @@ export interface DisplayFace {
 }
 
 interface PrinterSettings {
-  paperWidth?: number;
+  paperWidth?: 58 | 80;
+  paperPreset?: PaperPreset;
   printMode?: string;
   printArt?: boolean;
   printQR?: boolean;
@@ -93,7 +95,7 @@ export function ReceiptContent({
               <View style={[styles.receiptArtWrap, { width: artWidth, height: artHeight }]}>
                 <DitheredImage
                   imageUrl={(displayFace.artCropUrl || displayFace.normalImageUrl) as string}
-                  widthPx={printerSettings.paperWidth === 80 ? 576 : 384}
+                  widthPx={resolvePaperPreset(printerSettings).dotsPerLine}
                   algorithm={printerSettings.imageDither ?? 'floyd'}
                   brightness={printerSettings.imageBrightness ?? 1.0}
                   contrast={printerSettings.imageContrast ?? 1.0}

@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Printer, ChevronRight, Zap, Info, Globe, ChevronDown, Github, Star, ExternalLink } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { PAPER_PRESETS, PAPER_PRESET_ORDER, nextPaperPreset, resolvePaperPreset } from '@/constants/paperPresets';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/i18n';
 import { ErrorCategory, logger } from '@/utils/logger';
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings, updatePrinter } = useSettings();
   const { t, locale, setLocale } = useI18n();
+  const paperPreset = resolvePaperPreset(settings.printer);
   const appVersion = Constants.expoConfig?.version ?? '—';
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const dropdownAnim = useRef(new Animated.Value(0)).current;
@@ -36,8 +38,9 @@ export default function SettingsScreen() {
   }, [langDropdownOpen, dropdownAnim]);
 
   const togglePaperWidth = useCallback(() => {
-    updatePrinter({ paperWidth: settings.printer.paperWidth === 58 ? 80 : 58 });
-  }, [settings.printer.paperWidth, updatePrinter]);
+    const next = PAPER_PRESETS[nextPaperPreset(resolvePaperPreset(settings.printer).id)];
+    updatePrinter({ paperPreset: next.id, paperWidth: next.paperWidth });
+  }, [settings.printer, updatePrinter]);
 
   const handleSelectLocale = useCallback((loc: Locale) => {
     setLocale(loc);
@@ -92,17 +95,19 @@ export default function SettingsScreen() {
           <Pressable onPress={togglePaperWidth} style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>{t.printer.paperWidth}</Text>
-              <Text style={styles.settingValue}>{settings.printer.paperWidth}mm</Text>
+              <Text style={styles.settingValue}>
+                {paperPreset.paperWidth}mm · {paperPreset.dotsPerLine} dots · {paperPreset.charsPerLine} cols
+              </Text>
             </View>
             <View style={styles.togglePill}>
-              <Text style={[
-                styles.toggleOption,
-                settings.printer.paperWidth === 58 && styles.toggleOptionActive,
-              ]}>58</Text>
-              <Text style={[
-                styles.toggleOption,
-                settings.printer.paperWidth === 80 && styles.toggleOptionActive,
-              ]}>80</Text>
+              {PAPER_PRESET_ORDER.map((id) => (
+                <Text
+                  key={id}
+                  style={[styles.toggleOption, paperPreset.id === id && styles.toggleOptionActive]}
+                >
+                  {PAPER_PRESETS[id].label}
+                </Text>
+              ))}
             </View>
           </Pressable>
 

@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
 import type { Card } from '@/types';
+import { resolvePaperPreset } from '@/constants/paperPresets';
 
 export type PrinterConnectionState = 'checking' | 'connected' | 'disconnected' | 'no_printer';
 
@@ -133,9 +134,10 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
       const adapter = createAdapter();
       await adapter.connectPrinter(preferredPrinterId);
 
-      const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
+      const paperPreset = resolvePaperPreset(settings.printer ?? {});
+      const paperWidth = paperPreset.paperWidth;
       const printMode = settings.printer?.printMode ?? 'full';
-      const widthPx = paperWidth === 80 ? 576 : 384;
+      const widthPx = paperPreset.dotsPerLine;
 
       if (printMode === 'image_only') {
         // IMAGE-ONLY MODE: Print rasterized card image(s)
@@ -249,6 +251,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
           printQR: settings.printer?.printQR ?? true,
           cut: false,
           paperWidth,
+          charsPerLine: paperPreset.charsPerLine,
           qrSize: settings.printer?.qrSize ?? 8,
           qrErrorCorrection: settings.printer?.qrErrorCorrection ?? 'L',
         });

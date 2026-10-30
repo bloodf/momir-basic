@@ -123,10 +123,14 @@ export interface PrinterCapabilities {
 export type PrintMode = 'full' | 'image_only';
 export type DitherAlgorithm = 'floyd' | 'bayer' | 'threshold' | 'none';
 export type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
+/** Paper + print-head geometry presets; see constants/paperPresets.ts */
+export type PaperPreset = '58mm' | '80mm' | '80mm_180dpi';
 
 export interface PrinterPreferences {
   preferredPrinterId: string | null;  // null = no printer selected
   paperWidth: 58 | 80;
+  /** Selected paper preset; when unset, derived from paperWidth (pre-preset settings) */
+  paperPreset?: PaperPreset;
   printArt: boolean;
   printQR: boolean;
   printFlavorText: boolean;
