@@ -31,15 +31,18 @@ async function requestBluetoothPermissions(): Promise<boolean> {
 
 /**
  * Map a registry address + transport to the driver's scheme-prefixed address
- * (`bt:<MAC>`, `ble:<MAC>`, `lan:<host>:<port>`). Already-prefixed addresses pass through.
+ * (`bt:<MAC>`, `ble:<MAC>`, `lan:<host>:<port>`, `usb:<vid>:<pid>`). Already-prefixed
+ * addresses pass through; USB addresses come from the driver already prefixed.
  */
 export function toDriverAddress(address: string, transport?: PrinterTransport): string {
-  if (address.startsWith('bt:') || address.startsWith('ble:') || address.startsWith('lan:')) {
+  if (/^(bt|ble|lan|usb):/.test(address)) {
     return address;
   }
   switch (transport) {
     case 'tcp':
       return `lan:${address}`;
+    case 'usb':
+      return `usb:${address}`;
     case 'ble':
       return `ble:${address}`;
     default:
@@ -117,6 +120,23 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     // eslint-disable-next-line no-console
     logger.debug(ErrorCategory.Printer, `adapter returning ${devices.length} devices`);
     return devices;
+  }
+
+  async discoverUsbPrinters(): Promise<PrinterDiscoveryResult[]> {
+    // Drivers before USB support (<= 0.1.1) don't have scanUsbDevices
+    if (Platform.OS !== 'android' || typeof NativeModules.ThermalPrinterDriver.scanUsbDevices !== 'function') {
+      return [];
+    }
+    const devices: ScanDevice[] = await NativeModules.ThermalPrinterDriver.scanUsbDevices();
+    return devices
+      .filter((device) => device.address)
+      .map((device) => ({
+        id: device.address,
+        name: device.name || 'USB Printer',
+        transport: 'usb' as const,
+        address: device.address,
+        capabilities: DEFAULT_CAPABILITIES,
+      }));
   }
 
   async connectPrinter(address: string, transport: PrinterTransport = 'classic'): Promise<void> {

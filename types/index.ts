@@ -72,20 +72,21 @@ export enum PrinterTransportType {
   BLE = 'ble',
   CLASSIC = 'classic',
   TCP = 'tcp',
+  USB = 'usb',
 }
 
 /** Legacy type alias for backward compatibility — prefer PrinterTransportType */
-export type PrinterTransport = 'ble' | 'classic' | 'tcp';
+export type PrinterTransport = 'ble' | 'classic' | 'tcp' | 'usb';
 
 /**
  * Validates that a string is a known PrinterTransport.
  * Returns the valid transport or throws if unknown.
  */
 export function validateTransport(transport: string): PrinterTransport {
-  if (transport === 'ble' || transport === 'classic' || transport === 'tcp') {
+  if (transport === 'ble' || transport === 'classic' || transport === 'tcp' || transport === 'usb') {
     return transport;
   }
-  throw new Error(`Unsupported transport: "${transport}". Expected one of: ble, classic, tcp`);
+  throw new Error(`Unsupported transport: "${transport}". Expected one of: ble, classic, tcp, usb`);
 }
 
 /**

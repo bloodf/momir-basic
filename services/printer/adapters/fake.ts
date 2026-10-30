@@ -1,6 +1,6 @@
 import type { PrinterPort, PrinterDiscoveryResult } from './port';
 import { PrinterAdapterError, PrinterErrorCode } from './port';
-import type { PrinterCapabilities } from '../../../types';
+import type { PrinterCapabilities, PrinterTransport } from '../../../types';
 import { ErrorCategory, logger } from '@/utils/logger';
 
 type FailureMode = 'connect-timeout' | 'write-error' | 'discover-empty' | null;
@@ -123,7 +123,7 @@ export class FakePrinterAdapter implements PrinterPort {
     return DEFAULT_CAPABILITIES;
   }
 
-  async getCurrentDevice(): Promise<{ address: string; name: string; transport: 'ble' | 'classic' | 'tcp' }> {
+  async getCurrentDevice(): Promise<{ address: string; name: string; transport: PrinterTransport }> {
     if (this.connectedDevices.size === 0) {
       throw new PrinterAdapterError(PrinterErrorCode.NO_DEVICE_CONNECTED, 'No printer connected');
     }

@@ -55,7 +55,7 @@ export function PrinterDeviceList({
                 styles.deviceIcon,
                 printer.transport === 'ble'
                   ? styles.deviceIconBle
-                  : printer.transport === 'tcp'
+                  : (printer.transport === 'tcp' || printer.transport === 'usb')
                     ? styles.deviceIconTcp
                     : styles.deviceIconClassic,
               ]}
@@ -82,7 +82,7 @@ export function PrinterDeviceList({
                     styles.typeBadge,
                     printer.transport === 'ble'
                       ? styles.typeBadgeBle
-                      : printer.transport === 'tcp'
+                      : (printer.transport === 'tcp' || printer.transport === 'usb')
                         ? styles.typeBadgeTcp
                         : styles.typeBadgeClassic,
                   ]}
@@ -93,7 +93,7 @@ export function PrinterDeviceList({
                       styles.typeBadgeText,
                       printer.transport === 'ble'
                         ? styles.typeBadgeTextBle
-                        : printer.transport === 'tcp'
+                        : (printer.transport === 'tcp' || printer.transport === 'usb')
                           ? styles.typeBadgeTextTcp
                           : styles.typeBadgeTextClassic,
                     ]}

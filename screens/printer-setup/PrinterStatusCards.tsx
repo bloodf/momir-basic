@@ -243,7 +243,7 @@ export function PrinterStatusCards({
                     styles.connectedTypeBadge,
                     connectedPrinter.transport === 'ble'
                       ? styles.typeBadgeBle
-                      : connectedPrinter.transport === 'tcp'
+                      : (connectedPrinter.transport === 'tcp' || connectedPrinter.transport === 'usb')
                         ? styles.typeBadgeTcp
                         : styles.typeBadgeClassic,
                   ]}
@@ -253,7 +253,7 @@ export function PrinterStatusCards({
                       styles.typeBadgeText,
                       connectedPrinter.transport === 'ble'
                         ? styles.typeBadgeTextBle
-                        : connectedPrinter.transport === 'tcp'
+                        : (connectedPrinter.transport === 'tcp' || connectedPrinter.transport === 'usb')
                           ? styles.typeBadgeTextTcp
                           : styles.typeBadgeTextClassic,
                     ]}
@@ -366,7 +366,7 @@ export function PrinterStatusCards({
               <View style={styles.compatItem}>
                 <Radio size={14} color={Colors.textMuted} />
                 <Text style={styles.compatText}>
-                  {isIOS ? 'BLE only' : 'BLE + Classic BT + TCP'}
+                  {isIOS ? 'BLE only' : 'BLE + Classic BT + TCP + USB'}
                 </Text>
               </View>
             </View>

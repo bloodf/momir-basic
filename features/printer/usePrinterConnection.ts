@@ -90,8 +90,8 @@ export function usePrinterConnection(
     setUiState('connecting');
 
     try {
-      // TCP printers don't need Bluetooth permissions
-      if (!isIOS && printer.transport !== 'tcp') {
+      // TCP and USB printers don't need Bluetooth permissions
+      if (!isIOS && printer.transport !== 'tcp' && printer.transport !== 'usb') {
         await printerCapabilityService.ensureBluetoothPermissions();
       }
 

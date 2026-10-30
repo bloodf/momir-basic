@@ -30,11 +30,39 @@ export function mergeSavedAndScanned(saved: PrinterRecord[], scanned: PrinterRec
   return [...saved, ...scanned.filter((p) => !savedIds.has(p.id))];
 }
 
+const DEFAULT_SCAN_CAPABILITIES: PrinterCapabilities = {
+  supportImage: true,
+  supportQR: true,
+  supportCut: true,
+  supportText: true,
+  paperWidth: 58,
+};
+
 async function listSavedPrinters(): Promise<PrinterRecord[]> {
   try {
     return await registryService.listPrinters();
   } catch (error) {
     logger.warn(ErrorCategory.Printer, 'Failed to load saved printers', error);
+    return [];
+  }
+}
+
+/** Attached USB printers as records (Android USB host mode); empty when unsupported. */
+async function listUsbPrinters(): Promise<PrinterRecord[]> {
+  try {
+    const devices = (await createAdapter().discoverUsbPrinters?.()) ?? [];
+    const now = new Date().toISOString();
+    return devices.map((d) => ({
+      id: d.id,
+      name: d.name,
+      address: d.address,
+      transport: d.transport,
+      capabilities: d.capabilities ?? DEFAULT_SCAN_CAPABILITIES,
+      lastSeenAt: now,
+      createdAt: now,
+    }));
+  } catch (error) {
+    logger.warn(ErrorCategory.Printer, 'USB printer scan failed', error);
     return [];
   }
 }
@@ -47,10 +75,11 @@ export function usePrinterDiscovery(): UsePrinterDiscoveryReturn {
   const [scanError, setScanError] = useState<string | null>(null);
   const [permissionState, setPermissionState] = useState<AndroidBluetoothPermissionStatus | null>(null);
 
+  /** Saved printers plus attached USB printers; neither needs Bluetooth permission. */
   const loadSavedPrinters = useCallback(async (): Promise<PrinterRecord[]> => {
-    const saved = await listSavedPrinters();
-    setDiscoveredPrinters((current) => mergeSavedAndScanned(saved, current));
-    return saved;
+    const available = mergeSavedAndScanned(await listSavedPrinters(), await listUsbPrinters());
+    setDiscoveredPrinters((current) => mergeSavedAndScanned(available, current));
+    return available;
   }, []);
 
   const startScan = useCallback(async (): Promise<PrinterRecord[]> => {
@@ -60,6 +89,10 @@ export function usePrinterDiscovery(): UsePrinterDiscoveryReturn {
     // Saved printers (including TCP, which a Bluetooth scan can never find) are always listed
     const saved = await listSavedPrinters();
     setDiscoveredPrinters(saved);
+
+    // USB needs no Bluetooth permission, so list attached USB printers before the Bluetooth scan
+    const savedAndUsb = mergeSavedAndScanned(saved, await listUsbPrinters());
+    setDiscoveredPrinters(savedAndUsb);
 
     try {
       if (!isIOS) {
@@ -80,7 +113,7 @@ export function usePrinterDiscovery(): UsePrinterDiscoveryReturn {
         createdAt: now,
       }));
 
-      const merged = mergeSavedAndScanned(saved, records);
+      const merged = mergeSavedAndScanned(savedAndUsb, records);
       logger.debug(ErrorCategory.Printer, `records count: ${records.length} scanned, ${merged.length} total, setting discovered`);
       setDiscoveredPrinters(merged);
       return merged;
@@ -92,7 +125,7 @@ export function usePrinterDiscovery(): UsePrinterDiscoveryReturn {
       } else {
         setScanError(getErrorMessage(error, 'Unable to scan for printers.'));
       }
-      return saved;
+      return savedAndUsb;
     } finally {
       setIsScanning(false);
     }
