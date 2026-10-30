@@ -144,7 +144,8 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
             brightness: settings.printer?.imageBrightness ?? 1.0,
             contrast: settings.printer?.imageContrast ?? 1.0,
             threshold: settings.printer?.imageThreshold ?? 128,
-            maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+            // Full card: no height cap ("Max Art Height" is for receipt art), so it fills the width
+            maxHeightPx: Number.POSITIVE_INFINITY,
           });
           await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
         } else {
@@ -160,7 +161,8 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
               brightness: settings.printer?.imageBrightness ?? 1.0,
               contrast: settings.printer?.imageContrast ?? 1.0,
               threshold: settings.printer?.imageThreshold ?? 128,
-              maxHeightPx: settings.printer?.imageMaxHeightPx ?? 480,
+              // Full card: no height cap ("Max Art Height" is for receipt art), so it fills the width
+              maxHeightPx: Number.POSITIVE_INFINITY,
             });
             await adapter.sendImage(rasterizedBack.base64Png, rasterizedBack.widthPx, rasterizedBack.heightPx);
           }

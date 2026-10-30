@@ -33,7 +33,8 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
               brightness: printerSettings.imageBrightness ?? 1.0,
               contrast: printerSettings.imageContrast ?? 1.0,
               threshold: printerSettings.imageThreshold ?? 128,
-              maxHeightPx: printerSettings.imageMaxHeightPx ?? 480,
+              // Full card: no height cap ("Max Art Height" is for receipt art), so it fills the width
+              maxHeightPx: Number.POSITIVE_INFINITY,
             });
             await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
           }
