@@ -117,6 +117,56 @@ describe('EscPosRenderer', () => {
       const chunks = renderer.getChunks();
       expect(chunks.length).toBeGreaterThan(0);
     });
+
+    const concat = (chunks: Uint8Array[]) => chunks.flatMap((chunk) => Array.from(chunk));
+
+    // CRITICAL REGRESSION TEST: ESC * with a byte count made printers dump the bitmap as text
+    it('emits a GS v 0 raster header followed by the row-major bitmap', () => {
+      // 16x2 image: 2 bytes per row
+      const bitmap = Buffer.from([0xff, 0x00, 0x0f, 0xf0]).toString('base64');
+
+      renderer.printImage(bitmap, 16, 2);
+
+      expect(concat(renderer.getChunks())).toEqual([
+        0x1d, 0x76, 0x30, 0x00, 0x02, 0x00, 0x02, 0x00,
+        0xff, 0x00, 0x0f, 0xf0,
+        0x0a,
+      ]);
+    });
+
+    it('splits tall images into bands whose headers match their row counts', () => {
+      const width = 576;
+      const height = 300;
+      const bytesPerRow = width / 8;
+      const bitmap = Buffer.alloc(bytesPerRow * height, 0xaa).toString('base64');
+
+      renderer.printImage(bitmap, width, height);
+      const bytes = concat(renderer.getChunks());
+
+      const bands: number[] = [];
+      let offset = 0;
+      while (bytes[offset] === 0x1d && bytes[offset + 1] === 0x76) {
+        expect(bytes.slice(offset + 2, offset + 6)).toEqual([0x30, 0x00, bytesPerRow, 0x00]);
+        const rows = bytes[offset + 6] | (bytes[offset + 7] << 8);
+        bands.push(rows);
+        offset += 8 + rows * bytesPerRow;
+      }
+
+      expect(bands).toEqual([128, 128, 44]);
+      expect(bytes.slice(offset)).toEqual([0x0a]);
+    });
+
+    it('pads a short bitmap so the data length matches the header', () => {
+      const bitmap = Buffer.from([0xff]).toString('base64');
+
+      renderer.printImage(bitmap, 16, 2);
+
+      expect(concat(renderer.getChunks())).toEqual([
+        0x1d, 0x76, 0x30, 0x00, 0x02, 0x00, 0x02, 0x00,
+        0xff, 0x00, 0x00, 0x00,
+        0x0a,
+      ]);
+    });
   });
 
   describe('cut paper', () => {

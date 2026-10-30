@@ -6,6 +6,9 @@ const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
 
+/** Rows per GS v 0 band when printing raster images. */
+const RASTER_BAND_ROWS = 128;
+
 // Text alignment
 const ALIGN_LEFT = [ESC, 0x61, 0x00];
 const ALIGN_CENTER = [ESC, 0x61, 0x01];
@@ -251,37 +254,27 @@ export class EscPosRenderer {
       throw new Error('Image printing requires valid base64-encoded raster bitmap; decode failed');
     }
 
-    // Image print command: ESC * m n1 n2
-    // m = 0: 8-dot single-density
-    // n1 n2 = width in bytes (LSB, MSB)
-    const bytesPerLine = Math.ceil(width / 8);
-    const n1 = bytesPerLine % 256;
-    const n2 = Math.floor(bytesPerLine / 256);
+    // GS v 0 m xL xH yL yH d1...dk — raster bit image. Matches packBitmap's layout:
+    // row-major, MSB-first, 1 = black. (ESC * is column-major 8-dot bands and
+    // takes a dot count, so streaming this bitmap after it prints the pixels as text.)
+    const bytesPerRow = Math.ceil(width / 8);
+    const expectedLength = bytesPerRow * height;
+    if (imageData.length < expectedLength) {
+      // Pad a short bitmap with white rows so the byte count matches the header
+      const padded = new Uint8Array(expectedLength);
+      padded.set(imageData);
+      imageData = padded;
+    }
 
-    // Initialize image with default line spacing
-    this.addBytes([ESC, 0x33, 0x18]);
-
-    // Print raster image mode 0 (8-dot single-density)
-    this.addBytes([ESC, 0x2a, 0x00, n1, n2]);
-
-    // Output image data rows, respecting printer's line spacing
-    // Chunk per row to stay within transport MTU limits
-    const rowsPerChunk = 4;
-    for (let y = 0; y < height; y++) {
-      const rowStart = y * bytesPerLine;
-      const rowEnd = Math.min(rowStart + bytesPerLine, imageData.length);
-      if (rowStart < imageData.length) {
-        const rowData = imageData.slice(rowStart, rowEnd);
-        this.chunks.push(new Uint8Array(rowData));
-      } else {
-        // Pad short rows with zeros
-        this.chunks.push(new Uint8Array(bytesPerLine));
-      }
-
-      // Feed after each row group to prevent buffer overflow on limited printers
-      if ((y + 1) % rowsPerChunk === 0) {
-        this.addBytes([LF]);
-      }
+    // Send in bands so printers with small receive buffers don't overflow
+    for (let y = 0; y < height; y += RASTER_BAND_ROWS) {
+      const rows = Math.min(RASTER_BAND_ROWS, height - y);
+      this.addBytes([
+        GS, 0x76, 0x30, 0x00,
+        bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+        rows & 0xff, (rows >> 8) & 0xff,
+      ]);
+      this.chunks.push(imageData.slice(y * bytesPerRow, (y + rows) * bytesPerRow));
     }
 
     this.feedLine();
