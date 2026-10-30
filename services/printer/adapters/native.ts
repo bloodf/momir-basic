@@ -29,11 +29,31 @@ async function requestBluetoothPermissions(): Promise<boolean> {
   );
 }
 
-function toBtAddress(address: string): string {
-  if (address.startsWith('bt:') || address.startsWith('ble:') || address.startsWith('lan:')) {
+/**
+ * Map a registry address + transport to the driver's scheme-prefixed address
+ * (`bt:<MAC>`, `ble:<MAC>`, `lan:<host>:<port>`, `usb:<vid>:<pid>`). Already-prefixed
+ * addresses pass through; USB addresses come from the driver already prefixed.
+ */
+export function toDriverAddress(address: string, transport?: PrinterTransport): string {
+  if (/^(bt|ble|lan|usb):/.test(address)) {
     return address;
   }
-  return `bt:${address}`;
+  switch (transport) {
+    case 'tcp':
+      return `lan:${address}`;
+    case 'usb':
+      return `usb:${address}`;
+    case 'ble':
+      return `ble:${address}`;
+    default:
+      return `bt:${address}`;
+  }
+}
+
+interface ActiveConnection {
+  address: string;
+  transport: PrinterTransport;
+  driverAddress: string;
 }
 
 interface ScanDevice {
@@ -48,11 +68,17 @@ interface ScanResult {
 }
 
 export class NativeThermalPrinterAdapter implements PrinterPort {
-  private _connectedAddress: string | null = null;
+  private _connection: ActiveConnection | null = null;
 
-  private getThermalPrinter() {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('react-native-thermal-printer-driver').default;
+  /** Driver address of the active connection, or throws NOT_CONNECTED. */
+  private requireConnection(action: string): ActiveConnection {
+    if (!this._connection) {
+      throw new PrinterAdapterError(
+        PrinterErrorCode.NOT_CONNECTED,
+        `No printer connected — cannot ${action}`
+      );
+    }
+    return this._connection;
   }
 
   async discoverPrinters(): Promise<PrinterDiscoveryResult[]> {
@@ -96,43 +122,68 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
     return devices;
   }
 
-  async connectPrinter(address: string): Promise<void> {
+  async discoverUsbPrinters(): Promise<PrinterDiscoveryResult[]> {
+    // Drivers before USB support (<= 0.1.1) don't have scanUsbDevices
+    if (Platform.OS !== 'android' || typeof NativeModules.ThermalPrinterDriver.scanUsbDevices !== 'function') {
+      return [];
+    }
+    const devices: ScanDevice[] = await NativeModules.ThermalPrinterDriver.scanUsbDevices();
+    return devices
+      .filter((device) => device.address)
+      .map((device) => ({
+        id: device.address,
+        name: device.name || 'USB Printer',
+        transport: 'usb' as const,
+        address: device.address,
+        capabilities: DEFAULT_CAPABILITIES,
+      }));
+  }
+
+  async connectPrinter(address: string, transport: PrinterTransport = 'classic'): Promise<void> {
+    const driverAddress = toDriverAddress(address, transport);
     try {
-      const btAddress = toBtAddress(address);
-      await NativeModules.ThermalPrinterDriver.connect(btAddress, 10000);
-      this._connectedAddress = address;
+      await NativeModules.ThermalPrinterDriver.connect(driverAddress, 10000);
+      this._connection = { address, transport, driverAddress };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.CONNECTION_FAILED,
         `Failed to connect to ${address}: ${msg}`,
-        'classic'
+        transport
       );
     }
   }
 
+  /** Resolve the driver address, reusing the active connection's when the address matches. */
+  private resolveDriverAddress(address: string, transport?: PrinterTransport): string {
+    if (this._connection && this._connection.address === address) {
+      return this._connection.driverAddress;
+    }
+    return toDriverAddress(address, transport);
+  }
+
   async disconnectPrinter(address?: string): Promise<void> {
     try {
-      const btAddress = address ? toBtAddress(address) : null;
-      await NativeModules.ThermalPrinterDriver.disconnect(btAddress);
+      const driverAddress = address ? this.resolveDriverAddress(address) : null;
+      await NativeModules.ThermalPrinterDriver.disconnect(driverAddress);
 
-      if (!address || address === this._connectedAddress) {
-        this._connectedAddress = null;
+      if (!address || address === this._connection?.address) {
+        this._connection = null;
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.DISCONNECT_FAILED,
         `Failed to disconnect from ${address || 'device'}: ${msg}`,
-        'classic'
+        this._connection?.transport
       );
     }
   }
 
-  async isConnected(address: string): Promise<boolean> {
+  async isConnected(address: string, transport?: PrinterTransport): Promise<boolean> {
     try {
-      const btAddress = toBtAddress(address);
-      const result = await NativeModules.ThermalPrinterDriver.testConnection(btAddress);
+      const driverAddress = this.resolveDriverAddress(address, transport);
+      const result = await NativeModules.ThermalPrinterDriver.testConnection(driverAddress);
       return result?.success === true;
     } catch (error) {
       logger.debug(ErrorCategory.Printer, 'isConnection check failed', error);
@@ -141,88 +192,60 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
   }
 
   async sendText(text: string): Promise<void> {
-    if (!this._connectedAddress) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected — cannot send text'
-      );
-    }
+    const connection = this.requireConnection('send text');
 
     try {
-      const ThermalPrinter = this.getThermalPrinter();
-      const btAddress = toBtAddress(this._connectedAddress);
 
       const encoder = new TextEncoder();
       const textBytes = encoder.encode(text + '\n');
       const data = [0x1B, 0x40, ...Array.from(textBytes), 0x0A];
 
-      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, data, true, 10000);
+      await NativeModules.ThermalPrinterDriver.printRaw(connection.driverAddress, data, true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendText failed: ${msg}`,
-        'classic'
+        connection.transport
       );
     }
   }
 
   async sendImage(base64: string, width: number, _height: number): Promise<void> {
-    if (!this._connectedAddress) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected — cannot send image'
-      );
-    }
+    const connection = this.requireConnection('send image');
 
     try {
-      const ThermalPrinter = this.getThermalPrinter();
-      const btAddress = toBtAddress(this._connectedAddress);
-      const { image } = require('react-native-thermal-printer-driver');
 
-      await NativeModules.ThermalPrinterDriver.printImage(btAddress, base64, 'base64', width, 0, true, 10000);
+      await NativeModules.ThermalPrinterDriver.printImage(connection.driverAddress, base64, 'base64', width, 0, true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendImage failed: ${msg}`,
-        'classic'
+        connection.transport
       );
     }
   }
 
   async sendRaw(bytes: Uint8Array): Promise<void> {
-    if (!this._connectedAddress) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected — cannot send raw bytes'
-      );
-    }
+    const connection = this.requireConnection('send raw bytes');
 
     try {
-      const btAddress = toBtAddress(this._connectedAddress);
-      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, Array.from(bytes), true, 10000);
+      await NativeModules.ThermalPrinterDriver.printRaw(connection.driverAddress, Array.from(bytes), true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendRaw failed: ${msg}`,
-        'classic'
+        connection.transport
       );
     }
   }
 
   async sendQRCode(data: string, size: number): Promise<void> {
-    if (!this._connectedAddress) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected — cannot send QR code'
-      );
-    }
+    const connection = this.requireConnection('send QR code');
 
     try {
-      const ThermalPrinter = this.getThermalPrinter();
-      const btAddress = toBtAddress(this._connectedAddress);
 
       const dataBytes = new TextEncoder().encode(data);
       const storeLen = dataBytes.length + 3;
@@ -240,36 +263,29 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
         0x0A,
       ];
 
-      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, qrCommands, true, 10000);
+      await NativeModules.ThermalPrinterDriver.printRaw(connection.driverAddress, qrCommands, true, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `sendQRCode failed: ${msg}`,
-        'classic'
+        connection.transport
       );
     }
   }
 
   async cutPaper(): Promise<void> {
-    if (!this._connectedAddress) {
-      throw new PrinterAdapterError(
-        PrinterErrorCode.NOT_CONNECTED,
-        'No printer connected — cannot cut paper'
-      );
-    }
+    const connection = this.requireConnection('cut paper');
 
     try {
-      const ThermalPrinter = this.getThermalPrinter();
-      const btAddress = toBtAddress(this._connectedAddress);
 
-      await NativeModules.ThermalPrinterDriver.printRaw(btAddress, [0x1D, 0x56, 0x00], false, 10000);
+      await NativeModules.ThermalPrinterDriver.printRaw(connection.driverAddress, [0x1D, 0x56, 0x00], false, 10000);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new PrinterAdapterError(
         PrinterErrorCode.SEND_FAILED,
         `cutPaper failed: ${msg}`,
-        'classic'
+        connection.transport
       );
     }
   }
@@ -279,18 +295,17 @@ export class NativeThermalPrinterAdapter implements PrinterPort {
   }
 
   async getCurrentDevice(): Promise<PrinterDevice> {
-    if (!this._connectedAddress) {
+    if (!this._connection) {
       throw new PrinterAdapterError(
         PrinterErrorCode.NO_DEVICE_CONNECTED,
-        'No device connected',
-        'classic'
+        'No device connected'
       );
     }
 
     return {
-      address: this._connectedAddress,
+      address: this._connection.address,
       name: 'Thermal Printer',
-      transport: 'classic',
+      transport: this._connection.transport,
     };
   }
 }

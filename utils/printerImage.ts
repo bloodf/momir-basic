@@ -2,6 +2,7 @@ import { Buffer } from 'buffer';
 import { File, Paths } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { PNG } from 'pngjs/browser';
+import { SCRYFALL_USER_AGENT } from '@/services/scryfall';
 import { ditherImage, thresholdDither } from './dither';
 import type { DitherAlgorithm as DitherAlgorithmInternal } from './dither';
 import { formatPrinterImageProcessingError } from './printerImageErrors';
@@ -150,7 +151,11 @@ async function ensureLocalImageUri(imageUrl: string): Promise<string> {
   const localFile = new File(Paths.cache, `printer-art-${hashString(imageUrl)}.img`);
 
   if (!localFile.exists) {
-    await File.downloadFileAsync(imageUrl, localFile, { idempotent: true });
+    // Scryfall's image CDN answers 400 to OkHttp's default User-Agent, which expo-file-system sends on Android
+    await File.downloadFileAsync(imageUrl, localFile, {
+      idempotent: true,
+      headers: { 'User-Agent': SCRYFALL_USER_AGENT },
+    });
   }
 
   return localFile.uri;

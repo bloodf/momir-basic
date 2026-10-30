@@ -87,9 +87,15 @@ export interface PrinterPort {
   discoverPrinters(): Promise<PrinterDiscoveryResult[]>;
 
   /**
+   * Discover attached USB printers (Android USB host mode). Needs no Bluetooth
+   * permission. Optional: adapters or driver versions without USB omit it.
+   */
+  discoverUsbPrinters?(): Promise<PrinterDiscoveryResult[]>;
+
+  /**
    * Connect to a printer by its canonical address.
    * Resolves when connection is established.
-   * @param address - Device address (Bluetooth UUID for BLE/Classic, IP:port for TCP)
+   * @param address - Device address (Bluetooth MAC/UUID for BLE/Classic, host:port for TCP)
    * @param transport - Transport type for validation; adapter infers if omitted
    */
   connectPrinter(address: string, transport?: PrinterTransport): Promise<void>;
@@ -104,8 +110,10 @@ export interface PrinterPort {
   /**
    * Check if a printer is currently connected by address.
    * Returns false for stale address even if native reports connected (disconnect drift).
+   * @param address - Canonical device address (see connectPrinter)
+   * @param transport - Transport type; needed to reach TCP/BLE devices that are not the current connection
    */
-  isConnected(address: string): Promise<boolean>;
+  isConnected(address: string, transport?: PrinterTransport): Promise<boolean>;
 
   /**
    * Send raw text to the connected printer.

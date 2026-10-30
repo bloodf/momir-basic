@@ -153,7 +153,8 @@ export class PrinterCapabilityService {
   getTransportCapability(transport: PrinterTransport): TransportCapability {
     const nativeAvailable = hasNativeModule();
 
-    if (transport === 'tcp') {
+    if (transport === 'tcp' || transport === 'usb') {
+      // USB access is granted per device through the system dialog on connect, not a runtime permission
       if (!nativeAvailable) {
         return {
           transport,

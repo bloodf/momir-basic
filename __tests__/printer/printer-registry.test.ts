@@ -153,7 +153,7 @@ describe('PrinterRegistry', () => {
       adapterFactory: () => mockAdapter,
     });
     await service.connectPrinter('reg-001');
-    expect(mockAdapter.connectPrinter).toHaveBeenCalledWith('fake-ble-001');
+    expect(mockAdapter.connectPrinter).toHaveBeenCalledWith('fake-ble-001', 'ble');
   });
 
   it('connectPrinter throws if printer not found in registry', async () => {

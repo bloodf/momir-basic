@@ -6,6 +6,9 @@ const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
 
+/** Rows per GS v 0 band when printing raster images. */
+const RASTER_BAND_ROWS = 128;
+
 // Text alignment
 const ALIGN_LEFT = [ESC, 0x61, 0x00];
 const ALIGN_CENTER = [ESC, 0x61, 0x01];
@@ -118,11 +121,11 @@ export class EscPosRenderer {
   }
 
   /**
-   * Add a string as UTF-8 bytes
+   * Add a string, folded to printable ASCII (see toPrinterText)
    */
   addText(text: string): void {
     const encoder = new TextEncoder();
-    this.chunks.push(encoder.encode(text));
+    this.chunks.push(encoder.encode(toPrinterText(text)));
   }
 
   /**
@@ -223,8 +226,9 @@ export class EscPosRenderer {
     bytes.push(...[GS, 0x28, 0x6b, dataLen % 256, Math.floor(dataLen / 256), 0x31, 0x50, 0x30]);
     bytes.push(...dataBytes);
 
-    // Print
-    bytes.push(...[GS, 0x28, 0x6b, 0x02, 0x00, 0x31, 0x51, 0x00]);
+    // Print the stored symbol: GS ( k pL=3 pH=0 cn=49 fn=81 m=48. The old pL=2 / m=0 form
+    // was rejected by printers (verified on an Epson TM-H6000V), so no QR code printed.
+    bytes.push(...[GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]);
 
     this.addBytes(bytes);
   }
@@ -251,37 +255,27 @@ export class EscPosRenderer {
       throw new Error('Image printing requires valid base64-encoded raster bitmap; decode failed');
     }
 
-    // Image print command: ESC * m n1 n2
-    // m = 0: 8-dot single-density
-    // n1 n2 = width in bytes (LSB, MSB)
-    const bytesPerLine = Math.ceil(width / 8);
-    const n1 = bytesPerLine % 256;
-    const n2 = Math.floor(bytesPerLine / 256);
+    // GS v 0 m xL xH yL yH d1...dk — raster bit image. Matches packBitmap's layout:
+    // row-major, MSB-first, 1 = black. (ESC * is column-major 8-dot bands and
+    // takes a dot count, so streaming this bitmap after it prints the pixels as text.)
+    const bytesPerRow = Math.ceil(width / 8);
+    const expectedLength = bytesPerRow * height;
+    if (imageData.length < expectedLength) {
+      // Pad a short bitmap with white rows so the byte count matches the header
+      const padded = new Uint8Array(expectedLength);
+      padded.set(imageData);
+      imageData = padded;
+    }
 
-    // Initialize image with default line spacing
-    this.addBytes([ESC, 0x33, 0x18]);
-
-    // Print raster image mode 0 (8-dot single-density)
-    this.addBytes([ESC, 0x2a, 0x00, n1, n2]);
-
-    // Output image data rows, respecting printer's line spacing
-    // Chunk per row to stay within transport MTU limits
-    const rowsPerChunk = 4;
-    for (let y = 0; y < height; y++) {
-      const rowStart = y * bytesPerLine;
-      const rowEnd = Math.min(rowStart + bytesPerLine, imageData.length);
-      if (rowStart < imageData.length) {
-        const rowData = imageData.slice(rowStart, rowEnd);
-        this.chunks.push(new Uint8Array(rowData));
-      } else {
-        // Pad short rows with zeros
-        this.chunks.push(new Uint8Array(bytesPerLine));
-      }
-
-      // Feed after each row group to prevent buffer overflow on limited printers
-      if ((y + 1) % rowsPerChunk === 0) {
-        this.addBytes([LF]);
-      }
+    // Send in bands so printers with small receive buffers don't overflow
+    for (let y = 0; y < height; y += RASTER_BAND_ROWS) {
+      const rows = Math.min(RASTER_BAND_ROWS, height - y);
+      this.addBytes([
+        GS, 0x76, 0x30, 0x00,
+        bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+        rows & 0xff, (rows >> 8) & 0xff,
+      ]);
+      this.chunks.push(imageData.slice(y * bytesPerRow, (y + rows) * bytesPerRow));
     }
 
     this.feedLine();
@@ -392,4 +386,49 @@ export function buildScryfallUrl(
 export function buildQrUrl(scryfallUrl: string): string {
   const encoded = encodeURIComponent(scryfallUrl);
   return `https://api.qrserver.com/v1/create-qr-code/?size=144x144&data=${encoded}&bgcolor=FFFFFF&color=000000&margin=0`;
+}
+
+const PRINTER_TEXT_REPLACEMENTS: [RegExp, string][] = [
+  [/[\u2012-\u2015\u2212]/g, '-'], // figure/en/em/horizontal bar dashes, minus sign
+  [/[\u2018\u2019\u201a\u2032]/g, "'"],
+  [/[\u201c\u201d\u201e\u2033]/g, '"'],
+  [/\u2026/g, '...'],
+  [/\u2022/g, '*'], // bullet, used by modal spells
+  [/\u00b7/g, '.'],
+  [/\u00d7/g, 'x'],
+  [/\u00bd/g, '1/2'],
+  [/\u221e/g, 'inf'],
+  [/\u2122/g, 'TM'],
+  [/\u00ae/g, '(R)'],
+  [/\u00a9/g, '(C)'],
+  [/[\u00a0\u2009\u202f]/g, ' '],
+  [/\u00c6/g, 'AE'],
+  [/\u00e6/g, 'ae'],
+  [/\u0152/g, 'OE'],
+  [/\u0153/g, 'oe'],
+  [/\u00df/g, 'ss'],
+  [/\u00d8/g, 'O'],
+  [/\u00f8/g, 'o'],
+  [/\u0141/g, 'L'],
+  [/\u0142/g, 'l'],
+  [/\u0110/g, 'D'],
+  [/\u0111/g, 'd'],
+];
+
+/**
+ * Fold text to printable ASCII for receipts. Printers interpret bytes in a single-byte
+ * code page (PC437 by default), so UTF-8 multi-byte characters like the em-dash in
+ * "Creature \u2014 Goblin" print as several garbage glyphs. Punctuation is mapped to ASCII
+ * equivalents and accents are stripped (J\u00f6tun -> Jotun); anything left is printed as '?'.
+ * Control characters (ESC/POS commands embedded in text) are preserved.
+ */
+export function toPrinterText(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of PRINTER_TEXT_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
+  }
+  if (typeof out.normalize === 'function') {
+    out = out.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  return out.replace(/[^\x00-\x7f]/g, '?');
 }

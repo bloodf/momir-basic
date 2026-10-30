@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bluetooth, Radio, Wifi } from 'lucide-react-native';
+import { Bluetooth, Radio, Usb, Wifi } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import type { PrinterTransport } from '@/types';
 
@@ -32,6 +32,7 @@ export function getTransportLabel(transport: PrinterTransport): string {
     case 'ble': return 'BLE';
     case 'classic': return 'Classic BT';
     case 'tcp': return 'TCP/IP';
+    case 'usb': return 'USB';
   }
 }
 
@@ -40,5 +41,6 @@ export function getTransportIcon(transport: PrinterTransport): React.ReactNode {
     case 'ble': return <Radio size={14} color="#5B9BD5" />;
     case 'classic': return <Bluetooth size={14} color="#C084FC" />;
     case 'tcp': return <Wifi size={14} color={Colors.gold} />;
+    case 'usb': return <Usb size={14} color={Colors.gold} />;
   }
 }
