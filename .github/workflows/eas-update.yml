@@ -7,7 +7,7 @@ on:
       - 'app/**'
       - 'components/**'
       - 'services/**'
-      - 'providers/**'
+      - 'stores/**'
       - 'i18n/**'
       - 'types/**'
       - 'constants/**'

@@ -54,18 +54,6 @@ jest.mock('lucide-react-native', () => {
   });
 });
 
-jest.mock('../../providers/HistoryProvider', () => ({
-  useHistory: () => ({ cards: [], addCard: jest.fn(), addCards: jest.fn() }),
-}));
-
-jest.mock('../../providers/SettingsProvider', () => ({
-  useSettings: () => ({ settings: { excludeFunnySets: true } }),
-}));
-
-jest.mock('../../providers/NetworkProvider', () => ({
-  useNetwork: () => ({ isOnline: true }),
-}));
-
 jest.mock('../../components/HistorySheet', () => ({
   HistorySheet: () => null,
 }));
@@ -104,7 +92,7 @@ jest.mock('../../services/scryfall', () => ({
   getLocalizedScryfallErrorMessage: jest.fn(() => 'error'),
 }));
 
-jest.mock('../../i18n', () => ({
+jest.mock('../../stores/i18nStore', () => ({
   useI18n: () => {
     const { CARD_TYPES } = require('../../constants/cardTypes');
 

@@ -6,10 +6,9 @@ import React, { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { HistoryProvider } from "@/providers/HistoryProvider";
-import { SettingsProvider, useSettings } from "@/providers/SettingsProvider";
-import { NetworkProvider } from "@/providers/NetworkProvider";
-import { I18nProvider, useI18n } from "@/i18n";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useI18n } from "@/stores/i18nStore";
+import { initNetworkListener, cleanupNetworkListener } from "@/stores/networkStore";
 import { ToastProvider, showToast } from "@/components/Toast";
 import { registryService } from "../services/printer/registry/service";
 import { ErrorCategory, logger } from "@/utils/logger";
@@ -24,7 +23,7 @@ const queryClient = new QueryClient();
  * Uses registryService to connect using a registry DB key (NOT raw Bluetooth address).
  */
 function PrinterAutoConnect() {
-  const { settings } = useSettings();
+  const { settings } = useSettingsStore();
   const { t } = useI18n();
   const attemptedRef = useRef(false);
 
@@ -88,6 +87,11 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    initNetworkListener();
+    return cleanupNetworkListener;
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded) {
       void SplashScreen.hideAsync();
     }
@@ -99,18 +103,10 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <I18nProvider>
-            <SettingsProvider>
-              <HistoryProvider>
-                <NetworkProvider>
-                  <ToastProvider>
-                    <PrinterAutoConnect />
-                    <RootLayoutNav />
-                  </ToastProvider>
-                </NetworkProvider>
-              </HistoryProvider>
-            </SettingsProvider>
-          </I18nProvider>
+          <ToastProvider>
+            <PrinterAutoConnect />
+            <RootLayoutNav />
+          </ToastProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>

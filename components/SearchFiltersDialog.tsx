@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { X } from 'lucide-react-native'
 import Colors from '@/constants/colors'
-import { useI18n } from '@/i18n'
+import { useI18n } from '@/stores/i18nStore'
 import { FilterSections } from '@/components/SearchFilters'
 import { type SearchFilterState, EMPTY_FILTERS } from '@/components/SearchFilters.shared'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'

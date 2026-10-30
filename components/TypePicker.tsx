@@ -4,7 +4,7 @@ import { X, ChevronRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CARD_TYPES } from '@/constants/cardTypes';
 import { CardType } from '@/types';
-import { useI18n } from '@/i18n';
+import { useI18n } from '@/stores/i18nStore';
 
 interface TypePickerProps {
   visible: boolean;

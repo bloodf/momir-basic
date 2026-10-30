@@ -90,4 +90,30 @@ describe('useSettingsStore', () => {
     expect(repositories.getPrinterById).toHaveBeenCalledWith('printer-1');
     expect(preferred).toEqual(printer);
   });
+
+  it('fills printer preference defaults missing from persisted settings', async () => {
+    const { createMMKV } = require('react-native-mmkv') as {
+      createMMKV: (config: { id: string }) => { set: (key: string, value: string) => void };
+    };
+    createMMKV({ id: 'momir-storage' }).set(
+      'momir_settings',
+      JSON.stringify({ state: { settings: { excludeFunnySets: false, printer: { paperWidth: 80 } } }, version: 0 }),
+    );
+
+    const { useSettingsStore, DEFAULT_SETTINGS } = loadSettingsStoreModule();
+    await useSettingsStore.persist.rehydrate();
+
+    const { settings } = useSettingsStore.getState();
+    expect(settings.excludeFunnySets).toBe(false);
+    expect(settings.printer).toEqual({ ...DEFAULT_SETTINGS.printer, paperWidth: 80 });
+  });
+
+  it('exposes printer preferences to non-React callers', async () => {
+    const { getPrinterPreferences, savePrinterPreferences, useSettingsStore } = loadSettingsStoreModule();
+
+    await savePrinterPreferences({ preferredPrinterId: 'printer-2' });
+
+    expect(useSettingsStore.getState().settings.printer.preferredPrinterId).toBe('printer-2');
+    expect((await getPrinterPreferences()).preferredPrinterId).toBe('printer-2');
+  });
 });

@@ -14,14 +14,14 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Printer, ChevronRight, Zap, Info, Globe, ChevronDown, Github, Star, ExternalLink } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useSettings } from '@/providers/SettingsProvider';
-import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/i18n';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/stores/i18nStore';
 import { ErrorCategory, logger } from '@/utils/logger';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { settings, updateSettings, updatePrinter } = useSettings();
+  const { settings, updateSettings, updatePrinter } = useSettingsStore();
   const { t, locale, setLocale } = useI18n();
   const appVersion = Constants.expoConfig?.version ?? '—';
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);

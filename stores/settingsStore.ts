@@ -76,6 +76,28 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         settings: state.settings,
       }),
+      // Deep-merge printer prefs so new fields added in later versions pick up their defaults
+      merge: (persisted, current) => {
+        const persistedSettings = (persisted as Partial<Pick<SettingsState, 'settings'>> | undefined)?.settings;
+        return {
+          ...current,
+          settings: {
+            ...current.settings,
+            ...persistedSettings,
+            printer: { ...current.settings.printer, ...(persistedSettings?.printer ?? {}) },
+          },
+        };
+      },
     },
   ),
 );
+
+/** Read printer preferences outside React (e.g. from the printer registry service). */
+export async function getPrinterPreferences(): Promise<PrinterPreferences> {
+  return useSettingsStore.getState().settings.printer;
+}
+
+/** Update printer preferences outside React (e.g. from the printer registry service). */
+export async function savePrinterPreferences(partial: Partial<PrinterPreferences>): Promise<void> {
+  useSettingsStore.getState().updatePrinter(partial);
+}

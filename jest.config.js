@@ -18,7 +18,7 @@ module.exports = {
   collectCoverageFrom: [
     'app/**/*.{ts,tsx}',
     'services/**/*.{ts,tsx}',
-    'providers/**/*.{ts,tsx}',
+    'stores/**/*.{ts,tsx}',
     'types/**/*.{ts,tsx}',
     '!**/*.d.ts',
   ],

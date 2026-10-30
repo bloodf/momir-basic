@@ -20,7 +20,7 @@ import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useFilteredHistory, useHistoryStore } from '@/stores/historyStore';
 import { CardListItem } from '@/components/CardListItem';
-import { useI18n } from '@/i18n';
+import { useI18n } from '@/stores/i18nStore';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.85;
