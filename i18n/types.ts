@@ -230,10 +230,14 @@ export interface Translations {
   printer: {
     title: string;
     paperWidth: string;
+    cardSizePrint: string;
+    cardSizePrintHint: string;
     printCardArt: string;
     printCardArtHint: string;
     autoPrint: string;
     autoPrintHint: string;
+    cutAfterPrint: string;
+    cutAfterPrintHint: string;
     notConnected: string;
     connected: string;
     disconnect: string;

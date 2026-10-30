@@ -22,8 +22,11 @@ const QR_MODEL = [GS, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]; // Model 
 const IMAGE_INIT = [ESC, 0x33, 0x00]; // Default line spacing
 
 // Cut paper
-const CUT_PAPER = [GS, 0x56, 0x00]; // Full cut
-const CUT_PAPER_PARTIAL = [GS, 0x56, 0x01]; // Partial cut
+// GS V 65/66 0: feed to the cutting position, then cut. The plain GS V 0/1 forms cut
+// at the current position, slicing through the last lines on printers whose cutter
+// sits above the print head.
+const CUT_PAPER = [GS, 0x56, 0x41, 0x00]; // Feed + full cut
+const CUT_PAPER_PARTIAL = [GS, 0x56, 0x42, 0x00]; // Feed + partial cut
 
 // Paper widths
 export const PAPER_WIDTH_58MM = 58;
@@ -101,6 +104,25 @@ export class EscPosRenderer {
    */
   getChunks(): Uint8Array[] {
     return this.chunks;
+  }
+
+  /**
+   * Initialize the printer (ESC @): clears settings left by earlier jobs such as
+   * margins, print width, alignment, emphasis and line spacing.
+   */
+  initialize(): void {
+    this.addBytes([ESC, 0x40]);
+  }
+
+  /**
+   * Set the printable area: left margin (GS L) and width (GS W), in dots.
+   * Printers keep these until reset (ESC @), which receipts send first.
+   */
+  setPrintArea(leftMarginDots: number, widthDots: number): void {
+    this.addBytes([
+      GS, 0x4c, leftMarginDots & 0xff, (leftMarginDots >> 8) & 0xff,
+      GS, 0x57, widthDots & 0xff, (widthDots >> 8) & 0xff,
+    ]);
   }
 
   /**

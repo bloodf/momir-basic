@@ -120,6 +120,17 @@ describe('EscPosRenderer', () => {
   });
 
   describe('cut paper', () => {
+    // CRITICAL REGRESSION TEST: GS V 0/1 cut through the last lines on printers whose cutter sits above the head
+    it('feeds to the cutting position before cutting', () => {
+      renderer.cutPaper(false);
+      renderer.cutPaper(true);
+
+      expect(renderer.getChunks().map((chunk) => Array.from(chunk))).toEqual([
+        [0x1d, 0x56, 0x41, 0x00],
+        [0x1d, 0x56, 0x42, 0x00],
+      ]);
+    });
+
     it('renders cut paper command (full)', () => {
       renderer.cutPaper(false);
       

@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
 import type { Card } from '@/types';
+import { getPrintArea, resolvePaperPreset } from '@/constants/paperPresets';
 
 export type PrinterConnectionState = 'checking' | 'connected' | 'disconnected' | 'no_printer';
 
@@ -133,9 +134,11 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
       const adapter = createAdapter();
       await adapter.connectPrinter(preferredPrinterId);
 
-      const paperWidth = (settings.printer?.paperWidth ?? 58) as 58 | 80;
+      const paperPreset = resolvePaperPreset(settings.printer ?? {});
+      const paperWidth = paperPreset.paperWidth;
       const printMode = settings.printer?.printMode ?? 'full';
-      const widthPx = paperWidth === 80 ? 576 : 384;
+      const printArea = getPrintArea(paperPreset, settings.printer?.cardSizePrint ?? false);
+      const widthPx = printArea.widthDots;
 
       if (printMode === 'image_only') {
         // IMAGE-ONLY MODE: Print rasterized card image(s)
@@ -166,6 +169,9 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
             });
             await adapter.sendImage(rasterizedBack.base64Png, rasterizedBack.widthPx, rasterizedBack.heightPx);
           }
+        }
+        if (settings.printer?.cutAfterPrint) {
+          await adapter.cutPaper();
         }
       } else {
         // RECEIPT MODE: ESC/POS document via EscPosRenderer + sendRaw
@@ -239,7 +245,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
         const capabilities = {
           supportImage: true,
           supportQR: true,
-          supportCut: false,
+          supportCut: settings.printer?.cutAfterPrint ?? false,
           supportText: true,
           paperWidth,
         };
@@ -247,8 +253,11 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
         const doc = new CardReceiptDocument(enrichedCardData, {
           printArt,
           printQR: settings.printer?.printQR ?? true,
-          cut: false,
+          cut: settings.printer?.cutAfterPrint ?? false,
           paperWidth,
+          charsPerLine: printArea.charsPerLine,
+          // Only send GS L / GS W when card-size is on, so other printers get unchanged receipts
+          printArea: settings.printer?.cardSizePrint ? printArea : undefined,
           qrSize: settings.printer?.qrSize ?? 8,
           qrErrorCorrection: settings.printer?.qrErrorCorrection ?? 'L',
         });

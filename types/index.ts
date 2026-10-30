@@ -123,15 +123,23 @@ export interface PrinterCapabilities {
 export type PrintMode = 'full' | 'image_only';
 export type DitherAlgorithm = 'floyd' | 'bayer' | 'threshold' | 'none';
 export type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
+/** Paper + print-head geometry presets; see constants/paperPresets.ts */
+export type PaperPreset = '58mm' | '80mm' | '80mm_180dpi';
 
 export interface PrinterPreferences {
   preferredPrinterId: string | null;  // null = no printer selected
   paperWidth: 58 | 80;
+  /** Selected paper preset; when unset, derived from paperWidth (pre-preset settings) */
+  paperPreset?: PaperPreset;
+  /** Limit prints to card width (63 mm), left-aligned, so slips fold once to fit a sleeve */
+  cardSizePrint?: boolean;
   printArt: boolean;
   printQR: boolean;
   printFlavorText: boolean;
   autoPrint: boolean;
   printMode: PrintMode;  // 'full' = receipt layout, 'image_only' = full card image
+  /** Feed to the cutter and cut after each print (printers with an auto-cutter) */
+  cutAfterPrint?: boolean;
   // Image pre-processing tuning (applied before sending bitmap to printer)
   imageDither: DitherAlgorithm;       // default 'floyd'
   imageBrightness: number;            // 0.5..1.5, default 1.0
@@ -253,6 +261,7 @@ export const DEFAULT_PRINTER_PREFERENCES: PrinterPreferences = {
   printFlavorText: true,
   autoPrint: false,
   printMode: 'full' as const,
+  cutAfterPrint: false,
   imageDither: 'floyd',
   imageBrightness: 1.0,
   imageContrast: 1.0,

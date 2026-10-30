@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Card, type PrinterPreferences } from '@/types';
+import { getPrintArea, resolvePaperPreset } from '@/constants/paperPresets';
 import { ErrorCategory, logger } from '@/utils/logger';
 import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
@@ -18,8 +19,10 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
       if (!printerSettings.preferredPrinterId) return;
 
       const printMode = printerSettings.printMode ?? 'full';
-      const paperWidth = (printerSettings.paperWidth ?? 58) as 58 | 80;
-      const widthPx = paperWidth === 80 ? 576 : 384;
+      const paperPreset = resolvePaperPreset(printerSettings);
+      const paperWidth = paperPreset.paperWidth;
+      const printArea = getPrintArea(paperPreset, printerSettings.cardSizePrint ?? false);
+      const widthPx = printArea.widthDots;
       const imageUrl = cardToPrint.normalImageUrl || cardToPrint.artCropUrl;
       const printArt = printerSettings.printArt ?? true;
 
@@ -37,6 +40,9 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
               maxHeightPx: printerSettings.imageMaxHeightPx ?? 480,
             });
             await adapter.sendImage(rasterized.base64Png, rasterized.widthPx, rasterized.heightPx);
+          }
+          if (printerSettings.cutAfterPrint) {
+            await adapter.cutPaper();
           }
         } else {
           const { EscPosRenderer } = await import('@/services/printer/render/escpos');
@@ -82,7 +88,7 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
           const capabilities = {
             supportImage: true,
             supportQR: true,
-            supportCut: false,
+            supportCut: printerSettings.cutAfterPrint ?? false,
             supportText: true,
             paperWidth,
           };
@@ -90,8 +96,11 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
           const doc = new CardReceiptDocument(cardReceiptData, {
             printArt,
             printQR: printerSettings.printQR ?? true,
-            cut: false,
+            cut: printerSettings.cutAfterPrint ?? false,
             paperWidth,
+            charsPerLine: printArea.charsPerLine,
+            // Only send GS L / GS W when card-size is on, so other printers get unchanged receipts
+            printArea: printerSettings.cardSizePrint ? printArea : undefined,
             qrSize: printerSettings.qrSize ?? 8,
             qrErrorCorrection: printerSettings.qrErrorCorrection ?? 'L',
           });
