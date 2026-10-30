@@ -1,7 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Platform, NativeModules } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import createContextHook from '@nkzw/create-context-hook';
 import { ErrorCategory, logger } from '@/utils/logger';
 import { Translations } from './types';
 import en from './locales/en';
@@ -32,8 +29,6 @@ export const locales: Record<Locale, Translations> = {
   zhs,
   zht,
 };
-
-const LOCALE_KEY = 'momir_locale';
 
 export const LOCALE_TO_SCRYFALL_LANG: Record<Locale, string> = {
   en: 'en',
@@ -124,51 +119,3 @@ export const ALL_LOCALES: Locale[] = [
   'zhs',
   'zht',
 ];
-
-function isValidLocale(value: string): value is Locale {
-  return ALL_LOCALES.includes(value as Locale);
-}
-
-export const [I18nProvider, useI18n] = createContextHook(() => {
-  const [locale, setLocaleState] = useState<Locale>('en');
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem(LOCALE_KEY)
-      .then(stored => {
-        if (stored && isValidLocale(stored)) {
-          setLocaleState(stored);
-        } else {
-          setLocaleState(getDeviceLocale());
-        }
-        setLoaded(true);
-      })
-      .catch(error => {
-        logger.error(ErrorCategory.Storage, 'Failed to read stored locale', error);
-        setLocaleState(getDeviceLocale());
-        setLoaded(true);
-      });
-  }, []);
-
-  const setLocale = useCallback((newLocale: Locale) => {
-    setLocaleState(newLocale);
-    AsyncStorage.setItem(LOCALE_KEY, newLocale).catch(error => {
-      logger.error(ErrorCategory.Storage, 'Failed to persist locale', error);
-    });
-  }, []);
-
-  const t = useMemo(() => locales[locale], [locale]);
-
-  const scryfallLang = useMemo(() => LOCALE_TO_SCRYFALL_LANG[locale], [locale]);
-
-  return useMemo(
-    () => ({
-      locale,
-      setLocale,
-      t,
-      loaded,
-      scryfallLang,
-    }),
-    [locale, setLocale, t, loaded, scryfallLang]
-  );
-});

@@ -76,39 +76,6 @@ jest.mock('lucide-react-native', () => {
   });
 });
 
-jest.mock('../providers/HistoryProvider', () => ({
-  useHistory: () => ({
-    cards: [],
-    addCard: jest.fn(),
-    addCards: jest.fn(),
-    removeCard: jest.fn(),
-    clearHistory: jest.fn(),
-    isLoading: false,
-  }),
-}));
-
-jest.mock('../providers/SettingsProvider', () => ({
-  useSettings: () => ({
-    settings: {
-      printer: { preferredPrinterId: null, paperWidth: 58, printArt: true, autoPrint: false },
-      excludeDigitalOnly: true,
-      excludeFunnySets: true,
-      uniqueCardsOnly: false,
-      printerConnected: false,
-      devMode: false,
-    },
-    updateSettings: jest.fn(),
-    updatePrinter: jest.fn(),
-    savePreferredPrinter: jest.fn(),
-    getPreferredPrinter: jest.fn(),
-    isLoading: false,
-  }),
-}));
-
-jest.mock('../providers/NetworkProvider', () => ({
-  useNetwork: () => ({ isOnline: true, isChecking: false, checkNow: jest.fn() }),
-}));
-
 jest.mock('../components/HistorySheet', () => ({
   HistorySheet: () => null,
 }));
@@ -127,7 +94,7 @@ jest.mock('../components/TypePicker', () => ({
   TypePicker: () => null,
 }));
 
-jest.mock('../i18n', () => {
+jest.mock('../stores/i18nStore', () => {
   const { CARD_TYPES } = require('../constants/cardTypes');
   return {
     useI18n: () => ({
@@ -234,8 +201,9 @@ const MOCK_BG_DATA = {
 function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
+      // gcTime: Infinity schedules no GC timers, so Jest can exit after the run
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false, gcTime: Infinity },
     },
   });
 }

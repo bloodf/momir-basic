@@ -10,10 +10,7 @@ import {
   listPrinters,
   deletePrinter,
 } from '../storage/repositories';
-import {
-  getPrinterPreferencesFromSettings,
-  savePrinterPreferencesToSettings,
-} from '../../../providers/SettingsProvider';
+import { getPrinterPreferences, savePrinterPreferences } from '@/stores/settingsStore';
 import {
   emitDiscoveryStarted,
   emitDiscoveryResult,
@@ -45,8 +42,8 @@ export interface RegistryDependencies {
   repoListPrinters?: typeof listPrinters;
   repoDeletePrinter?: typeof deletePrinter;
   adapterFactory?: typeof createAdapter;
-  getPreferences?: typeof getPrinterPreferencesFromSettings;
-  savePreferences?: typeof savePrinterPreferencesToSettings;
+  getPreferences?: typeof getPrinterPreferences;
+  savePreferences?: typeof savePrinterPreferences;
 }
 
 export function createRegistryService(deps: RegistryDependencies = {}) {
@@ -56,8 +53,8 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
   const repoListPrinters = deps.repoListPrinters ?? listPrinters;
   const repoDeletePrinter = deps.repoDeletePrinter ?? deletePrinter;
   const adapterFactory = deps.adapterFactory ?? createAdapter;
-  const getPreferences = deps.getPreferences ?? getPrinterPreferencesFromSettings;
-  const savePreferences = deps.savePreferences ?? savePrinterPreferencesToSettings;
+  const getPreferences = deps.getPreferences ?? getPrinterPreferences;
+  const savePreferences = deps.savePreferences ?? savePrinterPreferences;
 
   // Cache the adapter instance so connection state persists across calls
   let cachedAdapter: ReturnType<typeof adapterFactory> | null = null;

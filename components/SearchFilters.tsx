@@ -13,7 +13,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, HelpCircle, Search } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useI18n } from '@/i18n';
+import { useI18n } from '@/stores/i18nStore';
 import { ManaSymbol } from '@/components/ManaSymbol';
 import { fetchSets } from '@/services/scryfall';
 import { useQuery } from '@tanstack/react-query';

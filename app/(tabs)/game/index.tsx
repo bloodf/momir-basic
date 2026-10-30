@@ -21,7 +21,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { useI18n } from '@/i18n';
+import { useI18n } from '@/stores/i18nStore';
 
 interface GameMode {
   id: string;

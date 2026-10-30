@@ -47,4 +47,23 @@ describe('MMKVStorage', () => {
     expect(MMKVStorage.getItem('broken')).toBeNull();
     expect(mmkvInstance.contains('broken')).toBe(false);
   });
+
+  it('falls back to async AsyncStorage when MMKV is unavailable', async () => {
+    jest.doMock('react-native-mmkv', () => ({
+      createMMKV: () => {
+        throw new Error('Nitro module not linked');
+      },
+    }));
+    const { MMKVStorage, mmkvInstance } = loadModule();
+
+    expect(mmkvInstance).toBeNull();
+
+    await MMKVStorage.setItem('fallback', '{"ok":true}');
+    const pending = MMKVStorage.getItem('fallback');
+
+    expect(pending).toBeInstanceOf(Promise);
+    await expect(pending).resolves.toBe('{"ok":true}');
+
+    jest.dontMock('react-native-mmkv');
+  });
 });

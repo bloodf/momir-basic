@@ -24,7 +24,7 @@ import {
 import { CardListItem } from '@/components/CardListItem';
 import { CardGridItem } from '@/components/CardGridItem';
 import { SearchSkeleton, CardGridSkeleton } from '@/components/Skeleton';
-import { useI18n } from '@/i18n';
+import { useI18n } from '@/stores/i18nStore';
 import {
   SearchFilterState,
   EMPTY_FILTERS,

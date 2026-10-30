@@ -7,7 +7,7 @@ import Colors from '@/constants/colors';
 import { Card } from '@/types';
 import { useFilteredHistory, useHistoryStore } from '@/stores/historyStore';
 import { CardListItem } from '@/components/CardListItem';
-import { useI18n } from '@/i18n';
+import { useI18n } from '@/stores/i18nStore';
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
