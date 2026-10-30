@@ -1,4 +1,10 @@
-import { PAPER_PRESETS, getPrintArea, nextPaperPreset, resolvePaperPreset } from '@/constants/paperPresets';
+import {
+  PAPER_PRESETS,
+  getPrintArea,
+  nextPaperPreset,
+  resolvePaperPreset,
+  supportsCardSizePrint,
+} from '@/constants/paperPresets';
 import {
   CardReceiptDocument,
   EscPosRenderer,
@@ -104,6 +110,14 @@ describe('getPrintArea', () => {
 
   it('keeps 58mm paper at full width since it is narrower than a card', () => {
     expect(getPrintArea(PAPER_PRESETS['58mm'], true)).toEqual(getPrintArea(PAPER_PRESETS['58mm'], false));
+  });
+});
+
+describe('supportsCardSizePrint', () => {
+  it('is offered only for paper wider than a card', () => {
+    expect(supportsCardSizePrint(PAPER_PRESETS['58mm'])).toBe(false);
+    expect(supportsCardSizePrint(PAPER_PRESETS['80mm'])).toBe(true);
+    expect(supportsCardSizePrint(PAPER_PRESETS['80mm_180dpi'])).toBe(true);
   });
 });
 

@@ -79,3 +79,8 @@ export function getPrintArea(preset: PaperPresetSpec, cardSize: boolean): PrintA
     charsPerLine: Math.min(preset.charsPerLine, Math.floor(widthDots / FONT_A_WIDTH_DOTS)),
   };
 }
+
+/** Whether card-size print changes anything: false when the paper is no wider than a card (58mm). */
+export function supportsCardSizePrint(preset: PaperPresetSpec): boolean {
+  return getPrintArea(preset, true).widthDots < preset.dotsPerLine;
+}

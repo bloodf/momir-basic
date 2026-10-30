@@ -14,7 +14,13 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Printer, ChevronRight, Zap, Info, Globe, ChevronDown, Github, Star, ExternalLink } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { PAPER_PRESETS, PAPER_PRESET_ORDER, nextPaperPreset, resolvePaperPreset } from '@/constants/paperPresets';
+import {
+  PAPER_PRESETS,
+  PAPER_PRESET_ORDER,
+  nextPaperPreset,
+  resolvePaperPreset,
+  supportsCardSizePrint,
+} from '@/constants/paperPresets';
 import { useSettings } from '@/providers/SettingsProvider';
 import { useI18n, LOCALE_LABELS, LOCALE_FLAGS, ALL_LOCALES, type Locale } from '@/i18n';
 import { ErrorCategory, logger } from '@/utils/logger';
@@ -111,18 +117,21 @@ export default function SettingsScreen() {
             </View>
           </Pressable>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t.printer.cardSizePrint}</Text>
-              <Text style={styles.settingHint}>{t.printer.cardSizePrintHint}</Text>
+          {/* 58mm paper is already narrower than a card, so the option would do nothing */}
+          {supportsCardSizePrint(paperPreset) && (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>{t.printer.cardSizePrint}</Text>
+                <Text style={styles.settingHint}>{t.printer.cardSizePrintHint}</Text>
+              </View>
+              <Switch
+                value={settings.printer.cardSizePrint ?? false}
+                onValueChange={(val) => updatePrinter({ cardSizePrint: val })}
+                trackColor={{ false: Colors.border, true: Colors.goldDark }}
+                thumbColor={(settings.printer.cardSizePrint ?? false) ? Colors.gold : Colors.textMuted}
+              />
             </View>
-            <Switch
-              value={settings.printer.cardSizePrint ?? false}
-              onValueChange={(val) => updatePrinter({ cardSizePrint: val })}
-              trackColor={{ false: Colors.border, true: Colors.goldDark }}
-              thumbColor={(settings.printer.cardSizePrint ?? false) ? Colors.gold : Colors.textMuted}
-            />
-          </View>
+          )}
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
