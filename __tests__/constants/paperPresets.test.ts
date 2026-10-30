@@ -124,21 +124,27 @@ describe('CardReceiptDocument printArea', () => {
     supportText: true,
     paperWidth: 80,
   };
-  const firstChunk = async (printArea?: { leftMarginDots: number; widthDots: number }) => {
+  const leadingChunks = async (printArea?: { leftMarginDots: number; widthDots: number }) => {
     const renderer = new EscPosRenderer();
     await new CardReceiptDocument(card, { paperWidth: 80, printArt: false, printQR: false, printArea }).render(renderer, capabilities);
-    return Array.from(renderer.getChunks()[0]);
+    return renderer.getChunks().slice(0, 2).map((chunk) => Array.from(chunk));
   };
 
-  it('sets GS L / GS W before any content', async () => {
+  // CRITICAL REGRESSION TEST: GS W from a card-size print persisted into later full-width receipts
+  it('resets the printer with ESC @ before anything else', async () => {
+    expect((await leadingChunks())[0]).toEqual([0x1b, 0x40]);
+    expect((await leadingChunks({ leftMarginDots: 0, widthDots: 416 }))[0]).toEqual([0x1b, 0x40]);
+  });
+
+  it('sets GS L / GS W right after the reset', async () => {
     // left 36 = 0x24, width 440 = 0x01b8
-    expect(await firstChunk({ leftMarginDots: 36, widthDots: 440 })).toEqual([
+    expect((await leadingChunks({ leftMarginDots: 36, widthDots: 440 }))[1]).toEqual([
       0x1d, 0x4c, 0x24, 0x00,
       0x1d, 0x57, 0xb8, 0x01,
     ]);
   });
 
   it('sends no print-area commands when no area is given', async () => {
-    expect((await firstChunk()).slice(0, 2)).not.toEqual([0x1d, 0x4c]);
+    expect((await leadingChunks())[1].slice(0, 2)).not.toEqual([0x1d, 0x4c]);
   });
 });

@@ -73,6 +73,8 @@ export class CardReceiptDocument implements PrintDocument {
   async render(renderer: EscPosRenderer, capabilities: PrinterCapabilities): Promise<void> {
     renderer.reset();
     renderer.setCapabilities(capabilities);
+    // Start from printer defaults: a previous card-size print leaves GS L / GS W in effect
+    renderer.initialize();
     if (this.options.printArea) {
       renderer.setPrintArea(this.options.printArea.leftMarginDots, this.options.printArea.widthDots);
     }

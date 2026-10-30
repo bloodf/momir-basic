@@ -107,8 +107,16 @@ export class EscPosRenderer {
   }
 
   /**
+   * Initialize the printer (ESC @): clears settings left by earlier jobs such as
+   * margins, print width, alignment, emphasis and line spacing.
+   */
+  initialize(): void {
+    this.addBytes([ESC, 0x40]);
+  }
+
+  /**
    * Set the printable area: left margin (GS L) and width (GS W), in dots.
-   * Printers keep these until reset, so receipts set them explicitly every time.
+   * Printers keep these until reset (ESC @), which receipts send first.
    */
   setPrintArea(leftMarginDots: number, widthDots: number): void {
     this.addBytes([
