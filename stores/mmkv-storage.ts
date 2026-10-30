@@ -9,27 +9,22 @@ type SyncKvStorage = {
   remove: (key: string) => void;
 };
 
-let mmkvInstance: SyncKvStorage | null | undefined;
-
-function getMMKVInstance(): SyncKvStorage | null {
-  if (mmkvInstance !== undefined) {
-    return mmkvInstance;
-  }
-
+function createMMKVInstance(): SyncKvStorage | null {
   try {
     const { createMMKV } = require('react-native-mmkv') as typeof import('react-native-mmkv');
-    mmkvInstance = createMMKV({ id: 'momir-storage' });
+    return createMMKV({ id: 'momir-storage' });
   } catch (error) {
-    mmkvInstance = null;
     logger.error(
       ErrorCategory.Storage,
       'MMKV unavailable at runtime, falling back to AsyncStorage persistence',
       error
     );
+    return null;
   }
-
-  return mmkvInstance;
 }
+
+/** Shared MMKV instance, or null when the native module is unavailable (e.g. web). */
+export const mmkvInstance = createMMKVInstance();
 
 function isValidPersistedJson(storageKey: string, value: string): boolean {
   try {
@@ -41,20 +36,26 @@ function isValidPersistedJson(storageKey: string, value: string): boolean {
       `Corrupted data in MMKV key "${storageKey}", clearing and using defaults`,
       error
     );
-    getMMKVInstance()?.remove(storageKey);
+    mmkvInstance?.remove(storageKey);
     return false;
   }
 }
 
+/**
+ * Zustand persist storage backed by MMKV.
+ *
+ * MMKV paths are deliberately synchronous: zustand's persist middleware hydrates
+ * during create() when getItem returns a value instead of a Promise, so stores
+ * never expose defaults on first render and early writes can't clobber saved data.
+ * Only the AsyncStorage fallback is async.
+ */
 export const MMKVStorage: StateStorage = {
-  async getItem(name) {
-    const mmkv = getMMKVInstance();
-
-    if (!mmkv) {
+  getItem(name) {
+    if (!mmkvInstance) {
       return AsyncStorage.getItem(name);
     }
 
-    const value = mmkv.getString(name);
+    const value = mmkvInstance.getString(name);
 
     if (value === undefined) {
       return null;
@@ -66,24 +67,18 @@ export const MMKVStorage: StateStorage = {
 
     return value;
   },
-  async setItem(name, value) {
-    const mmkv = getMMKVInstance();
-
-    if (!mmkv) {
-      await AsyncStorage.setItem(name, value);
-      return;
+  setItem(name, value) {
+    if (!mmkvInstance) {
+      return AsyncStorage.setItem(name, value);
     }
 
-    mmkv.set(name, value);
+    mmkvInstance.set(name, value);
   },
-  async removeItem(name) {
-    const mmkv = getMMKVInstance();
-
-    if (!mmkv) {
-      await AsyncStorage.removeItem(name);
-      return;
+  removeItem(name) {
+    if (!mmkvInstance) {
+      return AsyncStorage.removeItem(name);
     }
 
-    mmkv.remove(name);
+    mmkvInstance.remove(name);
   },
 };
