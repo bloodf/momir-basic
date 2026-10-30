@@ -1,7 +1,8 @@
 import type { DitherAlgorithm, QrErrorCorrection } from '@/types';
 
+/** Art for the image pre-processing preview: Llanowar Elves (M19). */
 export const SAMPLE_ART_URL =
-  'https://cards.scryfall.io/art_crop/front/a/b/ab1ef852-b050-4a36-8c28-f23b7ac8bc38.jpg';
+  'https://cards.scryfall.io/art_crop/front/7/3/73542493-cd0b-4bb7-a5b8-8f889c76e4d6.jpg';
 
 export const DITHER_OPTIONS: Array<{ label: string; value: DitherAlgorithm }> = [
   { label: 'Floyd-Steinberg', value: 'floyd' },
