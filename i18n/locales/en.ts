@@ -236,6 +236,8 @@ const en: Translations = {
     printCardArtHint: 'Disable for faster text-only prints',
     autoPrint: 'Auto-Print After Fetch',
     autoPrintHint: 'Automatically print when a card is fetched',
+    cutAfterPrint: 'Cut Paper After Printing',
+    cutAfterPrintHint: 'For printers with an auto-cutter',
     notConnected: 'Not connected',
     connected: 'Connected',
     disconnect: 'Disconnect',

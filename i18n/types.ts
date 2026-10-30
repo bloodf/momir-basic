@@ -234,6 +234,8 @@ export interface Translations {
     printCardArtHint: string;
     autoPrint: string;
     autoPrintHint: string;
+    cutAfterPrint: string;
+    cutAfterPrintHint: string;
     notConnected: string;
     connected: string;
     disconnect: string;

@@ -236,6 +236,8 @@ const it: Translations = {
     printCardArtHint: 'Disattiva per stampe solo testo più veloci',
     autoPrint: 'Auto-Stampa Dopo Ricerca',
     autoPrintHint: 'Stampa automaticamente quando una carta viene trovata',
+    cutAfterPrint: 'Taglia la carta dopo la stampa',
+    cutAfterPrintHint: 'Per stampanti con taglierina automatica',
     notConnected: 'Non collegata',
     connected: 'Collegata',
     disconnect: 'Scollega',

@@ -136,6 +136,8 @@ export interface PrinterPreferences {
   printFlavorText: boolean;
   autoPrint: boolean;
   printMode: PrintMode;  // 'full' = receipt layout, 'image_only' = full card image
+  /** Feed to the cutter and cut after each print (printers with an auto-cutter) */
+  cutAfterPrint?: boolean;
   // Image pre-processing tuning (applied before sending bitmap to printer)
   imageDither: DitherAlgorithm;       // default 'floyd'
   imageBrightness: number;            // 0.5..1.5, default 1.0
@@ -257,6 +259,7 @@ export const DEFAULT_PRINTER_PREFERENCES: PrinterPreferences = {
   printFlavorText: true,
   autoPrint: false,
   printMode: 'full' as const,
+  cutAfterPrint: false,
   imageDither: 'floyd',
   imageBrightness: 1.0,
   imageContrast: 1.0,

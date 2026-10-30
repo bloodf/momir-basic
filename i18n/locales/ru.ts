@@ -236,6 +236,8 @@ const ru: Translations = {
     printCardArtHint: 'Отключите для быстрой текстовой печати',
     autoPrint: 'Авто-печать после поиска',
     autoPrintHint: 'Автоматическая печать при получении карты',
+    cutAfterPrint: 'Отрезать бумагу после печати',
+    cutAfterPrintHint: 'Для принтеров с автоотрезчиком',
     notConnected: 'Не подключен',
     connected: 'Подключен',
     disconnect: 'Отключить',

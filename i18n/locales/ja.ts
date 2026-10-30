@@ -236,6 +236,8 @@ const ja: Translations = {
     printCardArtHint: '高速テキストのみ印刷にはオフ',
     autoPrint: '検索後自動印刷',
     autoPrintHint: 'カード取得時に自動的に印刷',
+    cutAfterPrint: '印刷後に用紙をカット',
+    cutAfterPrintHint: 'オートカッター搭載のプリンター向け',
     notConnected: '未接続',
     connected: '接続済み',
     disconnect: '切断',

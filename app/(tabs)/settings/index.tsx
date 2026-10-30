@@ -190,6 +190,19 @@ export default function SettingsScreen() {
               thumbColor={settings.printer.autoPrint ? Colors.gold : Colors.textMuted}
             />
           </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{t.printer.cutAfterPrint}</Text>
+              <Text style={styles.settingHint}>{t.printer.cutAfterPrintHint}</Text>
+            </View>
+            <Switch
+              value={settings.printer.cutAfterPrint ?? false}
+              onValueChange={(val) => updatePrinter({ cutAfterPrint: val })}
+              trackColor={{ false: Colors.border, true: Colors.goldDark }}
+              thumbColor={(settings.printer.cutAfterPrint ?? false) ? Colors.gold : Colors.textMuted}
+            />
+          </View>
         </View>
 
         <View style={styles.section}>

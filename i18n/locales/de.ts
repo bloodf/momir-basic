@@ -236,6 +236,8 @@ const de: Translations = {
     printCardArtHint: 'Deaktivieren für schnellere Nur-Text-Drucke',
     autoPrint: 'Auto-Druck nach Suche',
     autoPrintHint: 'Automatisch drucken wenn eine Karte gefunden wird',
+    cutAfterPrint: 'Papier nach dem Druck abschneiden',
+    cutAfterPrintHint: 'Für Drucker mit automatischem Abschneider',
     notConnected: 'Nicht verbunden',
     connected: 'Verbunden',
     disconnect: 'Trennen',

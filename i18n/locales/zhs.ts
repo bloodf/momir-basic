@@ -236,6 +236,8 @@ const zhs: Translations = {
     printCardArtHint: '关闭以进行更快的纯文本打印',
     autoPrint: '搜索后自动打印',
     autoPrintHint: '获取卡牌时自动打印',
+    cutAfterPrint: '打印后切纸',
+    cutAfterPrintHint: '适用于带自动切刀的打印机',
     notConnected: '未连接',
     connected: '已连接',
     disconnect: '断开连接',

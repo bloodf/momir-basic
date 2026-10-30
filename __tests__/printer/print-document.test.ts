@@ -347,3 +347,36 @@ describe('DiagnosticsDocument', () => {
     expect(text).toContain('Paper: 80mm');
   });
 });
+
+describe('CardReceiptDocument cut option', () => {
+  const card = {
+    name: 'Lightning Bolt',
+    manaCost: '{R}',
+    type: 'Instant',
+    oracleText: 'Lightning Bolt deals 3 damage to any target.',
+    imageUrl: '',
+    setCode: 'LEA',
+    scryfallId: '12345',
+  };
+  const capabilities: PrinterCapabilities = {
+    supportImage: false,
+    supportQR: false,
+    supportCut: true,
+    supportText: true,
+    paperWidth: 80,
+  };
+  const lastChunk = async (cut: boolean) => {
+    const renderer = new EscPosRenderer();
+    await new CardReceiptDocument(card, { cut, printArt: false, printQR: false, paperWidth: 80 }).render(renderer, capabilities);
+    const chunks = renderer.getChunks();
+    return Array.from(chunks[chunks.length - 1]);
+  };
+
+  it('ends with a feed-and-partial-cut when cut is enabled', async () => {
+    expect(await lastChunk(true)).toEqual([0x1d, 0x56, 0x42, 0x00]);
+  });
+
+  it('does not cut when cut is disabled', async () => {
+    expect(await lastChunk(false)).not.toEqual([0x1d, 0x56, 0x42, 0x00]);
+  });
+});
