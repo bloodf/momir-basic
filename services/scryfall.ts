@@ -2,8 +2,12 @@ import { Card, CardType, ScryfallCard } from '@/types';
 import { ErrorCategory, logger } from '@/utils/logger';
 
 const BASE_URL = 'https://api.scryfall.com';
+
+/** User-Agent for all Scryfall requests, including image CDN downloads. */
+export const SCRYFALL_USER_AGENT = 'Momir-Basic-App/1.0';
+
 const HEADERS = {
-  'User-Agent': 'Momir-Basic-App/1.0',
+  'User-Agent': SCRYFALL_USER_AGENT,
   'Accept': 'application/json',
 };
 
