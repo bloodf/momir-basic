@@ -52,6 +52,14 @@ export default function PrintPreviewScreen() {
     sendPrintJob,
   } = usePrintPreview(card, isDoubleFaced);
 
+  // Close the preview once a print succeeds; the global "Print Complete" toast confirms it.
+  // Failures keep the preview open so the error banner is visible and the user can retry.
+  useEffect(() => {
+    if (printOutcome?.type === 'success') {
+      router.back();
+    }
+  }, [printOutcome, router]);
+
   const { isSaving, saveToGallery } = useReceiptCapture(receiptRef);
 
   const displayFace = useMemo(() => {
