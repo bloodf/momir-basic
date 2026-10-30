@@ -73,6 +73,9 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
             imageUrl: imageUrl ?? '',
             setCode: cardToPrint.setCode,
             scryfallId: cardToPrint.id,
+            scryfallUrl:
+              cardToPrint.scryfallUri ||
+              `https://scryfall.com/card/${cardToPrint.setCode.toLowerCase()}/${cardToPrint.collectorNumber}`,
             artBitmapBase64,
             artWidthPx,
             artHeightPx,

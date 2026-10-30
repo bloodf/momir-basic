@@ -113,6 +113,7 @@ export function usePrintPreview(card: Card | null, isDoubleFaced: boolean): UseP
       imageUrl: card.normalImageUrl || card.artCropUrl,
       setCode: card.setCode,
       scryfallId: card.id,
+      scryfallUrl,
       backFaceData: isDoubleFaced && card.faces?.[1] ? {
         name: card.faces[1].name ?? card.name,
         manaCost: card.faces[1].manaCost,

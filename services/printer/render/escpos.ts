@@ -121,11 +121,11 @@ export class EscPosRenderer {
   }
 
   /**
-   * Add a string as UTF-8 bytes
+   * Add a string, folded to printable ASCII (see toPrinterText)
    */
   addText(text: string): void {
     const encoder = new TextEncoder();
-    this.chunks.push(encoder.encode(text));
+    this.chunks.push(encoder.encode(toPrinterText(text)));
   }
 
   /**
@@ -226,8 +226,9 @@ export class EscPosRenderer {
     bytes.push(...[GS, 0x28, 0x6b, dataLen % 256, Math.floor(dataLen / 256), 0x31, 0x50, 0x30]);
     bytes.push(...dataBytes);
 
-    // Print
-    bytes.push(...[GS, 0x28, 0x6b, 0x02, 0x00, 0x31, 0x51, 0x00]);
+    // Print the stored symbol: GS ( k pL=3 pH=0 cn=49 fn=81 m=48. The old pL=2 / m=0 form
+    // was rejected by printers (verified on an Epson TM-H6000V), so no QR code printed.
+    bytes.push(...[GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]);
 
     this.addBytes(bytes);
   }
@@ -385,4 +386,49 @@ export function buildScryfallUrl(
 export function buildQrUrl(scryfallUrl: string): string {
   const encoded = encodeURIComponent(scryfallUrl);
   return `https://api.qrserver.com/v1/create-qr-code/?size=144x144&data=${encoded}&bgcolor=FFFFFF&color=000000&margin=0`;
+}
+
+const PRINTER_TEXT_REPLACEMENTS: [RegExp, string][] = [
+  [/[\u2012-\u2015\u2212]/g, '-'], // figure/en/em/horizontal bar dashes, minus sign
+  [/[\u2018\u2019\u201a\u2032]/g, "'"],
+  [/[\u201c\u201d\u201e\u2033]/g, '"'],
+  [/\u2026/g, '...'],
+  [/\u2022/g, '*'], // bullet, used by modal spells
+  [/\u00b7/g, '.'],
+  [/\u00d7/g, 'x'],
+  [/\u00bd/g, '1/2'],
+  [/\u221e/g, 'inf'],
+  [/\u2122/g, 'TM'],
+  [/\u00ae/g, '(R)'],
+  [/\u00a9/g, '(C)'],
+  [/[\u00a0\u2009\u202f]/g, ' '],
+  [/\u00c6/g, 'AE'],
+  [/\u00e6/g, 'ae'],
+  [/\u0152/g, 'OE'],
+  [/\u0153/g, 'oe'],
+  [/\u00df/g, 'ss'],
+  [/\u00d8/g, 'O'],
+  [/\u00f8/g, 'o'],
+  [/\u0141/g, 'L'],
+  [/\u0142/g, 'l'],
+  [/\u0110/g, 'D'],
+  [/\u0111/g, 'd'],
+];
+
+/**
+ * Fold text to printable ASCII for receipts. Printers interpret bytes in a single-byte
+ * code page (PC437 by default), so UTF-8 multi-byte characters like the em-dash in
+ * "Creature \u2014 Goblin" print as several garbage glyphs. Punctuation is mapped to ASCII
+ * equivalents and accents are stripped (J\u00f6tun -> Jotun); anything left is printed as '?'.
+ * Control characters (ESC/POS commands embedded in text) are preserved.
+ */
+export function toPrinterText(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of PRINTER_TEXT_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
+  }
+  if (typeof out.normalize === 'function') {
+    out = out.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  return out.replace(/[^\x00-\x7f]/g, '?');
 }

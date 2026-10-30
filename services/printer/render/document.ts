@@ -28,6 +28,8 @@ export interface CardReceiptCardData {
   imageUrl: string;
   setCode: string;
   scryfallId: string;
+  /** Card page URL encoded in the QR code; falls back to a URL built from setCode + scryfallId */
+  scryfallUrl?: string;
   /** Pre-rasterized 1-bit ESC/POS bitmap for art (base64). If present, used instead of imageUrl. */
   artBitmapBase64?: string;
   artWidthPx?: number;
@@ -172,7 +174,7 @@ export class CardReceiptDocument implements PrintDocument {
     if (!isBackFace && this.options.printQR && capabilities.supportQR) {
       renderer.feedLine();
       renderer.setAlignment('center');
-      const scryfallUrl = buildScryfallUrl(
+      const scryfallUrl = this.card.scryfallUrl ?? buildScryfallUrl(
         undefined,
         this.card.setCode,
         this.card.scryfallId
