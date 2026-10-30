@@ -198,7 +198,7 @@ describe('Printer Settings Flows', () => {
 
       await service.connectPrinter('reg-001');
 
-      expect(mockAdapter.connectPrinter).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF');
+      expect(mockAdapter.connectPrinter).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF', 'ble');
     });
 
     it('isConnected verifies physical connection state', async () => {

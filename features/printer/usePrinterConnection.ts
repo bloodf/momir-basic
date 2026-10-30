@@ -61,7 +61,7 @@ export function usePrinterConnection(
 
     try {
       const adapter = createAdapter();
-      const isReallyConnected = await adapter.isConnected(prefRecord.address);
+      const isReallyConnected = await adapter.isConnected(prefRecord.address, prefRecord.transport);
 
       if (isReallyConnected) {
         setConnectedPrinter(prefRecord);
@@ -90,12 +90,13 @@ export function usePrinterConnection(
     setUiState('connecting');
 
     try {
-      if (!isIOS) {
+      // TCP printers don't need Bluetooth permissions
+      if (!isIOS && printer.transport !== 'tcp') {
         await printerCapabilityService.ensureBluetoothPermissions();
       }
 
       const adapter = createAdapter();
-      await adapter.connectPrinter(printer.address);
+      await adapter.connectPrinter(printer.address, printer.transport);
 
       // Persist printer to registry in background
       registryService.mergeDiscoveredWithRegistry([printer]).catch((error) => {
@@ -103,7 +104,7 @@ export function usePrinterConnection(
       });
 
       // CRITICAL: Verify the connection is real before declaring connected
-      const isReallyConnected = await adapter.isConnected(printer.address);
+      const isReallyConnected = await adapter.isConnected(printer.address, printer.transport);
 
       if (isReallyConnected) {
         // Ensure printer is in DB before saving as preferred

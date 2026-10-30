@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import type { PrinterRecord } from '../../../types';
-import type { PrinterDiscoveryResult } from '../adapters/port';
+import type { PrinterDiscoveryResult, PrinterPort } from '../adapters/port';
 import { createAdapter } from '../adapters/factory';
 import {
   upsertPrinter,
@@ -115,7 +115,11 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       return repoListPrinters();
     },
 
-    async connectPrinter(deviceId: string): Promise<void> {
+    /**
+     * Connect to a registered printer by registry ID, using its stored address and transport.
+     * Resolves with the connected adapter so callers can send print data on it.
+     */
+    async connectPrinter(deviceId: string): Promise<PrinterPort> {
       const printer = await repoGetPrinterById(deviceId);
       if (!printer) {
         throw new Error(`Printer with id ${deviceId} not found in registry`);
@@ -131,8 +135,9 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
       const start = Date.now();
       emitConnectStarted(printer.address, printer.transport);
       try {
-        await adapter.connectPrinter(printer.address);
+        await adapter.connectPrinter(printer.address, printer.transport);
         emitConnectSuccess(printer.address, printer.name, printer.transport, Date.now() - start);
+        return adapter;
       } catch (err) {
         const code = err instanceof PrinterAdapterError ? err.code : PrinterErrorCode.CONNECTION_FAILED;
         const msg = err instanceof Error ? err.message : String(err);
@@ -140,6 +145,15 @@ export function createRegistryService(deps: RegistryDependencies = {}) {
         emitNativeError(printer.transport, code, msg);
         throw err;
       }
+    },
+
+    /** Check whether a registered printer is reachable, by registry ID. */
+    async isPrinterConnected(deviceId: string): Promise<boolean> {
+      const printer = await repoGetPrinterById(deviceId);
+      if (!printer) {
+        return false;
+      }
+      return getAdapter().isConnected(printer.address, printer.transport);
     },
 
     async disconnectPrinter(deviceId: string): Promise<void> {

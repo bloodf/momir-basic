@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Card, type PrinterPreferences } from '@/types';
 import { ErrorCategory, logger } from '@/utils/logger';
-import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
+import { registryService } from '@/services/printer/registry/service';
 
 interface UseAutoPrintOptions {
   card: Card | undefined;
@@ -24,8 +24,7 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
       const printArt = printerSettings.printArt ?? true;
 
       try {
-        const adapter = createAdapter();
-        await adapter.connectPrinter(printerSettings.preferredPrinterId);
+        const adapter = await registryService.connectPrinter(printerSettings.preferredPrinterId);
 
         if (printMode === 'image_only') {
           if (imageUrl) {
