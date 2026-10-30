@@ -15,6 +15,8 @@ export interface CardReceiptOptions {
   paperWidth: 58 | 80;
   /** Font A characters per line; overrides the paperWidth default (32 / 48) */
   charsPerLine?: number;
+  /** Printable area (left margin + width, in dots) applied before any content */
+  printArea?: { leftMarginDots: number; widthDots: number };
   qrSize?: number;                    // 1..16, default 8
   qrErrorCorrection?: QrErrorCorrection; // default 'L'
 }
@@ -62,6 +64,7 @@ export class CardReceiptDocument implements PrintDocument {
       cut: options?.cut ?? false,
       paperWidth: options?.paperWidth ?? 58,
       charsPerLine: options?.charsPerLine,
+      printArea: options?.printArea,
       qrSize: options?.qrSize ?? 8,
       qrErrorCorrection: options?.qrErrorCorrection ?? 'L',
     };
@@ -70,6 +73,9 @@ export class CardReceiptDocument implements PrintDocument {
   async render(renderer: EscPosRenderer, capabilities: PrinterCapabilities): Promise<void> {
     renderer.reset();
     renderer.setCapabilities(capabilities);
+    if (this.options.printArea) {
+      renderer.setPrintArea(this.options.printArea.leftMarginDots, this.options.printArea.widthDots);
+    }
 
     const maxWidth = this.options.charsPerLine
       ?? (this.options.paperWidth === 80 ? MAX_COLUMN_80MM : MAX_COLUMN_58MM);

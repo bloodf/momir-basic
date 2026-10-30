@@ -232,6 +232,8 @@ const ko: Translations = {
   printer: {
     title: '프린터 설정',
     paperWidth: '용지 너비',
+    cardSizePrint: '카드 크기로 인쇄 (63 mm)',
+    cardSizePrintHint: '인쇄 폭을 카드 너비로 제한해 슬리브에 들어가게 합니다',
     printCardArt: '카드 아트 인쇄',
     printCardArtHint: '빠른 텍스트 전용 인쇄를 위해 비활성화',
     autoPrint: '검색 후 자동 인쇄',

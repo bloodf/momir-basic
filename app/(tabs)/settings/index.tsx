@@ -113,6 +113,19 @@ export default function SettingsScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{t.printer.cardSizePrint}</Text>
+              <Text style={styles.settingHint}>{t.printer.cardSizePrintHint}</Text>
+            </View>
+            <Switch
+              value={settings.printer.cardSizePrint ?? false}
+              onValueChange={(val) => updatePrinter({ cardSizePrint: val })}
+              trackColor={{ false: Colors.border, true: Colors.goldDark }}
+              thumbColor={(settings.printer.cardSizePrint ?? false) ? Colors.gold : Colors.textMuted}
+            />
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>{t.printer.printMode}</Text>
               <Text style={styles.settingHint}>Receipt prints name, art, text and QR. Full Card prints the entire card image.</Text>
             </View>

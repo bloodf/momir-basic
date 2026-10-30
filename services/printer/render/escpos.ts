@@ -107,6 +107,17 @@ export class EscPosRenderer {
   }
 
   /**
+   * Set the printable area: left margin (GS L) and width (GS W), in dots.
+   * Printers keep these until reset, so receipts set them explicitly every time.
+   */
+  setPrintArea(leftMarginDots: number, widthDots: number): void {
+    this.addBytes([
+      GS, 0x4c, leftMarginDots & 0xff, (leftMarginDots >> 8) & 0xff,
+      GS, 0x57, widthDots & 0xff, (widthDots >> 8) & 0xff,
+    ]);
+  }
+
+  /**
    * Reset the renderer state
    */
   reset(): void {

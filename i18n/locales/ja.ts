@@ -232,6 +232,8 @@ const ja: Translations = {
   printer: {
     title: 'プリンター設定',
     paperWidth: '用紙幅',
+    cardSizePrint: 'カードサイズで印刷 (63 mm)',
+    cardSizePrintHint: '印刷幅をカードの幅に収め、スリーブに入るようにします',
     printCardArt: 'カードアート印刷',
     printCardArtHint: '高速テキストのみ印刷にはオフ',
     autoPrint: '検索後自動印刷',

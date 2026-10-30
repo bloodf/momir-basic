@@ -232,6 +232,8 @@ const pt: Translations = {
   printer: {
     title: 'Configurar Impressora',
     paperWidth: 'Largura do Papel',
+    cardSizePrint: 'Impressão tamanho carta (63 mm)',
+    cardSizePrintHint: 'Limita a impressão à largura de uma carta para caber no sleeve',
     printCardArt: 'Imprimir Arte da Carta',
     printCardArtHint: 'Desative para impressões só texto mais rápidas',
     autoPrint: 'Auto-Imprimir Após Busca',

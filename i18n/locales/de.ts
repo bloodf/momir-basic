@@ -232,6 +232,8 @@ const de: Translations = {
   printer: {
     title: 'Drucker einrichten',
     paperWidth: 'Papierbreite',
+    cardSizePrint: 'Druck in Kartengröße (63 mm)',
+    cardSizePrintHint: 'Druck auf Kartenbreite begrenzen, damit der Zettel in eine Hülle passt',
     printCardArt: 'Kartenkunst drucken',
     printCardArtHint: 'Deaktivieren für schnellere Nur-Text-Drucke',
     autoPrint: 'Auto-Druck nach Suche',

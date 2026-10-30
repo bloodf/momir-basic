@@ -232,6 +232,8 @@ const en: Translations = {
   printer: {
     title: 'Printer Setup',
     paperWidth: 'Paper Width',
+    cardSizePrint: 'Card-Size Print (63 mm)',
+    cardSizePrintHint: 'Keep the print within card width so the slip fits a sleeve',
     printCardArt: 'Print Card Art',
     printCardArtHint: 'Disable for faster text-only prints',
     autoPrint: 'Auto-Print After Fetch',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Card, type PrinterPreferences } from '@/types';
-import { resolvePaperPreset } from '@/constants/paperPresets';
+import { getPrintArea, resolvePaperPreset } from '@/constants/paperPresets';
 import { ErrorCategory, logger } from '@/utils/logger';
 import { createAdapter } from '@/services/printer/adapters/factory';
 import { rasterizeCardArtForPrint } from '@/utils/printerImage';
@@ -21,7 +21,8 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
       const printMode = printerSettings.printMode ?? 'full';
       const paperPreset = resolvePaperPreset(printerSettings);
       const paperWidth = paperPreset.paperWidth;
-      const widthPx = paperPreset.dotsPerLine;
+      const printArea = getPrintArea(paperPreset, printerSettings.cardSizePrint ?? false);
+      const widthPx = printArea.widthDots;
       const imageUrl = cardToPrint.normalImageUrl || cardToPrint.artCropUrl;
       const printArt = printerSettings.printArt ?? true;
 
@@ -97,7 +98,9 @@ export function useAutoPrint({ card, printerSettings }: UseAutoPrintOptions) {
             printQR: printerSettings.printQR ?? true,
             cut: printerSettings.cutAfterPrint ?? false,
             paperWidth,
-            charsPerLine: paperPreset.charsPerLine,
+            charsPerLine: printArea.charsPerLine,
+            // Only send GS L / GS W when card-size is on, so other printers get unchanged receipts
+            printArea: printerSettings.cardSizePrint ? printArea : undefined,
             qrSize: printerSettings.qrSize ?? 8,
             qrErrorCorrection: printerSettings.qrErrorCorrection ?? 'L',
           });

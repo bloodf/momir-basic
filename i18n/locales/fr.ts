@@ -232,6 +232,8 @@ const fr: Translations = {
   printer: {
     title: 'Configuration Imprimante',
     paperWidth: 'Largeur du Papier',
+    cardSizePrint: 'Impression format carte (63 mm)',
+    cardSizePrintHint: 'Limite l’impression à la largeur d’une carte pour qu’elle tienne dans une pochette',
     printCardArt: 'Imprimer l\'Art',
     printCardArtHint: 'Désactivez pour des impressions texte uniquement plus rapides',
     autoPrint: 'Auto-Impression Après Recherche',

@@ -232,6 +232,8 @@ const ru: Translations = {
   printer: {
     title: 'Настройка принтера',
     paperWidth: 'Ширина бумаги',
+    cardSizePrint: 'Печать по размеру карты (63 мм)',
+    cardSizePrintHint: 'Ограничить ширину печати шириной карты, чтобы чек помещался в протектор',
     printCardArt: 'Печать арта карты',
     printCardArtHint: 'Отключите для быстрой текстовой печати',
     autoPrint: 'Авто-печать после поиска',

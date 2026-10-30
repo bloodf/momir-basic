@@ -232,6 +232,8 @@ const zhs: Translations = {
   printer: {
     title: '打印机设置',
     paperWidth: '纸张宽度',
+    cardSizePrint: '卡牌尺寸打印 (63 毫米)',
+    cardSizePrintHint: '将打印宽度限制为卡牌宽度，便于放入卡套',
     printCardArt: '打印卡牌画作',
     printCardArtHint: '关闭以进行更快的纯文本打印',
     autoPrint: '搜索后自动打印',

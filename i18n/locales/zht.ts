@@ -232,6 +232,8 @@ const zht: Translations = {
   printer: {
     title: '印表機設定',
     paperWidth: '紙張寬度',
+    cardSizePrint: '卡牌尺寸列印 (63 公釐)',
+    cardSizePrintHint: '將列印寬度限制為卡牌寬度，方便放入卡套',
     printCardArt: '列印卡牌畫作',
     printCardArtHint: '關閉以進行更快的純文字列印',
     autoPrint: '搜尋後自動列印',

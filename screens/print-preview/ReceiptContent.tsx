@@ -5,7 +5,7 @@ import { PrintManaCost } from '@/components/PrintManaCost';
 import { PrintOracleText } from '@/components/PrintOracleText';
 import { DitheredImage } from '@/components/DitheredImage';
 import type { DitherAlgorithm, PaperPreset } from '@/types';
-import { resolvePaperPreset } from '@/constants/paperPresets';
+import { getPrintArea, resolvePaperPreset } from '@/constants/paperPresets';
 import { styles } from './styles';
 
 export interface DisplayFace {
@@ -23,6 +23,7 @@ export interface DisplayFace {
 interface PrinterSettings {
   paperWidth?: 58 | 80;
   paperPreset?: PaperPreset;
+  cardSizePrint?: boolean;
   printMode?: string;
   printArt?: boolean;
   printQR?: boolean;
@@ -95,7 +96,7 @@ export function ReceiptContent({
               <View style={[styles.receiptArtWrap, { width: artWidth, height: artHeight }]}>
                 <DitheredImage
                   imageUrl={(displayFace.artCropUrl || displayFace.normalImageUrl) as string}
-                  widthPx={resolvePaperPreset(printerSettings).dotsPerLine}
+                  widthPx={getPrintArea(resolvePaperPreset(printerSettings), printerSettings.cardSizePrint ?? false).widthDots}
                   algorithm={printerSettings.imageDither ?? 'floyd'}
                   brightness={printerSettings.imageBrightness ?? 1.0}
                   contrast={printerSettings.imageContrast ?? 1.0}
